@@ -142,8 +142,6 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - name: Installer Graphviz
-        run: sudo apt-get install -y --no-install-recommends graphviz >/dev/null
       - name: Rendre les diagrammes
         run: ./scripts/render-diagrams.sh
       - name: Les images committées sont à jour

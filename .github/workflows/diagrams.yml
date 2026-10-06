@@ -36,9 +36,6 @@ jobs:
           distribution: temurin
           java-version: "27"
 
-      - name: Installer Graphviz
-        run: sudo apt-get install -y --no-install-recommends graphviz >/dev/null
-
       - name: Rendre les diagrammes
         run: ./scripts/render-diagrams.sh
 

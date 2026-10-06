@@ -10,6 +10,12 @@ JAR="${PLANTUML_JAR:-$ROOT/target/tools/plantuml-$PLANTUML_VERSION.jar}"
 SRC="$ROOT/docs/diagrams"
 OUT="$SRC/out"
 
+# Le rendu doit être identique sur toutes les machines et dans la CI : on
+# interdit Graphviz (le résultat dépend de sa version) et on utilise le moteur
+# embarqué. Les diagrammes qui ne sont pas de séquence doivent donc contenir
+# "!pragma layout smetana".
+export GRAPHVIZ_DOT=/nonexistent/dot
+
 if [ ! -f "$JAR" ]; then
     mkdir -p "$(dirname "$JAR")"
     curl -fsSL -o "$JAR" \
