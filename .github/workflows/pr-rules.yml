@@ -1,0 +1,38 @@
+name: Règles de PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  naming:
+    name: Nom de branche et titre de PR
+    runs-on: ubuntu-latest
+    env:
+      BRANCH: ${{ github.head_ref }}
+      TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: Nom de branche
+        run: |
+          # tig-XX-titre : lien automatique avec l'issue Linear.
+          # chore/... : outillage sans issue ; dependabot/... : mises à jour auto.
+          if [[ "$BRANCH" =~ ^(tig-[0-9]+-[a-z0-9-]+|chore/[a-z0-9._/-]+|dependabot/.+)$ ]]; then
+            echo "Branche valide : $BRANCH"
+          else
+            echo "::error::Nom de branche invalide : '$BRANCH'. Format attendu : tig-XX-titre (ex. tig-12-parsing-plan-xml), ou chore/titre."
+            exit 1
+          fi
+
+      - name: Titre de PR
+        run: |
+          # Soit un titre "type: description" (feat, fix, docs, ...), soit un ID Linear TIG-XX.
+          if [[ "$TITLE" =~ ^(feat|fix|docs|chore|refactor|test|ci|build|perf|style)(\([a-z0-9-]+\))?!?:\ .+ ]] \
+             || [[ "$TITLE" =~ TIG-[0-9]+ ]]; then
+            echo "Titre valide : $TITLE"
+          else
+            echo "::error::Titre invalide : '$TITLE'. Attendu : 'feat: ...', 'fix: ...' (etc.) ou contenir l'ID Linear (TIG-12)."
+            exit 1
+          fi

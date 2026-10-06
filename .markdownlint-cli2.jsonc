@@ -1,0 +1,11 @@
+{
+    "config": {
+        // Lignes longues : tableaux et liens
+        "MD013": false,
+        // HTML inline autorisé (commentaires, badges)
+        "MD033": false,
+        // Plusieurs titres identiques autorisés dans des sections différentes
+        "MD024": { "siblings_only": true }
+    },
+    "ignores": ["target/**", "node_modules/**"]
+}

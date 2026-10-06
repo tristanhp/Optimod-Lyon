@@ -48,12 +48,20 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
 | Tests + couverture (rapports JaCoCo) | `mvn clean verify` |
 | Générer la Javadoc | `mvn javadoc:javadoc` |
 | Produire le jar exécutable | `mvn clean package` |
+| Style (Checkstyle) | `mvn checkstyle:check` |
+| Détection de bugs (SpotBugs) | `mvn compile spotbugs:check` |
+| Javadoc avec diagrammes de classes UML | `mvn -Puml javadoc:javadoc` |
+| Rendre les diagrammes PlantUML | `./scripts/render-diagrams.sh` |
 | Lancer l'application | `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` |
 
 - Rapport de couverture HTML : `target/site/jacoco/index.html`
 - Rapport de couverture XML : `target/site/jacoco/jacoco.xml` (lu par Coverage
   Gutters : commande *Coverage Gutters: Display Coverage* dans VS Code)
 - Javadoc : `target/reports/apidocs/index.html`
+
+- Diagrammes PlantUML : sources dans `docs/diagrams/*.puml`, images générées dans
+  `docs/diagrams/out/` (non versionné). Extension VS Code optionnelle :
+  *PlantUML* (`jebbs.plantuml`).
 
 Les mêmes actions sont disponibles dans VS Code via *Terminal > Run Task*
 (`.vscode/tasks.json`).
@@ -62,7 +70,11 @@ Les mêmes actions sont disponibles dans VS Code via *Terminal > Run Task*
 
 ```
 optimod-lyon/
-├── docs/                      diagrammes et livrables
+├── .github/                   CI (workflows), Dependabot, CODEOWNERS, modèle de PR
+├── config/checkstyle.xml      règles de style
+├── docs/                      livrables
+│   └── diagrams/              sources PlantUML des diagrammes
+├── scripts/                   outils (rendu des diagrammes)
 ├── src/
 │   ├── main/
 │   │   ├── java/fr/insa/optimod/
@@ -95,12 +107,36 @@ optimod-lyon/
 
 - `main` est la branche stable : on ne pousse pas directement dessus.
 - Une branche par issue Linear, nommée `tig-XX-titre`
-  (ex. `tig-12-parsing-plan-xml`), créée depuis `main` à jour.
+  (ex. `tig-12-parsing-plan-xml`), créée depuis `main` à jour. Pour l'outillage
+  sans issue : `chore/titre`.
 - Commits courts et explicites (ex. `feat: parse le plan de ville`).
-- Ouvrir une *pull request* vers `main` ; au moins une personne de l'équipe la
-  relit avant le merge.
+- Ouvrir une *pull request* vers `main`. Le titre est soit `feat: ...` / `fix: ...`
+  / `docs: ...` (etc.), soit contient l'ID Linear (`TIG-12`).
+- Au moins une personne de l'équipe relit la PR avant le merge ; la revue
+  Copilot, si elle est activée, est un premier avis et ne remplace pas cette
+  approbation.
 - Avant de proposer une PR : `mvn clean verify` doit passer.
 - Une fois mergée, la branche est supprimée.
+
+## Intégration continue (GitHub Actions)
+
+Le check **CI OK** doit être vert avant de merger. Il regroupe :
+
+| Job | Contenu |
+| --- | --- |
+| Build, tests et couverture | `mvn clean verify` (JDK 27), seuil de couverture JaCoCo, Javadoc, test du jar |
+| Qualité | Checkstyle (avertissements) et SpotBugs |
+| Hygiène | EditorConfig, lint Markdown, liens, XML bien formés |
+| Diagrammes | rendu des `.puml` (échoue sur une erreur de syntaxe) |
+| Secrets | détection de secrets (gitleaks) |
+
+Autres workflows : règles de nommage des branches et des titres de PR, analyse
+CodeQL, publication de la documentation sur GitHub Pages à chaque push sur
+`main` (Javadoc avec diagrammes de classes, couverture, diagrammes), et
+publication d'une *release* avec le jar quand on pousse un tag `vX.Y.Z`.
+
+Le seuil de couverture est défini par la propriété `jacoco.line.minimum` du
+`pom.xml` ; on le relève à chaque itération.
 
 ## Équipe
 

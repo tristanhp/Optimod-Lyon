@@ -1,0 +1,5 @@
+# Relecture demandée automatiquement sur la configuration du build et de la CI.
+# Ajouter ici les autres membres de l'équipe : @pseudo1 @pseudo2
+/pom.xml            @tristanhp
+/.github/           @tristanhp
+/config/            @tristanhp

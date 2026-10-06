@@ -1,0 +1,32 @@
+@startuml sequence-calcul-tournee
+title Calcul d'une tournée (brouillon à compléter)
+
+actor Utilisateur
+participant "view" as V
+participant "controller" as C
+participant "xml" as X
+participant "algo" as A
+participant "model" as M
+
+Utilisateur -> V : charge le plan (XML)
+V -> C : chargerPlan(fichier)
+C -> X : lirePlan(fichier)
+X --> C : Plan
+C -> M : stocke le plan
+
+Utilisateur -> V : charge les demandes (XML)
+V -> C : chargerDemandes(fichier)
+C -> X : lireDemandes(fichier)
+X --> C : Demandes
+C -> M : stocke les demandes
+
+Utilisateur -> V : calcule la tournée
+V -> C : calculerTournee()
+C -> A : plusCourtsChemins(plan, demandes)
+A --> C : graphe complet
+C -> A : tsp(graphe, précédences)
+A --> C : ordre de passage
+C -> M : stocke la tournée
+C --> V : tournée avec horaires
+V --> Utilisateur : affiche la carte
+@enduml
