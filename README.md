@@ -68,7 +68,7 @@ Les mêmes actions sont disponibles dans VS Code via *Terminal > Run Task*
 
 ## Structure du projet
 
-```
+```text
 optimod-lyon/
 ├── .github/                   CI (workflows), Dependabot, CODEOWNERS, modèle de PR
 ├── config/checkstyle.xml      règles de style

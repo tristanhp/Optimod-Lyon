@@ -5,6 +5,8 @@
         // HTML inline autorisé (commentaires, badges)
         "MD033": false,
         // Plusieurs titres identiques autorisés dans des sections différentes
+        // Le modèle de PR commence par un titre de niveau 2
+        "MD041": false,
         "MD024": { "siblings_only": true }
     },
     "ignores": ["target/**", "node_modules/**"]
