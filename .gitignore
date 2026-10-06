@@ -29,6 +29,3 @@ replay_pid*
 # Système
 .DS_Store
 Thumbs.db
-
-# Diagrammes générés (voir scripts/render-diagrams.sh)
-docs/diagrams/out/

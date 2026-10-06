@@ -142,10 +142,15 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-      - name: Installer Graphviz
-        run: sudo apt-get install -y --no-install-recommends graphviz >/dev/null
       - name: Rendre les diagrammes
         run: ./scripts/render-diagrams.sh
+      - name: Les images committées sont à jour
+        run: |
+          if [ -n "$(git status --porcelain docs/diagrams/out)" ]; then
+            git status --short docs/diagrams/out
+            echo "::error::docs/diagrams/out n'est pas à jour. Lance ./scripts/render-diagrams.sh et committe le résultat (sur une PR, le workflow Diagrammes le fait automatiquement)."
+            exit 1
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: diagrammes
