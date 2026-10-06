@@ -1,0 +1,18 @@
+@startuml architecture-mvc
+!pragma layout smetana
+title Architecture MVC d'Optimod'Lyon
+
+package "view" as view
+package "controller" as controller
+package "model" as model
+package "algo" as algo
+package "xml" as xml
+
+view --> controller : actions utilisateur
+controller --> view : mises à jour
+controller --> model : lit / modifie
+controller --> algo : calcule les tournées
+controller --> xml : charge plan et demandes
+algo --> model
+xml --> model
+@enduml

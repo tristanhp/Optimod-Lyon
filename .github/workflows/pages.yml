@@ -1,0 +1,72 @@
+name: Documentation (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "27"
+          cache: maven
+
+      - name: Graphviz (diagrammes PlantUML)
+        run: sudo apt-get install -y --no-install-recommends graphviz >/dev/null
+
+      - name: Tests, couverture et Javadoc avec diagrammes de classes UML
+        run: mvn -B -ntp -Puml clean verify javadoc:javadoc
+
+      - name: Diagrammes PlantUML
+        run: ./scripts/render-diagrams.sh
+
+      - name: Assembler le site
+        run: |
+          mkdir -p _site
+          cp -r target/reports/apidocs _site/javadoc
+          cp -r target/site/jacoco _site/couverture
+          cp -r docs/diagrams/out _site/diagrammes
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="fr">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Optimod'Lyon - documentation</title>
+          </head>
+          <body>
+            <h1>Optimod'Lyon</h1>
+            <ul>
+              <li><a href="javadoc/">Javadoc (avec diagrammes de classes)</a></li>
+              <li><a href="couverture/">Rapport de couverture des tests</a></li>
+              <li><a href="diagrammes/architecture-mvc.svg">Architecture MVC</a></li>
+              <li><a href="diagrammes/sequence-calcul-tournee.svg">Séquence : calcul d'une tournée</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
+
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5
