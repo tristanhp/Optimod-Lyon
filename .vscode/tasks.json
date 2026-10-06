@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "maven: build",
+            "type": "shell",
+            "command": "mvn -B clean package -DskipTests",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "maven: test",
+            "type": "shell",
+            "command": "mvn -B test",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "maven: verify (tests + couverture)",
+            "type": "shell",
+            "command": "mvn -B clean verify",
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "maven: javadoc",
+            "type": "shell",
+            "command": "mvn -B javadoc:javadoc",
+            "problemMatcher": []
+        }
+    ]
+}

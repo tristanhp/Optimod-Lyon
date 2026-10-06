@@ -1,0 +1,14 @@
+{
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java"
+    },
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "coverage-gutters.coverageFileNames": [
+        "target/site/jacoco/jacoco.xml"
+    ],
+    "coverage-gutters.showLineCoverage": true
+}

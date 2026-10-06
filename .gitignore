@@ -1,0 +1,31 @@
+# Maven
+target/
+dependency-reduced-pom.xml
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+release.properties
+
+# Java
+*.class
+*.log
+hs_err_pid*
+replay_pid*
+
+# VS Code : on ne versionne que la configuration partagée
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Autres IDE (Eclipse, IntelliJ)
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+
+# Système
+.DS_Store
+Thumbs.db
