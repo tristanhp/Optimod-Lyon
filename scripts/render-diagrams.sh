@@ -21,5 +21,16 @@ mkdir -p "$OUT"
 java -Djava.awt.headless=true -jar "$JAR" -tsvg -failfast2 \
     -o "$OUT" "$SRC"/*.puml
 
+# PlantUML génère des identifiants de filtre aléatoires : on les remplace par des
+# identifiants stables pour que deux rendus identiques donnent des fichiers
+# identiques (sinon chaque rendu produit un diff dans git).
+for svg in "$OUT"/*.svg; do
+    perl -0pi -e '
+        my %map; my $n = 0;
+        s/(<filter\b[^>]*\bid=")([^"]+)"/$map{$2} = "filter" . ++$n; "$1$map{$2}\""/ge;
+        s/url\(#([^)]+)\)/exists $map{$1} ? "url(#$map{$1})" : "url(#$1)"/ge;
+    ' "$svg"
+done
+
 echo "Diagrammes générés dans $OUT :"
 ls "$OUT"
