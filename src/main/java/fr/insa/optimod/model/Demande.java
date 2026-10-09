@@ -1,49 +1,46 @@
 package fr.insa.optimod.model;
 
-public class Demande {
-    private final int idCollecte;
-    private final int idLivraison;
+/**
+ * Demande de livraison : une collecte puis une livraison.
+ */
+public final class Demande {
+    private final long idCollecte;
+    private final long idLivraison;
     private final int tempsCollecte; //secondes
     private final int tempsLivraison; //secondes
 
-    public Demande(int idCollecte, int idLivraison, int tempsCollecte, int tempsLivraison) {
+    /**
+     * Crée une demande.
+     *
+     * @param idCollecte id du noeud de collecte
+     * @param idLivraison id du noeud de livraison
+     * @param tempsCollecte durée de la collecte en secondes
+     * @param tempsLivraison durée de la livraison en secondes
+     */
+    public Demande(long idCollecte, long idLivraison, int tempsCollecte, int tempsLivraison) {
         this.idCollecte = idCollecte;
         this.idLivraison = idLivraison;
         this.tempsCollecte = tempsCollecte;
         this.tempsLivraison = tempsLivraison;
     }
 
-    public int getIdCollecte() {
+    /** @return id du noeud de collecte */
+    public long getIdCollecte() {
         return idCollecte;
     }
 
-    public int getIdLivraison() {
+    /** @return id du noeud de livraison */
+    public long getIdLivraison() {
         return idLivraison;
     }
 
+    /** @return durée de la collecte en secondes */
     public int getTempsCollecte() {
         return tempsCollecte;
     }
 
+    /** @return durée de la livraison en secondes */
     public int getTempsLivraison() {
         return tempsLivraison;
     }
-
-    public int setIdCollecte(int idCollecte) {
-        return this.idCollecte;
-    }
-
-    public int setIdLivraison(int idLivraison) {
-        return this.idLivraison;
-    }
-
-    public int setTempsCollecte(int tempsCollecte) {
-        return this.tempsCollecte;
-    }
-
-    public int setTempsLivraison(int tempsLivraison) {
-        return this.tempsLivraison;
-    }
-
-    
 }
