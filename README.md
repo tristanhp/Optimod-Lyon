@@ -75,6 +75,7 @@ optimod-lyon/
 ├── .github/                   CI (workflows), Dependabot, CODEOWNERS, modèle de PR
 ├── config/checkstyle.xml      règles de style
 ├── docs/                      livrables
+│   ├── code-fourni/tsp/       code TSP fourni (TSP.jar), en lecture seule
 │   └── diagrams/              sources PlantUML des diagrammes
 ├── scripts/                   outils (rendu des diagrammes)
 ├── src/
@@ -86,7 +87,7 @@ optimod-lyon/
 │   │   │   ├── view/          interface utilisateur et carte
 │   │   │   ├── algo/          graphe des plus courts chemins, TSP
 │   │   │   └── xml/           lecture des fichiers XML
-│   │   └── resources/data/    XML d'exemple
+│   │   └── resources/data/    XML fournis (plans et demandes de livraison)
 │   └── test/java/fr/insa/optimod/   tests JUnit 4 (même arborescence que main)
 ├── pom.xml
 └── .vscode/                   configuration VS Code partagée
