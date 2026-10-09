@@ -12,20 +12,18 @@ import fr.insa.optimod.xml.XmlInvalideException;
  */
 public final class MainController {
 
-    /** Écran piloté par ce contrôleur. */
-    private final MapScreen screen;
-
     /** Plan actuellement chargé, ou {@code null}. */
     private Plan plan;
 
     /**
-     * Crée le contrôleur et le branche au bouton « Importer ».
+     * Crée le contrôleur et le branche au bouton « Importer ». L'écran n'est
+     * pas conservé dans un champ : il n'est utilisé que par l'action du
+     * bouton.
      *
      * @param screen écran à piloter
      */
     public MainController(MapScreen screen) {
-        this.screen = screen;
-        screen.setOnImport(this::importPlan);
+        screen.setOnImport(() -> importPlan(screen));
     }
 
     /**
@@ -42,7 +40,7 @@ public final class MainController {
      * est invalide, une fenêtre d'information s'ouvre et la page est vidée.
      * Si l'utilisateur annule le choix, rien ne change.
      */
-    private void importPlan() {
+    private void importPlan(MapScreen screen) {
         File fichier = screen.chooseXmlFile().orElse(null);
         if (fichier == null) {
             return;
