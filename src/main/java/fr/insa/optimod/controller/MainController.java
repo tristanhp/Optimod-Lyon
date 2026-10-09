@@ -1,10 +1,11 @@
 package fr.insa.optimod.controller;
 
 import java.io.File;
+import java.io.IOException;
+
+import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.Plan;
-import fr.insa.optimod.xml.PlanXmlParser;
-import fr.insa.optimod.xml.XmlInvalideException;
 
 /**
  * Contrôleur de la page principale : importe un plan XML dans le modèle et
@@ -46,9 +47,9 @@ public final class MainController {
             return;
         }
         try {
-            plan = PlanXmlParser.lire(fichier);
+            plan = new Plan(fichier.getPath());
             screen.showPlan(plan);
-        } catch (XmlInvalideException e) {
+        } catch (IOException | SAXException | IllegalArgumentException e) {
             screen.showInvalidXml(e.getMessage());
             plan = null;
             screen.reset();

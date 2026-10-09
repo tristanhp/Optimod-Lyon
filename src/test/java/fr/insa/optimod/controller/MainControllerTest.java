@@ -87,7 +87,7 @@ public class MainControllerTest {
         screen.chosen = ecrire(PLAN_VALIDE);
         screen.onImport.run();
         assertEquals(List.of("plan"), screen.events);
-        assertEquals(1, screen.shown.getIntersections().size());
+        assertEquals(1, screen.shown.getNoeuds().size());
         assertEquals(screen.shown, controller.getPlan());
     }
 

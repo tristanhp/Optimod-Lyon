@@ -1,7 +1,8 @@
 package fr.insa.optimod.view;
 
-import fr.insa.optimod.model.Intersection;
-import fr.insa.optimod.model.Plan;
+import java.util.Collection;
+
+import fr.insa.optimod.model.Noeud;
 
 /**
  * Passage des coordonnées géographiques (latitude, longitude) aux pixels du
@@ -29,23 +30,23 @@ final class MapProjection {
     private final double offsetY;
 
     /**
-     * Calcule la projection qui fait tenir le plan dans la zone donnée.
+     * Calcule la projection qui fait tenir les noeuds dans la zone donnée.
      *
-     * @param plan plan à afficher (au moins une intersection)
+     * @param noeuds noeuds du plan à afficher (au moins un)
      * @param width largeur disponible, en pixels
      * @param height hauteur disponible, en pixels
      * @param padding marge intérieure, en pixels
      */
-    MapProjection(Plan plan, double width, double height, double padding) {
+    MapProjection(Collection<Noeud> noeuds, double width, double height, double padding) {
         double minLat = Double.POSITIVE_INFINITY;
         double maxLat = Double.NEGATIVE_INFINITY;
         double minLon = Double.POSITIVE_INFINITY;
         double maxLon = Double.NEGATIVE_INFINITY;
-        for (Intersection i : plan.getIntersections()) {
-            minLat = Math.min(minLat, i.latitude());
-            maxLat = Math.max(maxLat, i.latitude());
-            minLon = Math.min(minLon, i.longitude());
-            maxLon = Math.max(maxLon, i.longitude());
+        for (Noeud n : noeuds) {
+            minLat = Math.min(minLat, n.getLatitude());
+            maxLat = Math.max(maxLat, n.getLatitude());
+            minLon = Math.min(minLon, n.getLongitude());
+            maxLon = Math.max(maxLon, n.getLongitude());
         }
         stretch = Math.cos(Math.toRadians((minLat + maxLat) / 2));
         double spanX = Math.max((maxLon - minLon) * stretch, 1e-9);
