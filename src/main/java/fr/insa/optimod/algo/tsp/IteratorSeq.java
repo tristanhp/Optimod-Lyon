@@ -12,7 +12,7 @@ public class IteratorSeq implements Iterator<Integer> {
      * Cree un iterateur pour iterer sur l'ensemble des sommets de nonVus qui sont
      * successeurs de sommetCrt dans le graphe g,
      * dans l'odre d'apparition dans <code>nonVus</code>
-     * 
+     *
      * @param nonVus
      * @param sommetCrt
      * @param g
@@ -35,6 +35,8 @@ public class IteratorSeq implements Iterator<Integer> {
     @Override
     public Integer next() {
         nbCandidats--;
+        if (nbCandidats > candidats.length)
+            return -1;
         return candidats[nbCandidats];
     }
 

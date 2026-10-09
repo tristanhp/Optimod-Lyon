@@ -28,4 +28,12 @@ public class TSPtest {
          */
         assertTrue(test.getCoutSolution() == 134); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
+
+    /** IGNORE. */
+    @Test
+    public void IGNORE() {
+        // TODO : SUPPRIMER
+        TSP1 test = new TSP1();
+        assertTrue(0 == 0);
+    }
 }
