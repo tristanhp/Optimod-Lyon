@@ -19,7 +19,11 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <main.class>fr.insa.optimod.Main</main.class>
+        <!-- Interface graphique : lancée par mvn javafx:run -->
+        <gui.main.class>fr.insa.optimod.view.AppLauncher</gui.main.class>
 
+        <javafx.version>25.0.1</javafx.version>
+        <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
         <junit.version>4.13.2</junit.version>
 
         <maven-clean-plugin.version>3.5.0</maven-clean-plugin.version>
@@ -40,6 +44,11 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -95,6 +104,17 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>${jacoco-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Classes JavaFX (fenêtres, carte) : non testables en
+                         CI sans écran, hors du seuil de couverture. La logique
+                         testable reste dans MainController et MapProjection. -->
+                    <excludes>
+                        <exclude>fr/insa/optimod/view/AppLauncher*</exclude>
+                        <exclude>fr/insa/optimod/view/MainApp*</exclude>
+                        <exclude>fr/insa/optimod/view/MainView*</exclude>
+                        <exclude>fr/insa/optimod/view/MapCanvas*</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -173,6 +193,16 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Medium</threshold>
+                </configuration>
+            </plugin>
+
+            <!-- Interface graphique : mvn javafx:run -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>${javafx-maven-plugin.version}</version>
+                <configuration>
+                    <mainClass>${gui.main.class}</mainClass>
                 </configuration>
             </plugin>
 

@@ -53,6 +53,7 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
 | Javadoc avec diagrammes de classes UML | `mvn -Puml javadoc:javadoc` |
 | Rendre les diagrammes PlantUML | `./scripts/render-diagrams.sh` |
 | Lancer l'application | `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` |
+| Lancer l'interface JavaFX | `mvn javafx:run` |
 
 - Rapport de couverture HTML : `target/site/jacoco/index.html`
 - Rapport de couverture XML : `target/site/jacoco/jacoco.xml` (lu par Coverage
@@ -67,6 +68,68 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
 
 Les mêmes actions sont disponibles dans VS Code via *Terminal > Run Task*
 (`.vscode/tasks.json`).
+
+## Interface graphique (itération 1)
+
+Première version de l'interface JavaFX : charger un plan de ville au format
+XML et en afficher la carte (tickets TIG-32 et TIG-58).
+
+### Lancer l'interface
+
+Depuis la racine du projet, avec le JDK 27 et Maven 3.9+ (voir
+[Prérequis](#prérequis)) :
+
+```bash
+mvn javafx:run
+```
+
+Maven télécharge JavaFX au premier lancement. Sous Windows, il faut lancer la
+commande dans WSL (Ubuntu) ; la fenêtre s'affiche avec WSLg (Windows 11).
+
+Autres façons de lancer l'interface :
+
+- VS Code : *Exécuter et déboguer*, configuration **Interface JavaFX** ;
+- jar exécutable : `mvn clean package` puis
+  `java -cp target/optimod-lyon-0.1.0-SNAPSHOT.jar fr.insa.optimod.view.AppLauncher`.
+
+Ne pas lancer `MainApp` directement : JavaFX exige de passer par la classe
+`AppLauncher`.
+
+### Utiliser l'interface
+
+La fenêtre comporte un bouton **Importer** en haut à gauche et la carte
+dessous (vide au départ).
+
+1. Cliquer sur **Importer**.
+2. Choisir un plan XML dans le sélecteur de fichier. Les plans fournis sont
+   dans `src/main/resources/data/` : `petitPlan.xml` (308 intersections),
+   `moyenPlan.xml` (1 448) et `grandPlan.xml` (3 736).
+3. La carte s'affiche, orientée nord en haut et adaptée à la taille de la
+   fenêtre :
+   - les **tronçons** (segments de route) en gris ;
+   - les **intersections** (noeuds) en points sombres.
+4. Importer un autre fichier remplace la carte affichée. Annuler le sélecteur
+   ne change rien.
+
+Si la lecture du fichier échoue (XML mal formé, attribut illisible, tronçon
+vers un noeud inconnu, etc.), une fenêtre d'information « Fichier XML
+invalide » explique l'erreur, la carte est vidée et l'utilisateur peut
+réessayer avec un autre fichier. Un XML bien formé qui n'est pas un plan
+(par exemple `demandePetit1.xml`) n'est pas encore refusé : il donne une
+carte vide.
+
+### Organisation du code
+
+| Rôle | Classes |
+| --- | --- |
+| Modèle (`model`) | `Plan` (qui lit aussi le XML du plan), `Noeud`, `Troncon` |
+| Contrôleur (`controller`) | `MainController` ; interface `MapScreen` qui décrit ce que le contrôleur attend de l'écran |
+| Vue (`view`) | `MainView` (bouton et fenêtres), `MapCanvas` (dessin), `MapProjection` (latitude/longitude vers pixels), `MainApp` et `AppLauncher` (démarrage) |
+
+La vue ne lit pas les fichiers : le clic sur **Importer** appelle le
+contrôleur, qui construit le modèle à partir du fichier (`new Plan(chemin)`) et
+demande à la vue de l'afficher. Grâce à `MapScreen`, le contrôleur est testé
+sans fenêtre (`MainControllerTest`).
 
 ## Structure du projet
 
