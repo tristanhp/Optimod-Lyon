@@ -75,6 +75,7 @@ optimod-lyon/
 ├── .github/                   CI (workflows), Dependabot, CODEOWNERS, modèle de PR
 ├── config/checkstyle.xml      règles de style
 ├── docs/                      livrables
+│   ├── adr/                   décisions d'architecture (ADR)
 │   ├── code-fourni/tsp/       code TSP fourni (TSP.jar), en lecture seule
 │   └── diagrams/              sources PlantUML des diagrammes
 ├── scripts/                   outils (rendu des diagrammes)
@@ -88,7 +89,9 @@ optimod-lyon/
 │   │   │   ├── algo/          graphe des plus courts chemins, TSP
 │   │   │   └── xml/           lecture des fichiers XML
 │   │   └── resources/data/    XML fournis (plans et demandes de livraison)
-│   └── test/java/fr/insa/optimod/   tests JUnit 4 (même arborescence que main)
+│   └── test/
+│       ├── java/fr/insa/optimod/   tests JUnit 4 (même arborescence que main)
+│       └── resources/              données de test (petits XML...)
 ├── pom.xml
 └── .vscode/                   configuration VS Code partagée
 ```
@@ -103,8 +106,36 @@ optimod-lyon/
 - Le code est formaté et les imports organisés à la sauvegarde dans VS Code.
 - Toute classe et toute méthode publique est documentée en Javadoc ;
   `mvn javadoc:javadoc` doit passer sans erreur.
-- Tests unitaires avec JUnit 4, dans `src/test/java`, dans le même package que
-  la classe testée. Une classe `Foo` est testée par `FooTest`.
+- Tests unitaires : voir la section [Tests unitaires](#tests-unitaires).
+
+## Tests unitaires
+
+Les choix sont détaillés dans
+[l'ADR 0001](docs/adr/0001-organisation-des-tests-unitaires.md).
+
+- Tests avec JUnit 4. Une classe `Foo` est testée par `FooTest`.
+- Le test est dans le **même package** que la classe testée, donc dans la même
+  arborescence sous `src/test/java` :
+
+  ```text
+  src/main/java/fr/insa/optimod/model/Troncon.java
+  src/test/java/fr/insa/optimod/model/TronconTest.java
+  ```
+
+- Pas de classe qui appelle tous les tests : Maven (Surefire) lance
+  automatiquement toutes les classes `*Test`, en local comme en CI.
+  `MainTest` est seulement le test de `Main`.
+- Les fichiers de test (petits XML, etc.) vont dans `src/test/resources` et se
+  chargent avec `getClass().getResourceAsStream("/xml/petitPlan.xml")`.
+- Lancer tous les tests : `mvn test` ; une seule classe :
+  `mvn test -Dtest=TronconTest`.
+
+## Décisions d'architecture (ADR)
+
+Les décisions techniques importantes sont décrites dans
+[`docs/adr/`](docs/adr/README.md), une fiche par décision (contexte, décision,
+alternatives, conséquences). Pour en proposer une, copier
+[`docs/adr/modele.md`](docs/adr/modele.md) et ouvrir une PR.
 
 ## Workflow git
 
