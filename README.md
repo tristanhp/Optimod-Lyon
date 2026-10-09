@@ -53,6 +53,7 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
 | Javadoc avec diagrammes de classes UML | `mvn -Puml javadoc:javadoc` |
 | Rendre les diagrammes PlantUML | `./scripts/render-diagrams.sh` |
 | Lancer l'application | `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` |
+| Lancer l'interface JavaFX | `mvn javafx:run` |
 
 - Rapport de couverture HTML : `target/site/jacoco/index.html`
 - Rapport de couverture XML : `target/site/jacoco/jacoco.xml` (lu par Coverage
