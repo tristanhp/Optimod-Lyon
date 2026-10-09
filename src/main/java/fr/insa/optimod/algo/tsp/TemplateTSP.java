@@ -11,6 +11,7 @@ public abstract class TemplateTSP implements TSP {
     private int coutMeilleureSolution;
     private int tpsLimite;
     private long tpsDebut;
+    private long tpsFin;
 
     public void chercheSolution(int tpsLimite, Graphe g) {
         if (tpsLimite <= 0)
@@ -26,6 +27,7 @@ public abstract class TemplateTSP implements TSP {
         vus.add(0); // le premier sommet visite est 0
         coutMeilleureSolution = Integer.MAX_VALUE;
         branchAndBound(0, nonVus, vus, 0);
+        tpsFin = System.currentTimeMillis();
     }
 
     public Integer getSolution(int i) {
@@ -40,9 +42,15 @@ public abstract class TemplateTSP implements TSP {
         return -1;
     }
 
+    public long getDureeCalcul() {
+        if (g != null)
+            return tpsFin - tpsDebut;
+        return -1;
+    }
+
     /**
      * Methode devant etre redefinie par les sous-classes de TemplateTSP
-     * 
+     *
      * @param sommetCourant
      * @param nonVus
      * @return une borne inferieure du cout des chemins de <code>g</code> partant de
@@ -54,7 +62,7 @@ public abstract class TemplateTSP implements TSP {
 
     /**
      * Methode devant etre redefinie par les sous-classes de TemplateTSP
-     * 
+     *
      * @param sommetCrt
      * @param nonVus
      * @param g
@@ -67,7 +75,7 @@ public abstract class TemplateTSP implements TSP {
     /**
      * Methode definissant le patron (template) d'une resolution par separation et
      * evaluation (branch and bound) du TSP pour le graphe <code>g</code>.
-     * 
+     *
      * @param sommetCrt le dernier sommet visite
      * @param nonVus    la liste des sommets qui n'ont pas encore ete visites
      * @param vus       la liste des sommets deja visites (y compris sommetCrt)
