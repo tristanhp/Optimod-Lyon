@@ -10,7 +10,7 @@ public class GrapheComplet implements Graphe {
     /**
      * Cree un graphe complet dont les aretes ont un cout compris entre COUT_MIN et
      * COUT_MAX
-     * 
+     *
      * @param nbSommets
      */
     public GrapheComplet(int nbSommets) {
