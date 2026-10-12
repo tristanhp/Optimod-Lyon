@@ -1,13 +1,10 @@
-package fr.insa.optimod;
+package fr.insa.optimod.algo.tsp;
 
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
-import fr.insa.optimod.algo.tsp.GrapheComplet;
-import fr.insa.optimod.algo.tsp.TSP1;
-
-public class TSPtest {
+public class TSPTest {
     /** Le message de démarrage mentionne le nom de l'application. */
     @Test
     public void testTSP() {
@@ -29,11 +26,21 @@ public class TSPtest {
         assertTrue(test.getCoutSolution() == 134); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
 
-    /** IGNORE. */
+    /** Le 4e indice de la meilleure solution */
     @Test
-    public void IGNORE() {
+    public void testGetSolution() {
         // TODO : SUPPRIMER
         TSP1 test = new TSP1();
+        test.chercheSolution(10000, new GrapheComplet(10)); // Graphe à 10 sommet et temps limite =1s
+        System.out.println("Solution a l'indice 4 : " + Integer.toString(test.getSolution(4)));
+        assertTrue(test.getSolution(4) == 4);
+    }
+
+    /** IGNORE. */
+    @Test
+    public void testBound() {
+        // TODO : SUPPRIMER
+        RunTSP test = new RunTSP();
         assertTrue(0 == 0);
     }
 }

@@ -35,8 +35,6 @@ public class IteratorSeq implements Iterator<Integer> {
     @Override
     public Integer next() {
         nbCandidats--;
-        if (nbCandidats > candidats.length)
-            return -1;
         return candidats[nbCandidats];
     }
 
