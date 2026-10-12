@@ -7,6 +7,13 @@
             "request": "launch",
             "mainClass": "fr.insa.optimod.Main",
             "projectName": "optimod-lyon"
+        },
+        {
+            "type": "java",
+            "name": "Interface JavaFX",
+            "request": "launch",
+            "mainClass": "fr.insa.optimod.view.AppLauncher",
+            "projectName": "optimod-lyon"
         }
     ]
 }
