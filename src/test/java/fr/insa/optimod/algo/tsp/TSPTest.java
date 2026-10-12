@@ -34,7 +34,6 @@ public class TSPTest {
         test.chercheSolution(10000, new GrapheComplet(10)); // Graphe à 10 sommet et temps limite =1s
         System.out.println("Solution a l'indice 4 : " + Integer.toString(test.getSolution(4)));
         assertTrue(test.getSolution(4) == 4);
-        test.getSolution(1)
     }
 
     /** IGNORE. */
