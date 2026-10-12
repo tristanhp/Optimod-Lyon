@@ -124,6 +124,7 @@ jobs:
 
       - name: Fichiers XML bien formés
         run: |
+          sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libxml2-utils >/dev/null
           shopt -s nullglob
           files=(src/main/resources/data/*.xml)
