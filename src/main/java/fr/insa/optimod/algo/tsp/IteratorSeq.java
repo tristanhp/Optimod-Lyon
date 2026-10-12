@@ -2,6 +2,7 @@ package fr.insa.optimod.algo.tsp;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 public class IteratorSeq implements Iterator<Integer> {
 
@@ -34,6 +35,9 @@ public class IteratorSeq implements Iterator<Integer> {
 
     @Override
     public Integer next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException("No more elements available");
+        }
         nbCandidats--;
         return candidats[nbCandidats];
     }
