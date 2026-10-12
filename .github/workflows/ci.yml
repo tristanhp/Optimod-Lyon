@@ -37,7 +37,7 @@ jobs:
         run: mvn $MAVEN_ARGS javadoc:javadoc
 
       - name: Smoke test du jar exécutable
-        run: java -jar "$(ls target/optimod-lyon-*.jar | grep -v '^target/original-' | head -n 1)"
+        run: java -jar "$(ls target/optimod-lyon-*.jar | grep -v '^target/original-' | head -n 1)" --version
 
       - name: Résumé de la couverture
         if: always()
