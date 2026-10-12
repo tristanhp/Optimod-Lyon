@@ -4,7 +4,7 @@ public interface Graphe {
 
     /**
      * Permet d'obtenir le nombre de sommet de ce graphe
-     * 
+     *
      * @return le nombre de sommets de <code>this</code>
      */
     public abstract int getNbSommets();
