@@ -22,7 +22,7 @@
         <!-- Interface graphique : lancée par mvn javafx:run -->
         <gui.main.class>fr.insa.optimod.view.AppLauncher</gui.main.class>
 
-        <javafx.version>25.0.1</javafx.version>
+        <javafx.version>27</javafx.version>
         <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
         <junit.version>4.13.2</junit.version>
 
