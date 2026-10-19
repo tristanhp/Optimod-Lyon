@@ -9,8 +9,8 @@ public class GrapheDepandance implements Graphe {
 
     public GrapheDepandance(int nbSommets, int[][] cout, HashMap<Integer, Integer> depandance) {
         this.nbSommets = nbSommets;
-        this.cout = cout;
-        this.depandance = depandance;
+        this.cout = cout.clone();
+        this.depandance = new HashMap<>(depandance);
     }
 
     @Override

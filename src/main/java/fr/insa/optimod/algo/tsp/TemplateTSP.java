@@ -9,7 +9,8 @@ public abstract class TemplateTSP implements TSP {
     private Integer[] meilleureSolution;
     protected GrapheDepandance g;
     private int coutMeilleureSolution;
-    private int coutLimite = Integer.MAX_VALUE; // A changer pour stopper TSP si le cout actuelle depasse 18h
+    // private int coutLimite = Integer.MAX_VALUE; // A changer pour stopper TSP si
+    // le cout actuelle depasse 18h
     private int tpsLimite;
     private long tpsDebut;
     private long tpsFin;
