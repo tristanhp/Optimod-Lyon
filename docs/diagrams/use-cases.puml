@@ -1,0 +1,54 @@
+@startuml use-cases
+!pragma layout smetana
+title Cas d'utilisation d'Optimod'Lyon
+left to right direction
+
+actor "Planificateur\nde livraison" as Planificateur
+
+rectangle "Optimod'Lyon" {
+    package "Initialisation et configuration" {
+        usecase "Cas 1 : Charger et afficher\nla carte urbaine" as UC1
+        usecase "Cas 2 : Configurer la flotte\nde coursiers" as UC2
+    }
+    package "Gestion des requêtes" {
+        usecase "Cas 3 : Importer un lot\nde requêtes (fichier)" as UC3
+        usecase "Cas 4 : Modifier le programme\nde livraisons" as UC4
+        usecase "Ajouter une livraison\n(saisie manuelle)" as UC4a
+        usecase "Supprimer une livraison" as UC4b
+        usecase "Décaler un pickup" as UC4c
+        usecase "Déplacer un pickup\nou un delivery" as UC4d
+        usecase "Changer l'ordre\nde passage" as UC4e
+    }
+    package "Optimisation" {
+        usecase "Cas 5 : Calculer le meilleur\nitinéraire" as UC5
+        usecase "Cas 6 : Gérer l'infaisabilité\nd'une tournée" as UC6
+    }
+    package "Visualisation et suivi" {
+        usecase "Cas 7 : Visualiser les tournées\ndétaillées" as UC7
+        usecase "Cas 10 : Générer les feuilles\nde route (2e itération)" as UC10
+    }
+    package "Persistance (si on a le temps)" {
+        usecase "Cas 8 : Sauvegarder l'état\ndes livraisons" as UC8
+        usecase "Cas 9 : Restaurer une session\nde livraisons" as UC9
+    }
+}
+
+Planificateur --> UC1
+Planificateur --> UC2
+Planificateur --> UC3
+Planificateur --> UC4
+Planificateur --> UC5
+Planificateur --> UC7
+Planificateur --> UC10
+Planificateur --> UC8
+Planificateur --> UC9
+
+UC4 <|-- UC4a
+UC4 <|-- UC4b
+UC4 <|-- UC4c
+UC4 <|-- UC4d
+UC4 <|-- UC4e
+
+UC4 ..> UC5 : <<include>>
+UC6 ..> UC5 : <<extend>>
+@enduml

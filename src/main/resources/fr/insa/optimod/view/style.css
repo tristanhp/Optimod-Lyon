@@ -1,0 +1,25 @@
+/* Feuille de style de l'interface Optimod'Lyon : barre d'outils et bouton. */
+
+.root {
+    -fx-font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    -fx-font-size: 13px;
+}
+
+.tool-bar-box {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent #dadce0 transparent;
+    -fx-padding: 10 14 10 14;
+}
+
+.accent-button {
+    -fx-background-color: #1a73e8;
+    -fx-background-radius: 4;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-padding: 6 16 6 16;
+    -fx-cursor: hand;
+}
+
+.accent-button:hover {
+    -fx-background-color: #1558b0;
+}

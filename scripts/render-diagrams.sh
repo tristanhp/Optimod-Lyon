@@ -4,7 +4,7 @@
 # Le jar PlantUML est téléchargé depuis Maven Central (nécessite Java).
 set -euo pipefail
 
-PLANTUML_VERSION="${PLANTUML_VERSION:-8059}"
+PLANTUML_VERSION="${PLANTUML_VERSION:-1.2026.7}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JAR="${PLANTUML_JAR:-$ROOT/target/tools/plantuml-$PLANTUML_VERSION.jar}"
 SRC="$ROOT/docs/diagrams"

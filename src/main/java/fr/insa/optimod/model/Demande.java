@@ -1,49 +1,47 @@
 package fr.insa.optimod.model;
 
-public class Demande {
-    private final int idCollecte;
-    private final int idLivraison;
-    private final int tempsCollecte; //secondes
-    private final int tempsLivraison; //secondes
+/**
+ * Demande de livraison : une collecte puis une livraison.
+ */
+public final class Demande {
+    private final long identifiantCollecte;
+    private final long identifiantLivraison;
+    private final int dureeCollecte; //secondes
+    private final int dureeLivraison; //secondes
 
-    public Demande(int idCollecte, int idLivraison, int tempsCollecte, int tempsLivraison) {
-        this.idCollecte = idCollecte;
-        this.idLivraison = idLivraison;
-        this.tempsCollecte = tempsCollecte;
-        this.tempsLivraison = tempsLivraison;
+    /**
+     * Crée une demande.
+     *
+     * @param identifiantCollecte identifiant du noeud de collecte
+     * @param identifiantLivraison identifiant du noeud de livraison
+     * @param dureeCollecte durée de la collecte en secondes
+     * @param dureeLivraison durée de la livraison en secondes
+     */
+
+    public Demande(long identifiantCollecte, long identifiantLivraison, int dureeCollecte, int dureeLivraison) {
+        this.identifiantCollecte = identifiantCollecte;
+        this.identifiantLivraison = identifiantLivraison;
+        this.dureeCollecte = dureeCollecte;
+        this.dureeLivraison = dureeLivraison;
     }
 
-    public int getIdCollecte() {
-        return idCollecte;
+    /** @return identifiant du noeud de collecte */
+    public long obtenirIdentifiantCollecte() {
+        return identifiantCollecte;
     }
 
-    public int getIdLivraison() {
-        return idLivraison;
+    /** @return identifiant du noeud de livraison */
+    public long obtenirIdentifiantLivraison() {
+        return identifiantLivraison;
     }
 
-    public int getTempsCollecte() {
-        return tempsCollecte;
+    /** @return durée de la collecte en secondes */
+    public int obtenirDureeCollecte() {
+        return dureeCollecte;
     }
 
-    public int getTempsLivraison() {
-        return tempsLivraison;
+    /** @return durée de la livraison en secondes */
+    public int obtenirDureeLivraison() {
+        return dureeLivraison;
     }
-
-    public int setIdCollecte(int idCollecte) {
-        return this.idCollecte;
-    }
-
-    public int setIdLivraison(int idLivraison) {
-        return this.idLivraison;
-    }
-
-    public int setTempsCollecte(int tempsCollecte) {
-        return this.tempsCollecte;
-    }
-
-    public int setTempsLivraison(int tempsLivraison) {
-        return this.tempsLivraison;
-    }
-
-    
 }

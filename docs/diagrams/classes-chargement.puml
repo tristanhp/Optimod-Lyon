@@ -1,0 +1,202 @@
+@startuml classes-chargement
+!pragma layout smetana
+title Classes d'Optimod'Lyon : chargement et module TSP
+skinparam classAttributeIconSize 0
+hide empty members
+package "fr.insa.optimod.controller" {
+ interface MapScreen {
+  +definirActionImportPlan(action : Runnable)
+  +definirActionImportLivraison(action : Runnable)
+  +choisirFichierPlan() : Optional<File>
+  +choisirFichierLivraison() : Optional<File>
+  +afficherPlan(plan : Plan)
+  +afficherLivraisonChargee()
+  +afficherErreurXml(detail : String)
+  +reinitialiser()
+ }
+ class MainController {
+  -planCharge : Boolean
+  +MainController(ecran : MapScreen)
+  +obtenirPlan() : Plan
+  +obtenirLivraison() : Livraison
+  -importerPlan(ecran : MapScreen)
+  -importerLivraison(ecran : MapScreen)
+ }
+}
+package "fr.insa.optimod.view" {
+ class AppLauncher {
+  +{static} main(arguments : String[])
+ }
+ class MainApp {
+  +start(fenetre : Stage)
+ }
+ class MainView {
+  -boutonImporterPlan : Button
+  -boutonImporterLivraison : Button
+  -messageLivraison : Label
+  -dernierDossier : File
+  ~MainView()
+  -choisirFichierXml(titre : String) : Optional<File>
+ }
+ class MapCanvas {
+  ~afficherPlan(nouveauPlan : Plan)
+  ~effacerCarte()
+  #layoutChildren()
+  -dessinerCarte()
+ }
+ class MapProjection {
+  -longitudeMinimale : double
+  -latitudeMaximale : double
+  -echelle : double
+  -correctionLongitude : double
+  -decalageHorizontal : double
+  -decalageVertical : double
+  ~MapProjection(noeuds, largeur, hauteur, margeInterieure)
+  ~calculerAbscisseEcran(longitude : double) : double
+  ~calculerOrdonneeEcran(latitude : double) : double
+ }
+}
+package "fr.insa.optimod.model" {
+ class Plan {
+  +Plan(cheminFichierXml : String)
+  +Plan(fluxXml : InputStream)
+  -Plan(documentXml : Document)
+  -{static} creerLecteurXml() : DocumentBuilder
+  -trouverNoeud(identifiant : String) : Noeud
+  +obtenirNoeuds() : Collection<Noeud>
+  +obtenirNoeud(identifiant : long) : Noeud
+  +obtenirTroncons() : List<Troncon>
+  +obtenirTronconsSortants(noeud : Noeud) : List<Troncon>
+ }
+ class Noeud {
+  -identifiant : long
+  -longitude : double
+  -latitude : double
+  +obtenirIdentifiant() : long
+  +obtenirLongitude() : double
+  +obtenirLatitude() : double
+ }
+ class Troncon {
+  -longueur : double
+  -nomRue : String
+  +obtenirNoeudOrigine() : Noeud
+  +obtenirNoeudDestination() : Noeud
+  +obtenirLongueur() : double
+  +obtenirNomRue() : String
+ }
+ class Livraison {
+  -heureDepart : String
+  +Livraison(cheminFichierXml : String)
+  +Livraison(fluxXml : InputStream)
+  +Livraison(demandes, entrepot)
+  +Livraison(demandes, entrepot, heureDepart)
+  -Livraison(documentXml : Document)
+  -{static} creerLecteurXml() : DocumentBuilder
+  -{static} lireAttributObligatoire(element, nom) : String
+  +obtenirDemandes() : List<Demande>
+  +obtenirEntrepot() : Entrepot
+  +obtenirHeureDepart() : String
+ }
+ class Entrepot {
+  -identifiant : long
+  -heureDepart : String
+  +obtenirIdentifiant() : long
+  +obtenirHeureDepart() : String
+ }
+ class Demande {
+  -identifiantCollecte : long
+  -identifiantLivraison : long
+  -dureeCollecte : int
+  -dureeLivraison : int
+  +obtenirIdentifiantCollecte() : long
+  +obtenirIdentifiantLivraison() : long
+  +obtenirDureeCollecte() : int
+  +obtenirDureeLivraison() : int
+ }
+}
+AppLauncher ..> MainApp : lance
+MainApp --> "1" MainController : controleur
+MainApp ..> MainView : crée
+MainView ..|> MapScreen
+MainController ..> MapScreen : actions et affichage
+MainController --> "0..1" Plan : plan
+MainController --> "0..1" Livraison : livraison
+MainView *--> "1" MapCanvas : carte
+MapCanvas --> "0..1" Plan : plan
+MapCanvas ..> MapProjection : crée
+MapProjection ..> Noeud : coordonnées
+Plan *--> "0..*" Noeud : noeuds
+Plan *--> "0..*" Troncon : troncons / tronconsSortants
+Troncon --> "1" Noeud : noeudOrigine
+Troncon --> "1" Noeud : noeudDestination
+Livraison o--> "0..*" Demande : demandes
+Livraison o--> "1" Entrepot : entrepot
+note bottom of Demande
+Adresses : identifiants longs (pas de référence Noeud).
+Durées en secondes. Liste des demandes non modifiable.
+end note
+note bottom of MainView
+Implémente toutes les opérations de MapScreen.
+Héritages JavaFX : MainApp -> Application,
+MainView -> BorderPane, MapCanvas -> Pane.
+end note
+package "fr.insa.optimod.algo.tsp" {
+ interface Graphe {
+  +obtenirNombreSommets() : int
+  +obtenirCoutArc(indiceSommet, indiceDestination) : int
+  +estArc(indiceSommet, indiceDestination) : boolean
+ }
+ class GrapheComplet {
+  ~nombreSommets : int
+  ~coutsArcs : int[][]
+  +GrapheComplet(nombreSommets : int)
+ }
+ interface TSP {
+  +chercherSolution(dureeLimiteMillis, graphe)
+  +obtenirSommetSolution(indiceSommet : int) : Integer
+  +obtenirCoutSolution() : int
+ }
+ abstract class TemplateTSP {
+  -meilleureSolution : Integer[]
+  -coutMeilleureSolution : int
+  -dureeLimiteMillis : int
+  -instantDebutMillis : long
+  -instantFinMillis : long
+  +obtenirDureeCalcul() : long
+  #{abstract} calculerBorneInferieure(sommetCourant, sommetsNonVisites) : int
+  #{abstract} creerIterateurSuccesseurs(sommetCourant, sommetsNonVisites, graphe)
+  -explorerParSeparationEtEvaluation(sommetCourant, sommetsNonVisites, sommetsVisites, coutParcours)
+ }
+ class TSP1 {
+  #calculerBorneInferieure(sommetCourant, sommetsNonVisites) : int
+  #creerIterateurSuccesseurs(sommetCourant, sommetsNonVisites, graphe)
+ }
+ class IteratorSeq {
+  -candidats : Integer[]
+  -nombreCandidats : int
+  +IteratorSeq(sommetsNonVisites, sommetCourant, graphe)
+  +hasNext() : boolean
+  +next() : Integer
+  +remove()
+ }
+ class RunTSP {
+  +{static} main(arguments : String[])
+ }
+}
+class Main {
+ +{static} obtenirMessageDemarrage() : String
+ +{static} main(arguments : String[])
+}
+GrapheComplet ..|> Graphe
+TemplateTSP ..|> TSP
+TSP1 --|> TemplateTSP
+TemplateTSP --> "0..1" Graphe : graphe
+TSP1 ..> IteratorSeq : crée
+IteratorSeq ..> Graphe : filtre les successeurs
+RunTSP ..> TSP1 : crée
+RunTSP ..> GrapheComplet : crée
+note bottom of IteratorSeq
+Implémente java.util.Iterator<Integer>.
+Les noms hasNext, next et remove sont imposés par Java.
+end note
+@enduml

@@ -1,5 +1,8 @@
 {
     "Disable": {
         "IndentSize": true
-    }
+    },
+    "Exclude": [
+        "^docs/code-fourni/"
+    ]
 }

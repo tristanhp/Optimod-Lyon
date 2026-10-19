@@ -6,7 +6,7 @@ package fr.insa.optimod;
 public final class Main {
 
     /** Nom affiché de l'application. */
-    private static final String APP_NAME = "Optimod'Lyon";
+    private static final String NOM_APPLICATION = "Optimod'Lyon";
 
     private Main() {
     }
@@ -16,16 +16,16 @@ public final class Main {
      *
      * @return le message de démarrage
      */
-    public static String banner() {
-        return APP_NAME + " - optimisation de tournées de livraison à vélo";
+    public static String obtenirMessageDemarrage() {
+        return NOM_APPLICATION + " - optimisation de tournées de livraison à vélo";
     }
 
     /**
      * Démarre l'application.
      *
-     * @param args arguments de la ligne de commande (non utilisés)
+     * @param arguments arguments de la ligne de commande (non utilisés)
      */
-    public static void main(String[] args) {
-        System.out.println(banner());
+    public static void main(String[] arguments) {
+        System.out.println(obtenirMessageDemarrage());
     }
 }
