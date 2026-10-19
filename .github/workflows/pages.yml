@@ -30,7 +30,9 @@ jobs:
           cache: maven
 
       - name: Graphviz (diagrammes PlantUML)
-        run: sudo apt-get install -y --no-install-recommends graphviz >/dev/null
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends graphviz >/dev/null
 
       - name: Tests, couverture et Javadoc avec diagrammes de classes UML
         run: mvn -B -ntp -Puml clean verify javadoc:javadoc
