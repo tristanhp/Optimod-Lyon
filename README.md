@@ -52,7 +52,7 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
 | Détection de bugs (SpotBugs) | `mvn compile spotbugs:check` |
 | Javadoc avec diagrammes de classes UML | `mvn -Puml javadoc:javadoc` |
 | Rendre les diagrammes PlantUML | `./scripts/render-diagrams.sh` |
-| Lancer l'application | `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` |
+| Lancer l'application (interface) | `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` |
 | Lancer l'interface JavaFX | `mvn javafx:run` |
 
 - Rapport de couverture HTML : `target/site/jacoco/index.html`
@@ -90,7 +90,9 @@ Autres façons de lancer l'interface :
 
 - VS Code : *Exécuter et déboguer*, configuration **Interface JavaFX** ;
 - jar exécutable : `mvn clean package` puis
-  `java -cp target/optimod-lyon-0.1.0-SNAPSHOT.jar fr.insa.optimod.view.AppLauncher`.
+  `java -jar target/optimod-lyon-0.1.0-SNAPSHOT.jar` (avec `--version`, le
+  jar affiche seulement son nom, sans ouvrir de fenêtre). Le jar embarque
+  JavaFX pour Linux, Windows et macOS Apple Silicon (pas les Mac Intel).
 
 Ne pas lancer `MainApp` directement : JavaFX exige de passer par la classe
 `AppLauncher`.

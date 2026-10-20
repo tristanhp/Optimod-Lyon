@@ -1,12 +1,19 @@
 package fr.insa.optimod;
 
+import java.util.Arrays;
+
+import fr.insa.optimod.view.AppLauncher;
+
 /**
- * Point d'entrée de l'application Optimod'Lyon.
+ * Point d'entrée de l'application Optimod'Lyon (classe principale du jar).
  */
 public final class Main {
 
     /** Nom affiché de l'application. */
-    private static final String NOM_APPLICATION = "Optimod'Lyon";
+    private static final String APP_NAME = "Optimod'Lyon";
+
+    /** Option qui affiche le message de démarrage sans ouvrir l'interface. */
+    public static final String VERSION_OPTION = "--version";
 
     private Main() {
     }
@@ -17,15 +24,29 @@ public final class Main {
      * @return le message de démarrage
      */
     public static String obtenirMessageDemarrage() {
-        return NOM_APPLICATION + " - optimisation de tournées de livraison à vélo";
+        return APP_NAME + " - optimisation de tournées de livraison à vélo";
     }
 
     /**
-     * Démarre l'application.
+     * Indique si l'interface graphique doit être ouverte.
      *
-     * @param arguments arguments de la ligne de commande (non utilisés)
+     * @param args arguments de la ligne de commande
+     * @return {@code false} si {@link #VERSION_OPTION} est présent
      */
-    public static void main(String[] arguments) {
+    static boolean shouldLaunchGui(String[] args) {
+        return !Arrays.asList(args).contains(VERSION_OPTION);
+    }
+
+    /**
+     * Démarre l'application : affiche le message de démarrage puis ouvre
+     * l'interface graphique, sauf avec {@link #VERSION_OPTION}.
+     *
+     * @param args arguments de la ligne de commande
+     */
+    public static void main(String[] args) {
         System.out.println(obtenirMessageDemarrage());
+        if (shouldLaunchGui(args)) {
+            AppLauncher.main(args);
+        }
     }
 }
