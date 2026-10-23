@@ -11,52 +11,52 @@ import fr.insa.optimod.model.Noeud;
 
 public class MapProjectionTest {
 
-    private static final double W = 800;
-    private static final double H = 600;
-    private static final double PAD = 20;
+    private static final double LARGEUR = 800;
+    private static final double HAUTEUR = 600;
+    private static final double MARGE = 20;
 
     /** Noeud à partir de (latitude, longitude), dans l'ordre de lecture. */
-    private static Noeud noeud(long id, double latitude, double longitude) {
-        return new Noeud(id, longitude, latitude);
+    private static Noeud noeud(long identifiant, double latitude, double longitude) {
+        return new Noeud(identifiant, longitude, latitude);
     }
 
     @Test
     public void lNordEstEnHautEtLEstADroite() {
         Noeud sudOuest = noeud(1, 45.70, 4.80);
         Noeud nordEst = noeud(2, 45.80, 4.90);
-        MapProjection p = new MapProjection(List.of(sudOuest, nordEst), W, H, PAD);
-        assertTrue(p.toScreenY(45.80) < p.toScreenY(45.70));
-        assertTrue(p.toScreenX(4.90) > p.toScreenX(4.80));
+        MapProjection projection = new MapProjection(List.of(sudOuest, nordEst), LARGEUR, HAUTEUR, MARGE);
+        assertTrue(projection.calculerOrdonneeEcran(45.80) < projection.calculerOrdonneeEcran(45.70));
+        assertTrue(projection.calculerAbscisseEcran(4.90) > projection.calculerAbscisseEcran(4.80));
     }
 
     @Test
     public void toutLePlanResteDansLaZone() {
-        Noeud a = noeud(1, 45.70, 4.80);
-        Noeud b = noeud(2, 45.80, 4.95);
-        MapProjection p = new MapProjection(List.of(a, b), W, H, PAD);
-        for (Noeud i : List.of(a, b)) {
-            double x = p.toScreenX(i.getLongitude());
-            double y = p.toScreenY(i.getLatitude());
-            assertTrue(x >= PAD - 1e-6 && x <= W - PAD + 1e-6);
-            assertTrue(y >= PAD - 1e-6 && y <= H - PAD + 1e-6);
+        Noeud premierNoeud = noeud(1, 45.70, 4.80);
+        Noeud secondNoeud = noeud(2, 45.80, 4.95);
+        MapProjection projection = new MapProjection(List.of(premierNoeud, secondNoeud), LARGEUR, HAUTEUR, MARGE);
+        for (Noeud noeud : List.of(premierNoeud, secondNoeud)) {
+            double abscisse = projection.calculerAbscisseEcran(noeud.obtenirLongitude());
+            double ordonnee = projection.calculerOrdonneeEcran(noeud.obtenirLatitude());
+            assertTrue(abscisse >= MARGE - 1e-6 && abscisse <= LARGEUR - MARGE + 1e-6);
+            assertTrue(ordonnee >= MARGE - 1e-6 && ordonnee <= HAUTEUR - MARGE + 1e-6);
         }
     }
 
     @Test
     public void leDessinEstCentre() {
-        Noeud a = noeud(1, 45.70, 4.80);
-        Noeud b = noeud(2, 45.80, 4.82);
-        MapProjection p = new MapProjection(List.of(a, b), W, H, PAD);
-        double gauche = p.toScreenX(4.80);
-        double droite = p.toScreenX(4.82);
-        assertEquals(W - droite, gauche, 1e-6);
+        Noeud premierNoeud = noeud(1, 45.70, 4.80);
+        Noeud secondNoeud = noeud(2, 45.80, 4.82);
+        MapProjection projection = new MapProjection(List.of(premierNoeud, secondNoeud), LARGEUR, HAUTEUR, MARGE);
+        double gauche = projection.calculerAbscisseEcran(4.80);
+        double droite = projection.calculerAbscisseEcran(4.82);
+        assertEquals(LARGEUR - droite, gauche, 1e-6);
     }
 
     @Test
     public void unSeulPointNeFaitPasPlanter() {
-        Noeud a = noeud(1, 45.75, 4.85);
-        MapProjection p = new MapProjection(List.of(a), W, H, PAD);
-        assertTrue(Double.isFinite(p.toScreenX(4.85)));
-        assertTrue(Double.isFinite(p.toScreenY(45.75)));
+        Noeud premierNoeud = noeud(1, 45.75, 4.85);
+        MapProjection projection = new MapProjection(List.of(premierNoeud), LARGEUR, HAUTEUR, MARGE);
+        assertTrue(Double.isFinite(projection.calculerAbscisseEcran(4.85)));
+        assertTrue(Double.isFinite(projection.calculerOrdonneeEcran(45.75)));
     }
 }

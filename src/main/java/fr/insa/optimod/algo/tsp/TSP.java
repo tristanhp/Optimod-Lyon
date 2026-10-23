@@ -10,21 +10,21 @@ public interface TSP {
      * @param tpsLimite (int) Le temps limite de la recherche de solution en ms
      * @param g         (Graphe) Le graphe dans lequelle la solution est cherche
      */
-    public void chercheSolution(int tpsLimite, GrapheDepandance g);
+    public void chercherSolution(int tpsLimite, GrapheDepandance g);
 
     /**
      * @param i (int)
      * @return le ieme sommet visite dans la solution calculee par
-     *         <code>chercheSolution</code> (-1 si <code>chercheSolution</code> n'a
+     *         <code>chercherSolution</code> (-1 si <code>chercherSolution</code> n'a
      *         pas encore ete appele, ou si i {@literal <} 0 ou i
-     *         {@literal >}= g.getNbSommets())
+     *         {@literal >}= g.obtenirNombreSommets())
      */
-    public Integer getSolution(int i);
+    public Integer obtenirSommetSolution(int i);
 
     /**
      * @return la somme des couts des arcs de la solution calculee par
-     *         <code>chercheSolution</code> (-1 si <code>chercheSolution</code> n'a
+     *         <code>chercherSolution</code> (-1 si <code>chercherSolution</code> n'a
      *         pas encore ete appele).
      */
-    public int getCoutSolution();
+    public int obtenirCoutSolution();
 }

@@ -45,10 +45,10 @@ public final class GrapheChemins implements Graphe {
      */
     private static List<Noeud> indexerPoints(Plan plan, Livraison livraison) {
         List<Noeud> points = new ArrayList<>();
-        points.add(trouverNoeud(plan, livraison.getEntrepot().getId()));
-        for (Demande demande : livraison.getDemandes()) {
-            points.add(trouverNoeud(plan, demande.getIdCollecte()));
-            points.add(trouverNoeud(plan, demande.getIdLivraison()));
+        points.add(trouverNoeud(plan, livraison.obtenirEntrepot().obtenirIdentifiant()));
+        for (Demande demande : livraison.obtenirDemandes()) {
+            points.add(trouverNoeud(plan, demande.obtenirIdentifiantCollecte()));
+            points.add(trouverNoeud(plan, demande.obtenirIdentifiantLivraison()));
         }
         return points;
     }
@@ -62,7 +62,7 @@ public final class GrapheChemins implements Graphe {
      * @throws IllegalArgumentException si le noeud est absent du plan
      */
     private static Noeud trouverNoeud(Plan plan, long id) {
-        Noeud noeud = plan.getNoeud(id);
+        Noeud noeud = plan.obtenirNoeud(id);
         if (noeud == null) {
             throw new IllegalArgumentException(
                     "Point de livraison absent du plan : " + id);
@@ -91,7 +91,7 @@ public final class GrapheChemins implements Graphe {
     }
 
     @Override
-    public int getNbSommets() {
+    public int obtenirNombreSommets() {
         return sommets.size();
     }
 
@@ -103,7 +103,7 @@ public final class GrapheChemins implements Graphe {
      * @return la longueur arrondie au mètre si (i,j) est un arc, -1 sinon
      */
     @Override
-    public int getCout(int i, int j) {
+    public int obtenirCoutArc(int i, int j) {
         if (!estArc(i, j)) {
             return -1;
         }

@@ -17,9 +17,9 @@ public final class AppLauncher {
     /**
      * Lance l'interface graphique.
      *
-     * @param args arguments de la ligne de commande
+     * @param arguments arguments de la ligne de commande
      */
-    public static void main(String[] args) {
-        Application.launch(MainApp.class, args);
+    public static void main(String[] arguments) {
+        Application.launch(MainApp.class, arguments);
     }
 }

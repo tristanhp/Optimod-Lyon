@@ -244,3 +244,8 @@ Le seuil de couverture est défini par la propriété `jacoco.line.minimum` du
 | Nom | Prénom | Rôle |
 | --- | --- | --- |
 | | | |
+
+## Livrables UML actualisés
+
+Les [diagrammes de séquence, de classes et de packages](docs/diagrams/README.md)
+décrivent le chargement du plan et des livraisons avec les noms français du code.

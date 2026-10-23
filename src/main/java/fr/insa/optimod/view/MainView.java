@@ -10,6 +10,8 @@ import fr.insa.optimod.model.Passage;
 import fr.insa.optimod.model.Plan;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.geometry.Insets;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.BorderPane;
@@ -30,9 +32,12 @@ final class MainView extends BorderPane implements MapScreen {
     private static final double TOUR_WIDTH = 280;
 
     /** Bouton de chargement du fichier XML. */
-    private final Button importButton = new Button("Importer");
+    private final Button importButton = new Button("Importer le Plan");
 
     /** Bouton de calcul de la tournée. */
+    private final Button boutonImporterLivraison = new Button("Importer la Livraison");
+    private final Label messageLivraison = new Label();
+
     private final Button calculateButton = new Button("Calculer");
 
     /** Indicateur d'attente affiché pendant le calcul. */
@@ -59,7 +64,11 @@ final class MainView extends BorderPane implements MapScreen {
         calculateButton.getStyleClass().add("accent-button");
         waitingIndicator.setPrefSize(24, 24);
         waitingIndicator.setVisible(false);
-        HBox toolBar = new HBox(8, importButton, calculateButton,
+        boutonImporterLivraison.getStyleClass().add("accent-button");
+        boutonImporterLivraison.setDisable(true);
+        messageLivraison.setPadding(new Insets(12));
+        setBottom(messageLivraison);
+        HBox toolBar = new HBox(8, importButton, boutonImporterLivraison, calculateButton,
                 waitingIndicator);
         toolBar.getStyleClass().add("tool-bar-box");
         tourList.setPrefWidth(TOUR_WIDTH);
@@ -72,7 +81,7 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void setOnImport(Runnable action) {
+    public void definirActionImportPlan(Runnable action) {
         importButton.setOnAction(event -> action.run());
     }
 
@@ -95,9 +104,13 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public Optional<File> chooseXmlFile() {
+    public Optional<File> choisirFichierPlan() {
+        return choisirFichierXml("Importer un plan XML");
+    }
+
+    private Optional<File> choisirFichierXml(String titre) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Importer un plan XML");
+        chooser.setTitle(titre);
         chooser.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Fichiers XML", "*.xml"));
         if (lastDirectory != null && lastDirectory.isDirectory()) {
@@ -111,9 +124,11 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void showPlan(Plan plan) {
+    public void afficherPlan(Plan plan) {
         clearTour();
-        map.showPlan(plan);
+        map.afficherPlan(plan);
+        messageLivraison.setText("");
+        boutonImporterLivraison.setDisable(false);
     }
 
     @Override
@@ -139,7 +154,7 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void showInvalidXml(String detail) {
+    public void afficherErreurXml(String detail) {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Fichier XML invalide");
@@ -150,9 +165,27 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void reset() {
+    public void reinitialiser() {
         clearTour();
-        map.clear();
+        map.effacerCarte();
+        messageLivraison.setText("");
+        boutonImporterLivraison.setDisable(true);
+    }
+
+    @Override
+    public void definirActionImportLivraison(Runnable action) {
+        boutonImporterLivraison.setOnAction(event -> action.run());
+    }
+
+    @Override
+    public Optional<File> choisirFichierLivraison() {
+        return choisirFichierXml("Importer des demandes de livraison XML");
+    }
+
+    @Override
+    public void afficherLivraisonChargee() {
+        clearTour();
+        messageLivraison.setText("livraison chargée");
     }
 
     private void clearTour() {

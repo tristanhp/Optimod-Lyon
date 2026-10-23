@@ -26,22 +26,22 @@ public final class Troncon {
     }
 
     /** @return noeud de départ */
-    public Noeud getNoeudOrigine() {
+    public Noeud obtenirNoeudOrigine() {
         return noeudOrigine;
     }
 
     /** @return noeud d'arrivée */
-    public Noeud getNoeudDestination() {
+    public Noeud obtenirNoeudDestination() {
         return noeudDestination;
     }
 
     /** @return longueur en mètres */
-    public double getLongueur() {
+    public double obtenirLongueur() {
         return longueur;
     }
 
     /** @return nom de la rue */
-    public String getNomRue() {
+    public String obtenirNomRue() {
         return nomRue;
     }
 }

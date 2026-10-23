@@ -32,43 +32,43 @@ public final class Plan {
     /**
      * Lit un plan depuis un fichier XML.
      *
-     * @param xmlFileName chemin du fichier XML
+     * @param cheminFichierXml chemin du fichier XML
      * @throws IOException si le fichier est illisible
      * @throws SAXException si le XML est invalide
      */
-    public Plan(String xmlFileName) throws IOException, SAXException {
-        this(nouveauBuilder().parse(new File(xmlFileName)));
+    public Plan(String cheminFichierXml) throws IOException, SAXException {
+        this(creerLecteurXml().parse(new File(cheminFichierXml)));
     }
 
     /**
      * Lit un plan depuis un flux XML.
      *
-     * @param xml contenu XML du plan
+     * @param fluxXml contenu XML du plan
      * @throws IOException si le flux est illisible
      * @throws SAXException si le XML est invalide
      */
-    public Plan(InputStream xml) throws IOException, SAXException {
-        this(nouveauBuilder().parse(xml));
+    public Plan(InputStream fluxXml) throws IOException, SAXException {
+        this(creerLecteurXml().parse(fluxXml));
     }
 
-    private Plan(Document doc) throws SAXException {
-        doc.getDocumentElement().normalize();
+    private Plan(Document documentXml) throws SAXException {
+        documentXml.getDocumentElement().normalize();
 
-        NodeList nodeList = doc.getElementsByTagName("noeud");
-        for (int i = 0; i < nodeList.getLength(); i++) {
-            Element element = (Element) nodeList.item(i);
-            long id = Long.parseLong(element.getAttribute("id"));
+        NodeList elementsNoeuds = documentXml.getElementsByTagName("noeud");
+        for (int indiceElement = 0; indiceElement < elementsNoeuds.getLength(); indiceElement++) {
+            Element element = (Element) elementsNoeuds.item(indiceElement);
+            long identifiant = Long.parseLong(element.getAttribute("id"));
             double latitude = Double.parseDouble(element.getAttribute("latitude"));
             double longitude = Double.parseDouble(element.getAttribute("longitude"));
-            Noeud noeud = new Noeud(id, longitude, latitude);
-            noeuds.put(id, noeud);
+            Noeud noeud = new Noeud(identifiant, longitude, latitude);
+            noeuds.put(identifiant, noeud);
             tronconsSortants.put(noeud, new ArrayList<>());
         }
 
         //dictionnaire idNoeud vers Noeud pour pouvoir créer les troncons
-        NodeList tronconList = doc.getElementsByTagName("troncon");
-        for (int i = 0; i < tronconList.getLength(); i++) {
-            Element element = (Element) tronconList.item(i);
+        NodeList elementsTroncons = documentXml.getElementsByTagName("troncon");
+        for (int indiceElement = 0; indiceElement < elementsTroncons.getLength(); indiceElement++) {
+            Element element = (Element) elementsTroncons.item(indiceElement);
             Noeud origine = trouverNoeud(element.getAttribute("origine"));
             Noeud destination = trouverNoeud(element.getAttribute("destination"));
             double longueur = Double.parseDouble(element.getAttribute("longueur"));
@@ -79,44 +79,44 @@ public final class Plan {
         }
     }
 
-    private static DocumentBuilder nouveauBuilder() {
+    private static DocumentBuilder creerLecteurXml() {
         try {
-            DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
-            dbFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-            dbFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            DocumentBuilder builder = dbFactory.newDocumentBuilder();
-            builder.setErrorHandler(new DefaultHandler()); // pas de trace sur stderr
-            return builder;
-        } catch (ParserConfigurationException e) {
-            throw new IllegalStateException(e);
+            DocumentBuilderFactory fabriqueLecteurXml = DocumentBuilderFactory.newInstance();
+            fabriqueLecteurXml.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            fabriqueLecteurXml.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            DocumentBuilder lecteurXml = fabriqueLecteurXml.newDocumentBuilder();
+            lecteurXml.setErrorHandler(new DefaultHandler()); // pas de trace sur stderr
+            return lecteurXml;
+        } catch (ParserConfigurationException erreur) {
+            throw new IllegalStateException(erreur);
         }
     }
 
-    private Noeud trouverNoeud(String id) throws SAXException {
-        Noeud noeud = noeuds.get(Long.parseLong(id));
+    private Noeud trouverNoeud(String identifiant) throws SAXException {
+        Noeud noeud = noeuds.get(Long.parseLong(identifiant));
         if (noeud == null) {
-            throw new SAXException("Tronçon vers un noeud inconnu : " + id);
+            throw new SAXException("Tronçon vers un noeud inconnu : " + identifiant);
         }
         return noeud;
     }
 
     /** @return noeuds du plan (non modifiable) */
-    public Collection<Noeud> getNoeuds() {
+    public Collection<Noeud> obtenirNoeuds() {
         return Collections.unmodifiableCollection(noeuds.values());
     }
 
     /**
-     * Renvoie un noeud à partir de son id.
+     * Renvoie un noeud à partir de son identifiant.
      *
-     * @param id identifiant du noeud
+     * @param identifiant identifiant du noeud
      * @return le noeud, ou {@code null} s'il n'existe pas
      */
-    public Noeud getNoeud(long id) {
-        return noeuds.get(id);
+    public Noeud obtenirNoeud(long identifiant) {
+        return noeuds.get(identifiant);
     }
 
     /** @return tronçons du plan (non modifiable) */
-    public List<Troncon> getTroncons() {
+    public List<Troncon> obtenirTroncons() {
         return Collections.unmodifiableList(troncons);
     }
 
@@ -126,7 +126,8 @@ public final class Plan {
      * @param noeud noeud de départ
      * @return tronçons sortants (non modifiable, vide si le noeud est inconnu)
      */
-    public List<Troncon> getTronconsSortants(Noeud noeud) {
+    public List<Troncon> obtenirTronconsSortants(Noeud noeud) {
         return Collections.unmodifiableList(tronconsSortants.getOrDefault(noeud, List.of()));
     }
+
 }

@@ -43,8 +43,8 @@ public class AEtoileTest {
      * @return le chemin trouvé par A*
      */
     private Chemin chemin(long source, long cible) {
-        return aEtoile.plusCourtChemin(plan.getNoeud(source),
-                plan.getNoeud(cible));
+        return aEtoile.plusCourtChemin(plan.obtenirNoeud(source),
+                plan.obtenirNoeud(cible));
     }
 
     /** Vérifie que le chemin relie la source à la cible sans trou. */
@@ -53,9 +53,9 @@ public class AEtoileTest {
         Noeud courant = source;
         double somme = 0;
         for (Troncon t : chemin.troncons()) {
-            assertSame(courant, t.getNoeudOrigine());
-            courant = t.getNoeudDestination();
-            somme += t.getLongueur();
+            assertSame(courant, t.obtenirNoeudOrigine());
+            courant = t.obtenirNoeudDestination();
+            somme += t.obtenirLongueur();
         }
         assertSame(cible, courant);
         assertEquals(chemin.longueur(), somme, PRECISION);
@@ -67,7 +67,7 @@ public class AEtoileTest {
         Chemin chemin = chemin(1, 2);
         assertEquals(249.6, chemin.longueur(), PRECISION);
         assertEquals(2, chemin.troncons().size());
-        verifierContigu(chemin, plan.getNoeud(1), plan.getNoeud(2));
+        verifierContigu(chemin, plan.obtenirNoeud(1), plan.obtenirNoeud(2));
     }
 
     /** Les tronçons sont orientés : le retour peut être plus long. */
@@ -76,7 +76,7 @@ public class AEtoileTest {
         assertEquals(100, chemin(1, 3).longueur(), PRECISION);
         Chemin retour = chemin(3, 1);
         assertEquals(449.6, retour.longueur(), PRECISION);
-        verifierContigu(retour, plan.getNoeud(3), plan.getNoeud(1));
+        verifierContigu(retour, plan.obtenirNoeud(3), plan.obtenirNoeud(1));
     }
 
     /** Un noeud isolé est inaccessible, dans les deux sens. */
@@ -91,10 +91,10 @@ public class AEtoileTest {
     /** L'heuristique ne surestime jamais un tronçon du plan fourni. */
     @Test
     public void heuristiqueAdmissibleSurPetitPlan() throws Exception {
-        for (Troncon t : PlansPourTests.petitPlan().getTroncons()) {
-            double estimation = AEtoile.heuristique(t.getNoeudOrigine(),
-                    t.getNoeudDestination());
-            assertTrue(estimation <= t.getLongueur());
+        for (Troncon t : PlansPourTests.petitPlan().obtenirTroncons()) {
+            double estimation = AEtoile.heuristique(t.obtenirNoeudOrigine(),
+                    t.obtenirNoeudDestination());
+            assertTrue(estimation <= t.obtenirLongueur());
         }
     }
 }

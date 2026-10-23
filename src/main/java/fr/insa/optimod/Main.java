@@ -23,7 +23,7 @@ public final class Main {
      *
      * @return le message de démarrage
      */
-    public static String banner() {
+    public static String obtenirMessageDemarrage() {
         return APP_NAME + " - optimisation de tournées de livraison à vélo";
     }
 
@@ -44,7 +44,7 @@ public final class Main {
      * @param args arguments de la ligne de commande
      */
     public static void main(String[] args) {
-        System.out.println(banner());
+        System.out.println(obtenirMessageDemarrage());
         if (shouldLaunchGui(args)) {
             AppLauncher.main(args);
         }

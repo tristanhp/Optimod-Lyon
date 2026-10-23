@@ -18,7 +18,7 @@ public class MainTest {
     /** Le message de démarrage mentionne le nom de l'application. */
     @Test
     public void bannerMentionsApplicationName() {
-        assertTrue(Main.banner().contains("Optimod'Lyon"));
+        assertTrue(Main.obtenirMessageDemarrage().contains("Optimod'Lyon"));
     }
 
     /** Sans option, le jar ouvre l'interface graphique. */
@@ -44,7 +44,7 @@ public class MainTest {
         } finally {
             System.setOut(originalOut);
         }
-        assertEquals(Main.banner(),
+        assertEquals(Main.obtenirMessageDemarrage(),
                 captured.toString(StandardCharsets.UTF_8).trim());
     }
 }

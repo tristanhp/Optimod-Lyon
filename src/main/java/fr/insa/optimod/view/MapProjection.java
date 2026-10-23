@@ -12,52 +12,52 @@ import fr.insa.optimod.model.Noeud;
 final class MapProjection {
 
     /** Longitude minimale du plan. */
-    private final double minLongitude;
+    private final double longitudeMinimale;
 
     /** Latitude maximale du plan. */
-    private final double maxLatitude;
+    private final double latitudeMaximale;
 
     /** Pixels par degré de latitude. */
-    private final double scale;
+    private final double echelle;
 
     /** Rapport de longueur d'un degré de longitude sur un de latitude. */
-    private final double stretch;
+    private final double correctionLongitude;
 
     /** Décalage horizontal en pixels. */
-    private final double offsetX;
+    private final double decalageHorizontal;
 
     /** Décalage vertical en pixels. */
-    private final double offsetY;
+    private final double decalageVertical;
 
     /**
      * Calcule la projection qui fait tenir les noeuds dans la zone donnée.
      *
      * @param noeuds noeuds du plan à afficher (au moins un)
-     * @param width largeur disponible, en pixels
-     * @param height hauteur disponible, en pixels
-     * @param padding marge intérieure, en pixels
+     * @param largeur largeur disponible, en pixels
+     * @param hauteur hauteur disponible, en pixels
+     * @param margeInterieure marge intérieure, en pixels
      */
-    MapProjection(Collection<Noeud> noeuds, double width, double height, double padding) {
-        double minLat = Double.POSITIVE_INFINITY;
-        double maxLat = Double.NEGATIVE_INFINITY;
-        double minLon = Double.POSITIVE_INFINITY;
-        double maxLon = Double.NEGATIVE_INFINITY;
-        for (Noeud n : noeuds) {
-            minLat = Math.min(minLat, n.getLatitude());
-            maxLat = Math.max(maxLat, n.getLatitude());
-            minLon = Math.min(minLon, n.getLongitude());
-            maxLon = Math.max(maxLon, n.getLongitude());
+    MapProjection(Collection<Noeud> noeuds, double largeur, double hauteur, double margeInterieure) {
+        double latitudeMinimale = Double.POSITIVE_INFINITY;
+        double latitudeMaximaleLue = Double.NEGATIVE_INFINITY;
+        double longitudeMinimaleLue = Double.POSITIVE_INFINITY;
+        double longitudeMaximale = Double.NEGATIVE_INFINITY;
+        for (Noeud noeud : noeuds) {
+            latitudeMinimale = Math.min(latitudeMinimale, noeud.obtenirLatitude());
+            latitudeMaximaleLue = Math.max(latitudeMaximaleLue, noeud.obtenirLatitude());
+            longitudeMinimaleLue = Math.min(longitudeMinimaleLue, noeud.obtenirLongitude());
+            longitudeMaximale = Math.max(longitudeMaximale, noeud.obtenirLongitude());
         }
-        stretch = Math.cos(Math.toRadians((minLat + maxLat) / 2));
-        double spanX = Math.max((maxLon - minLon) * stretch, 1e-9);
-        double spanY = Math.max(maxLat - minLat, 1e-9);
-        double availableX = Math.max(width - 2 * padding, 1);
-        double availableY = Math.max(height - 2 * padding, 1);
-        scale = Math.min(availableX / spanX, availableY / spanY);
-        minLongitude = minLon;
-        maxLatitude = maxLat;
-        offsetX = padding + (availableX - spanX * scale) / 2;
-        offsetY = padding + (availableY - spanY * scale) / 2;
+        correctionLongitude = Math.cos(Math.toRadians((latitudeMinimale + latitudeMaximaleLue) / 2));
+        double etendueHorizontale = Math.max((longitudeMaximale - longitudeMinimaleLue) * correctionLongitude, 1e-9);
+        double etendueVerticale = Math.max(latitudeMaximaleLue - latitudeMinimale, 1e-9);
+        double largeurDisponible = Math.max(largeur - 2 * margeInterieure, 1);
+        double hauteurDisponible = Math.max(hauteur - 2 * margeInterieure, 1);
+        echelle = Math.min(largeurDisponible / etendueHorizontale, hauteurDisponible / etendueVerticale);
+        longitudeMinimale = longitudeMinimaleLue;
+        latitudeMaximale = latitudeMaximaleLue;
+        decalageHorizontal = margeInterieure + (largeurDisponible - etendueHorizontale * echelle) / 2;
+        decalageVertical = margeInterieure + (hauteurDisponible - etendueVerticale * echelle) / 2;
     }
 
     /**
@@ -66,8 +66,8 @@ final class MapProjection {
      * @param longitude longitude en degrés
      * @return abscisse, croissante vers l'est
      */
-    double toScreenX(double longitude) {
-        return offsetX + (longitude - minLongitude) * stretch * scale;
+    double calculerAbscisseEcran(double longitude) {
+        return decalageHorizontal + (longitude - longitudeMinimale) * correctionLongitude * echelle;
     }
 
     /**
@@ -76,7 +76,7 @@ final class MapProjection {
      * @param latitude latitude en degrés
      * @return ordonnée, croissante vers le sud (le nord est en haut)
      */
-    double toScreenY(double latitude) {
-        return offsetY + (maxLatitude - latitude) * scale;
+    double calculerOrdonneeEcran(double latitude) {
+        return decalageVertical + (latitudeMaximale - latitude) * echelle;
     }
 }

@@ -7,7 +7,7 @@ import java.util.Iterator;
 public class TSP3 extends TemplateTSP {
 
     @Override
-    protected int bound(Integer sommetCourant, Collection<Integer> nonVus) {
+    protected int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus) {
         /*
          * Cette fonction d’évaluation calcule une borne inférieure de la
          * longueur du plus court chemin allant du dernier sommet visité jusqu’à 0
@@ -15,17 +15,17 @@ public class TSP3 extends TemplateTSP {
          * exactement une fois 1.
          */
         if (nonVus.size() == 1) {
-            return g.getCout(sommetCourant, 0);
+            return g.obtenirCoutArc(sommetCourant, 0);
         }
         int res = coutMin(sommetCourant, nonVus);
-        Iterator<Integer> it = iterator(sommetCourant, nonVus, g);
+        Iterator<Integer> it = creerIterateurSuccesseurs(sommetCourant, nonVus, g);
         while (it.hasNext()) {
             int next = it.next();
             int temp = coutMin(next, nonVus);
-            if (temp < g.getCout(next, 0)) {
+            if (temp < g.obtenirCoutArc(next, 0)) {
                 res += temp;
             } else {
-                res += g.getCout(next, 0);
+                res += g.obtenirCoutArc(next, 0);
             }
         }
         // System.out.println(res);
@@ -33,7 +33,7 @@ public class TSP3 extends TemplateTSP {
     }
 
     @Override
-    protected Iterator<Integer> iterator(Integer sommetCrt, Collection<Integer> nonVus, Graphe g) {
+    protected Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt, Collection<Integer> nonVus, Graphe g) {
         return new IteratorSeq(nonVus, sommetCrt, g);
     }
 
@@ -42,7 +42,7 @@ public class TSP3 extends TemplateTSP {
             GrapheDepandance g) {
         return false;
         /*
-         * Iterator<Integer> it = iterator(sommetCrt, nonVus, g);
+         * Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt, nonVus, g);
          * if (!it.hasNext())
          * return false;
          * Integer sommetprecedent = it.next();
@@ -60,16 +60,16 @@ public class TSP3 extends TemplateTSP {
     }
 
     private boolean cross(Graphe g, int i, int j, int k, int l) { // arc (i, j) et arc (k, l)
-        return ((g.getCout(i, j)) + g.getCout(k, l)) > (g.getCout(i, k) + g.getCout(j, l));
+        return ((g.obtenirCoutArc(i, j)) + g.obtenirCoutArc(k, l)) > (g.obtenirCoutArc(i, k) + g.obtenirCoutArc(j, l));
     }
 
     private int coutMin(Integer sommet, Collection<Integer> listeSommet) {
         int min = Integer.MAX_VALUE;
-        Iterator<Integer> it = iterator(sommet, listeSommet, g);
+        Iterator<Integer> it = creerIterateurSuccesseurs(sommet, listeSommet, g);
         while (it.hasNext()) {
             int next = it.next();
-            if (g.getCout(sommet, next) < min)
-                min = g.getCout(sommet, next);
+            if (g.obtenirCoutArc(sommet, next) < min)
+                min = g.obtenirCoutArc(sommet, next);
         }
         return min;
     }
@@ -77,27 +77,27 @@ public class TSP3 extends TemplateTSP {
     @Override
     protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, GrapheDepandance g) {
         ArrayList<Integer> resultat = new ArrayList<Integer>(nonVus.size() + 1);
-        Iterator<Integer> it = iterator(sommetCrt, nonVus, g);
+        Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt, nonVus, g);
         while (it.hasNext()) {
             int next = it.next();
             int i = 0;
             for (i = 0; i < resultat.size(); i++) {
-                if (g.getCout(sommetCrt, next) < g.getCout(sommetCrt, resultat.get(i))) {
+                if (g.obtenirCoutArc(sommetCrt, next) < g.obtenirCoutArc(sommetCrt, resultat.get(i))) {
                     break;
                 }
             }
             resultat.add(i, next);
-            // System.out.println(i + " [" + next + "] : " + g.getCout(sommetCrt, next));
+            // System.out.println(i + " [" + next + "] : " + g.obtenirCoutArc(sommetCrt, next));
 
             // for (i = 0; i < resultat.size(); i++) {
-            // System.out.print(resultat.get(i) + " (" + g.getCout(sommetCrt,
+            // System.out.print(resultat.get(i) + " (" + g.obtenirCoutArc(sommetCrt,
             // resultat.get(i)) + ") ");
             // }
             // System.out.print("\n");
         }
         // System.out.print("RES : ");
         // for (int i = 0; i < resultat.size(); i++) {
-        // System.out.print(resultat.get(i) + " (" + g.getCout(sommetCrt,
+        // System.out.print(resultat.get(i) + " (" + g.obtenirCoutArc(sommetCrt,
         // resultat.get(i)) + ") ");
         // }
         // System.out.print("\n");
