@@ -47,13 +47,13 @@ public class TSPTest {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp2 = new TSP2();
-        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
     }
 
@@ -65,13 +65,15 @@ public class TSPTest {
         /*
          * System.out.println("Cout graphe : " +
          * Integer.toString(tsp1.obtenirCoutSolution()));
-         * System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) +
+         * System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul())
+         * +
          * "ms");
          *
          * System.out.println("Graphe : [\n");
          * for (int i = 0; i < 10; ++i) {
          * for (int j = 0; j < 10; ++j) {
-         * System.out.print(Integer.toString(grapheDepandance.obtenirCoutArc(i, j)) + ", ");
+         * System.out.print(Integer.toString(grapheDepandance.obtenirCoutArc(i, j)) +
+         * ", ");
          * }
          * System.out.println("");
          * }

@@ -1,6 +1,7 @@
 package fr.insa.optimod.algo;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import fr.insa.optimod.algo.tsp.TSP;
 import fr.insa.optimod.algo.tsp.TSP2;
@@ -23,6 +24,7 @@ enum TSPResult {
 
 public class CalculateurTournee {
     private final int TEMPS_LIMITE_MS = 10000;
+    public static final double VITESSE_KMH = 15;
     GrapheChemins grapheChemins;
     ArrayList<Chemin> listeChemin;
     ArrayList<Etape> listeEtape;
@@ -40,11 +42,23 @@ public class CalculateurTournee {
         grapheChemins = new GrapheChemins(plan, livraison);
         TSP tsp = new TSP2();
         tsp.chercheSolution(TEMPS_LIMITE_MS, grapheChemins);
-        listeEtape.add(new Etape(livraison.getEntrepot(), TEMPS_LIMITE_MS, TEMPS_LIMITE_MS))
-        for (int i = 1; i<grapheChemins.getNbSommets(); i++) {
-            listeChemin.add(grapheChemins.getChemin(tsp.getSolution(i-1), tsp.getSolution(i)));
-            listeEtape.add(new Etape(i, i, i));
+        listeEtape.add(new Etape(livraison.obtenirEntrepot().obtenirIdentifiant(), 0, 0));
+        int heure = 0;
+        for (int i = 1; i < grapheChemins.obtenirNombreSommets(); i++) {
+            Chemin chemin = grapheChemins.getChemin(tsp.obtenirSommetSolution(i - 1), tsp.obtenirSommetSolution(i));
+            listeChemin.add(chemin);
+            heure += Math.round(chemin.longueur() / VITESSE_KMH * 1000 / 3600);
+            listeEtape.add(new Etape(grapheChemins.obtenirIdNoeuds(i), 100, heure));
+            heure += 100;
         }
         return TSPResult.RESULT_OK;
+    }
+
+    public List<Chemin> obtenirListeChemin() {
+        return listeChemin;
+    }
+
+    public List<Etape> obtenirListeEtape() {
+        return listeEtape;
     }
 }

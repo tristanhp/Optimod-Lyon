@@ -48,7 +48,7 @@ public class TSP3Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP3 renvoie le cout de la meilleur solution. */
@@ -100,7 +100,8 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
+                    sommetDepart,
                     suivant));
             precedent = suivant;
         }
@@ -116,7 +117,8 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
+                    sommetDepart,
                     suivant));
             precedent = suivant;
         }

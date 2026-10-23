@@ -39,7 +39,7 @@ public final class GrapheChemins implements Graphe { // extends GrapheDepandance
     public GrapheChemins(Plan plan, Livraison livraison) {
         sommets = indexerPoints(plan, livraison);
         chemins = calculerChemins(new AEtoile(plan), sommets);
-        depandance = creerDepandanceHashMap(getNbSommets());
+        depandance = creerDepandanceHashMap(obtenirNombreSommets());
     }
 
     /**
@@ -169,5 +169,18 @@ public final class GrapheChemins implements Graphe { // extends GrapheDepandance
      */
     public int getDepandance(int indice) {
         return (this.depandance.getOrDefault(indice, -1));
+    }
+
+    /**
+     * Renvoie le plus court chemin entre deux sommets.
+     *
+     * @param i sommet de départ
+     * @param j sommet d'arrivée
+     * @return le chemin, {@link Chemin#INACCESSIBLE} si j est inaccessible
+     *         depuis i
+     * @throws ArrayIndexOutOfBoundsException si un sommet n'existe pas
+     */
+    public long obtenirIdNoeuds(int indiceSommet) {
+        return sommets.get(indiceSommet).obtenirIdentifiant();
     }
 }
