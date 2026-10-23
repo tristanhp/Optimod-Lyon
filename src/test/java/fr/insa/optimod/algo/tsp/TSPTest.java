@@ -109,11 +109,4 @@ public class TSPTest {
         }
         // System.out.println();
     }
-
-    /** IGNORE. */
-    @Test
-    public void testBound() {
-        // TODO : SUPPRIMER
-        assertTrue(0 == 0);
-    }
 }
