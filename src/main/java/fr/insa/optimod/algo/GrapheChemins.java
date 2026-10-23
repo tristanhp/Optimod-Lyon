@@ -1,9 +1,11 @@
 package fr.insa.optimod.algo;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import fr.insa.optimod.algo.tsp.Graphe;
+import fr.insa.optimod.model.Chemin;
 import fr.insa.optimod.model.Demande;
 import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Noeud;
@@ -15,7 +17,7 @@ import fr.insa.optimod.model.Plan;
  * l'entrepôt, puis pour la demande k, 2k+1 est sa collecte et 2k+2 sa
  * livraison.
  */
-public final class GrapheChemins implements Graphe {
+public final class GrapheChemins implements Graphe { // extends GrapheDepandance {
 
     /** Noeud du plan associé à chaque sommet. */
     private final List<Noeud> sommets;
@@ -23,23 +25,27 @@ public final class GrapheChemins implements Graphe {
     /** Plus court chemin entre chaque couple de sommets. */
     private final Chemin[][] chemins;
 
+    /** Dictionnaire des depandances du graphe */
+    private HashMap<Integer, Integer> depandance;
+
     /**
      * Construit le graphe en calculant les plus courts chemins entre tous les
      * points de la livraison.
      *
-     * @param plan plan de la ville
+     * @param plan      plan de la ville
      * @param livraison entrepôt et demandes à desservir
      * @throws IllegalArgumentException si un point est absent du plan
      */
     public GrapheChemins(Plan plan, Livraison livraison) {
         sommets = indexerPoints(plan, livraison);
         chemins = calculerChemins(new AEtoile(plan), sommets);
+        depandance = creerDepandanceHashMap(getNbSommets());
     }
 
     /**
      * Range les points de la livraison dans l'ordre des sommets.
      *
-     * @param plan plan de la ville
+     * @param plan      plan de la ville
      * @param livraison entrepôt et demandes
      * @return les noeuds, rangés par numéro de sommet
      */
@@ -54,10 +60,29 @@ public final class GrapheChemins implements Graphe {
     }
 
     /**
+     * Création un dictionnaire des depandances collecte et livraison
+     *
+     * @param nbNoeuds le nombre de noeuds
+     * @return Hashmap des depandances du graphe
+     */
+    private static HashMap<Integer, Integer> creerDepandanceHashMap(int nbNoeuds) {
+        HashMap<Integer, Integer> depandance = new HashMap<>();
+        /*
+         * Numérotation des sommets : 0 est l'entrepôt, puis pour la demande k, 2k+1 est
+         * sa collecte et 2k+2 sa livraison.
+         * Il y 2*n + 1 noeud avec n collecte, n livraison et 1 entrepot
+         */
+        for (int i = 0; i < (int) (nbNoeuds) - 1 / 2; i++) {
+            depandance.put(2 * i + 1, 2 * i + 2);
+        }
+        return depandance;
+    }
+
+    /**
      * Renvoie le noeud du plan qui porte un id donné.
      *
      * @param plan plan de la ville
-     * @param id identifiant du noeud
+     * @param id   identifiant du noeud
      * @return le noeud
      * @throws IllegalArgumentException si le noeud est absent du plan
      */
@@ -134,5 +159,15 @@ public final class GrapheChemins implements Graphe {
      */
     public Chemin getChemin(int i, int j) {
         return chemins[i][j];
+    }
+
+    /**
+     * Retourne la depandance d'un sommet
+     *
+     * @param indice
+     * @return la depandance si indice a une depandance, -1 sinon
+     */
+    public int getDepandance(int indice) {
+        return (this.depandance.getOrDefault(indice, -1));
     }
 }

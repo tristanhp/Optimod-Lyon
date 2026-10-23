@@ -17,12 +17,12 @@ public class TSP1 extends TemplateTSP {
 
     @Override
     protected Boolean croisementArc(Integer sommetCrt, Integer sommetVisite, Collection<Integer> nonVus,
-            GrapheDepandance g) {
+            Graphe g) {
         return false;
     }
 
     @Override
-    protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, GrapheDepandance g) {
+    protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, Graphe g) {
         return nonVus;
     }
 }

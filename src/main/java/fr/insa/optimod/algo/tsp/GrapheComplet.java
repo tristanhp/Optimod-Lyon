@@ -52,4 +52,9 @@ public class GrapheComplet implements Graphe {
         return i != j;
     }
 
+    @Override
+    public int getDepandance(int indice) {
+        return -1;
+    }
+
 }

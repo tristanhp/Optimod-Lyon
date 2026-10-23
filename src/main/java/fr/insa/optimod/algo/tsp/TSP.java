@@ -10,7 +10,7 @@ public interface TSP {
      * @param tpsLimite (int) Le temps limite de la recherche de solution en ms
      * @param g         (Graphe) Le graphe dans lequelle la solution est cherche
      */
-    public void chercheSolution(int tpsLimite, GrapheDepandance g);
+    public void chercheSolution(int tpsLimite, Graphe g);
 
     /**
      * @param i (int)

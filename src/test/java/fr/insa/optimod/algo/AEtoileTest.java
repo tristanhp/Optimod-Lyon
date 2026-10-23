@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 
+import fr.insa.optimod.model.Chemin;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Troncon;
@@ -39,7 +40,7 @@ public class AEtoileTest {
      * Cherche le plus court chemin entre deux noeuds du petit réseau.
      *
      * @param source id du noeud de départ
-     * @param cible id du noeud d'arrivée
+     * @param cible  id du noeud d'arrivée
      * @return le chemin trouvé par A*
      */
     private Chemin chemin(long source, long cible) {

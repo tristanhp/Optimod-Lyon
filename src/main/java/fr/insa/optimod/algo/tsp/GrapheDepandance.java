@@ -32,14 +32,7 @@ public class GrapheDepandance implements Graphe {
         return i != j;
     }
 
-    /**
-     * Retourne la depandance d'un sommet
-     *
-     * @param indice
-     * @return la depandance si indice a une depandance, -1 sinon
-     */
     public int getDepandance(int indice) {
         return (this.depandance.getOrDefault(indice, -1));
     }
-
 }

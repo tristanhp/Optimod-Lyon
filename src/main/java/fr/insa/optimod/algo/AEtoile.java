@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 
+import fr.insa.optimod.model.Chemin;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Troncon;
@@ -49,7 +50,7 @@ public final class AEtoile {
      * des tronçons.
      *
      * @param source noeud de départ
-     * @param cible noeud d'arrivée
+     * @param cible  noeud d'arrivée
      * @return le plus court chemin, ou {@link Chemin#INACCESSIBLE} si la cible
      *         ne peut pas être atteinte
      */
@@ -95,9 +96,9 @@ public final class AEtoile {
      * Remonte les prédécesseurs de la cible jusqu'à la source.
      *
      * @param predecesseurs tronçon par lequel chaque noeud a été atteint
-     * @param source noeud de départ
-     * @param cible noeud d'arrivée
-     * @param longueur longueur du chemin trouvé
+     * @param source        noeud de départ
+     * @param cible         noeud d'arrivée
+     * @param longueur      longueur du chemin trouvé
      * @return le chemin de la source à la cible
      */
     private static Chemin reconstruireChemin(
@@ -126,11 +127,10 @@ public final class AEtoile {
         double latitudeA = Math.toRadians(noeud.getLatitude());
         double latitudeB = Math.toRadians(cible.getLatitude());
         double ecartLatitude = latitudeB - latitudeA;
-        double ecartLongitude =
-                Math.toRadians(cible.getLongitude() - noeud.getLongitude());
+        double ecartLongitude = Math.toRadians(cible.getLongitude() - noeud.getLongitude());
         double h = Math.pow(Math.sin(ecartLatitude / 2), 2)
                 + Math.cos(latitudeA) * Math.cos(latitudeB)
-                * Math.pow(Math.sin(ecartLongitude / 2), 2);
+                        * Math.pow(Math.sin(ecartLongitude / 2), 2);
         double volOiseau = 2 * RAYON_TERRE * Math.asin(Math.sqrt(h));
         return COEFFICIENT_HEURISTIQUE * volOiseau;
     }

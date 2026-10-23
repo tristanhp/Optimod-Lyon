@@ -39,7 +39,7 @@ public class TSP3 extends TemplateTSP {
 
     @Override
     protected Boolean croisementArc(Integer sommetCrt, Integer sommetVisite, Collection<Integer> nonVus,
-            GrapheDepandance g) {
+            Graphe g) {
         return false;
         /*
          * Iterator<Integer> it = iterator(sommetCrt, nonVus, g);
@@ -75,7 +75,7 @@ public class TSP3 extends TemplateTSP {
     }
 
     @Override
-    protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, GrapheDepandance g) {
+    protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, Graphe g) {
         ArrayList<Integer> resultat = new ArrayList<Integer>(nonVus.size() + 1);
         Iterator<Integer> it = iterator(sommetCrt, nonVus, g);
         while (it.hasNext()) {

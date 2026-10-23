@@ -1,21 +1,18 @@
-package fr.insa.optimod.algo;
+package fr.insa.optimod.model;
 
 import java.util.List;
-
-import fr.insa.optimod.model.Troncon;
 
 /**
  * Plus court chemin entre deux noeuds du plan.
  *
  * @param longueur longueur totale en mètres, infinie si la cible est
- *        inaccessible
+ *                 inaccessible
  * @param troncons tronçons parcourus dans l'ordre, de la source à la cible
  */
 public record Chemin(double longueur, List<Troncon> troncons) {
 
     /** Chemin renvoyé quand la cible ne peut pas être atteinte. */
-    public static final Chemin INACCESSIBLE =
-            new Chemin(Double.POSITIVE_INFINITY, List.of());
+    public static final Chemin INACCESSIBLE = new Chemin(Double.POSITIVE_INFINITY, List.of());
 
     /**
      * Crée un chemin en copiant la liste des tronçons.

@@ -7,7 +7,7 @@ import java.util.Iterator;
 public abstract class TemplateTSP implements TSP {
 
     private Integer[] meilleureSolution;
-    protected GrapheDepandance g;
+    protected Graphe g;
     private int coutMeilleureSolution;
     // private int coutLimite = Integer.MAX_VALUE; // A changer pour stopper TSP si
     // le cout actuelle depasse 18h
@@ -15,7 +15,7 @@ public abstract class TemplateTSP implements TSP {
     private long tpsDebut;
     private long tpsFin;
 
-    public void chercheSolution(int tpsLimite, GrapheDepandance g) {
+    public void chercheSolution(int tpsLimite, Graphe g) {
         if (tpsLimite <= 0)
             return;
         tpsDebut = System.currentTimeMillis();
@@ -83,7 +83,7 @@ public abstract class TemplateTSP implements TSP {
      * @return true s'il y a un croisement d'arc, false sinon (TODO : texe a revoir)
      */
     protected abstract Boolean croisementArc(Integer sommetCrt, Integer sommetVisite, Collection<Integer> nonVus,
-            GrapheDepandance g);
+            Graphe g);
 
     /**
      * Methode devant etre redefinie par les sous-classes de TemplateTSP
@@ -94,7 +94,7 @@ public abstract class TemplateTSP implements TSP {
      * @return une liste des sommet non vus trie par distance du sommet courant
      */
     protected abstract Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus,
-            GrapheDepandance g);
+            Graphe g);
 
     /**
      * Methode definissant le patron (template) d'une resolution par separation et
