@@ -33,6 +33,23 @@ public class MainControllerTest {
 
     /** Écran factice qui enregistre ce que le contrôleur lui demande. */
     private static final class FakeScreen implements MapScreen {
+        private Runnable actionImportLivraison;
+
+        @Override
+        public void definirActionImportLivraison(Runnable action) {
+            actionImportLivraison = action;
+        }
+
+        @Override
+        public Optional<File> choisirFichierLivraison() {
+            return Optional.ofNullable(chosen);
+        }
+
+        @Override
+        public void afficherLivraisonChargee() {
+            events.add("livraison chargée");
+        }
+
         private Runnable onImport;
         private Runnable onCalculate;
         private File chosen;
@@ -44,7 +61,7 @@ public class MainControllerTest {
         private String calculationError;
 
         @Override
-        public void setOnImport(Runnable action) {
+        public void definirActionImportPlan(Runnable action) {
             onImport = action;
         }
 
@@ -65,12 +82,12 @@ public class MainControllerTest {
         }
 
         @Override
-        public Optional<File> chooseXmlFile() {
+        public Optional<File> choisirFichierPlan() {
             return Optional.ofNullable(chosen);
         }
 
         @Override
-        public void showPlan(Plan plan) {
+        public void afficherPlan(Plan plan) {
             shown = plan;
             events.add("plan");
         }
@@ -88,14 +105,14 @@ public class MainControllerTest {
         }
 
         @Override
-        public void showInvalidXml(String detail) {
+        public void afficherErreurXml(String detail) {
             events.add("invalide");
         }
 
         @Override
-        public void reset() {
+        public void reinitialiser() {
             shown = null;
-            events.add("reset");
+            events.add("reinitialiser");
         }
     }
 
@@ -161,8 +178,8 @@ public class MainControllerTest {
     public void afficheLePlanImporte() throws Exception {
         importerPlan();
         assertEquals(List.of("plan"), screen.events);
-        assertEquals(1, screen.shown.getNoeuds().size());
-        assertEquals(screen.shown, controller.getPlan());
+        assertEquals(1, screen.shown.obtenirNoeuds().size());
+        assertEquals(screen.shown, controller.obtenirPlan());
     }
 
     @Test
@@ -170,9 +187,9 @@ public class MainControllerTest {
         importerPlan();
         screen.chosen = ecrire("<reseau>");
         screen.onImport.run();
-        assertEquals(List.of("plan", "invalide", "reset"), screen.events);
+        assertEquals(List.of("plan", "invalide", "reinitialiser"), screen.events);
         assertNull(screen.shown);
-        assertNull(controller.getPlan());
+        assertNull(controller.obtenirPlan());
     }
 
     @Test
@@ -181,12 +198,12 @@ public class MainControllerTest {
         screen.chosen = null;
         screen.onImport.run();
         assertEquals(List.of("plan"), screen.events);
-        assertNotNull(controller.getPlan());
+        assertNotNull(controller.obtenirPlan());
     }
 
     @Test
     public void pasDePlanAuDepart() {
-        assertNull(controller.getPlan());
+        assertNull(controller.obtenirPlan());
         assertTrue(screen.events.isEmpty());
     }
 
@@ -201,6 +218,34 @@ public class MainControllerTest {
     public void calculerActiveAvecUnPlanEtUnLot() throws Exception {
         importerPlan();
         controller.setLivraison(LOT);
+        assertTrue(screen.calculateEnabled);
+    }
+
+    @Test
+    public void importLivraisonActiveLeCalcul() throws Exception {
+        importerPlan();
+        screen.chosen = new File(getClass().getResource(
+                "/data/demandePetit1.xml").toURI());
+        screen.actionImportLivraison.run();
+        assertNotNull(controller.obtenirLivraison());
+        assertTrue(screen.calculateEnabled);
+        screen.onCalculate.run();
+        executerArrierePlan();
+        assertSame(controller.obtenirLivraison(), lotRecu);
+        assertSame(TOURNEE, screen.tour);
+    }
+
+    @Test
+    public void resultatIgnoreSiLaLivraisonChangePendantLeCalcul()
+            throws Exception {
+        importerPlan();
+        controller.setLivraison(LOT);
+        screen.onCalculate.run();
+        controller.setLivraison(new Livraison(List.of(),
+                new Entrepot(1, "9:0:0")));
+        executerArrierePlan();
+        assertNull(screen.tour);
+        assertFalse(screen.waiting);
         assertTrue(screen.calculateEnabled);
     }
 
@@ -237,7 +282,7 @@ public class MainControllerTest {
         assertEquals(List.of("attente:true", "attente:false", "tournee"),
                 screen.events);
         assertSame(TOURNEE, screen.tour);
-        assertSame(controller.getPlan(), planRecu);
+        assertSame(controller.obtenirPlan(), planRecu);
         assertSame(LOT, lotRecu);
         assertTrue(screen.calculateEnabled);
     }

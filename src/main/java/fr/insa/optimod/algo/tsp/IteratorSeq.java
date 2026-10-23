@@ -7,30 +7,30 @@ import java.util.NoSuchElementException;
 public class IteratorSeq implements Iterator<Integer> {
 
     private Integer[] candidats;
-    private int nbCandidats;
+    private int nombreCandidats;
 
     /**
-     * Cree un iterateur pour iterer sur l'ensemble des sommets de nonVus qui sont
-     * successeurs de sommetCrt dans le graphe g,
-     * dans l'odre d'apparition dans <code>nonVus</code>
+     * Cree un iterateur pour iterer sur l'ensemble des sommets de sommetsNonVisites qui sont
+     * successeurs de sommetCourant dans le graphe graphe,
+     * dans l'odre d'apparition dans <code>sommetsNonVisites</code>
      *
-     * @param nonVus
-     * @param sommetCrt
-     * @param g
+     * @param sommetsNonVisites
+     * @param sommetCourant
+     * @param graphe
      */
-    public IteratorSeq(Collection<Integer> nonVus, int sommetCrt, Graphe g) {
-        this.candidats = new Integer[nonVus.size()];
-        Iterator<Integer> it = nonVus.iterator();
-        while (it.hasNext()) {
-            Integer s = it.next();
-            if (g.estArc(sommetCrt, s))
-                candidats[nbCandidats++] = s;
+    public IteratorSeq(Collection<Integer> sommetsNonVisites, int sommetCourant, Graphe graphe) {
+        this.candidats = new Integer[sommetsNonVisites.size()];
+        Iterator<Integer> iterateurSommets = sommetsNonVisites.iterator();
+        while (iterateurSommets.hasNext()) {
+            Integer sommetCandidat = iterateurSommets.next();
+            if (graphe.estArc(sommetCourant, sommetCandidat))
+                candidats[nombreCandidats++] = sommetCandidat;
         }
     }
 
     @Override
     public boolean hasNext() {
-        return nbCandidats > 0;
+        return nombreCandidats > 0;
     }
 
     @Override
@@ -38,8 +38,8 @@ public class IteratorSeq implements Iterator<Integer> {
         if (!hasNext()) {
             throw new NoSuchElementException("No more elements available");
         }
-        nbCandidats--;
-        return candidats[nbCandidats];
+        nombreCandidats--;
+        return candidats[nombreCandidats];
     }
 
     @Override

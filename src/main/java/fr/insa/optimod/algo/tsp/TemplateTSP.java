@@ -21,30 +21,30 @@ public abstract class TemplateTSP implements TSP {
         tpsDebut = System.currentTimeMillis();
         this.tpsLimite = tpsLimite;
         this.g = g;
-        meilleureSolution = new Integer[g.getNbSommets()];
-        Collection<Integer> nonVus = new ArrayList<Integer>(g.getNbSommets() - 1);
-        for (int i = 1; i < g.getNbSommets(); i++)
+        meilleureSolution = new Integer[g.obtenirNombreSommets()];
+        Collection<Integer> nonVus = new ArrayList<Integer>(g.obtenirNombreSommets() - 1);
+        for (int i = 1; i < g.obtenirNombreSommets(); i++)
             nonVus.add(i);
-        Collection<Integer> vus = new ArrayList<Integer>(g.getNbSommets());
+        Collection<Integer> vus = new ArrayList<Integer>(g.obtenirNombreSommets());
         vus.add(0); // le premier sommet visite est 0
         coutMeilleureSolution = Integer.MAX_VALUE;
         branchAndBound(0, nonVus, vus, 0);
         tpsFin = System.currentTimeMillis();
     }
 
-    public Integer getSolution(int i) {
-        if (g != null && i >= 0 && i < g.getNbSommets())
+    public Integer obtenirSommetSolution(int i) {
+        if (g != null && i >= 0 && i < g.obtenirNombreSommets())
             return meilleureSolution[i];
         return -1;
     }
 
-    public int getCoutSolution() {
+    public int obtenirCoutSolution() {
         if (g != null)
             return coutMeilleureSolution;
         return -1;
     }
 
-    public long getDureeCalcul() {
+    public long obtenirDureeCalcul() {
         if (g != null)
             return tpsFin - tpsDebut;
         return -1;
@@ -60,7 +60,7 @@ public abstract class TemplateTSP implements TSP {
      *         tous les sommets de <code>nonVus</code> exactement une fois, puis
      *         retournant sur le sommet <code>0</code>.
      */
-    protected abstract int bound(Integer sommetCourant, Collection<Integer> nonVus);
+    protected abstract int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus);
 
     /**
      * Methode devant etre redefinie par les sous-classes de TemplateTSP
@@ -72,7 +72,8 @@ public abstract class TemplateTSP implements TSP {
      *         <code>nonVus</code> qui sont successeurs de
      *         <code>sommetCourant</code>
      */
-    protected abstract Iterator<Integer> iterator(Integer sommetCrt, Collection<Integer> nonVus, Graphe g);
+    protected abstract Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt, Collection<Integer> nonVus,
+            Graphe g);
 
     /**
      * Methode devant etre redefinie par les sous-classes de TemplateTSP
@@ -98,7 +99,8 @@ public abstract class TemplateTSP implements TSP {
 
     /**
      * Methode definissant le patron (template) d'une resolution par separation et
-     * evaluation (branch and bound) du TSP pour le graphe <code>g</code>.
+     * evaluation (branch and calculerBorneInferieure) du TSP pour le graphe
+     * <code>g</code>.
      *
      * @param sommetCrt le dernier sommet visite
      * @param nonVus    la liste des sommets qui n'ont pas encore ete visites
@@ -111,15 +113,16 @@ public abstract class TemplateTSP implements TSP {
             return;
         if (nonVus.size() == 0) { // tous les sommets ont ete visites
             if (g.estArc(sommetCrt, 0)) { // on peut retourner au sommet de depart (0)
-                if (coutVus + g.getCout(sommetCrt, 0) < coutMeilleureSolution) { // on a trouve une solution meilleure
-                                                                                 // que meilleureSolution
+                if (coutVus + g.obtenirCoutArc(sommetCrt, 0) < coutMeilleureSolution) { // on a trouve une solution
+                                                                                        // meilleure
+                    // que meilleureSolution
                     vus.toArray(meilleureSolution);
-                    coutMeilleureSolution = coutVus + g.getCout(sommetCrt, 0);
+                    coutMeilleureSolution = coutVus + g.obtenirCoutArc(sommetCrt, 0);
                 }
             }
-        } else if (coutVus + bound(sommetCrt, nonVus) < coutMeilleureSolution) {
+        } else if (coutVus + calculerBorneInferieure(sommetCrt, nonVus) < coutMeilleureSolution) {
             Collection<Integer> nonVusTrieeParDistance = trieParDistance(sommetCrt, nonVus, g);
-            Iterator<Integer> it = iterator(sommetCrt, nonVusTrieeParDistance, g);
+            Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt, nonVusTrieeParDistance, g);
             while (it.hasNext()) {
                 Integer prochainSommet = it.next();
 
@@ -129,7 +132,7 @@ public abstract class TemplateTSP implements TSP {
                 }
 
                 // On retire les sommet qu'on ne peut pas aller voir a cause des depandances
-                Iterator<Integer> iterator_depandance = iterator(sommetCrt, nonVusTrieeParDistance, g);
+                Iterator<Integer> iterator_depandance = creerIterateurSuccesseurs(sommetCrt, nonVusTrieeParDistance, g);
                 Boolean depandanceRempli = true;
                 while (iterator_depandance.hasNext()) {
                     Integer sommetNonVus = iterator_depandance.next();
@@ -142,7 +145,7 @@ public abstract class TemplateTSP implements TSP {
                     vus.add(prochainSommet);
                     nonVusTrieeParDistance.remove(prochainSommet);
                     branchAndBound(prochainSommet, nonVusTrieeParDistance, vus,
-                            coutVus + g.getCout(sommetCrt, prochainSommet));
+                            coutVus + g.obtenirCoutArc(sommetCrt, prochainSommet));
                     vus.remove(prochainSommet);
                     nonVusTrieeParDistance.add(prochainSommet);
                 }

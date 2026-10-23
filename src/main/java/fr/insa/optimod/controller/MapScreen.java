@@ -13,39 +13,49 @@ import fr.insa.optimod.model.Plan;
  */
 public interface MapScreen {
 
+    /** Définit l'action d'import des demandes. @param action action au clic */
+    void definirActionImportLivraison(Runnable action);
+
+    /** @return fichier XML de demandes choisi, ou vide après annulation */
+    Optional<File> choisirFichierLivraison();
+
+    /** Affiche la confirmation du chargement des demandes. */
+    void afficherLivraisonChargee();
+
+
     /**
      * Définit l'action déclenchée par le bouton « Importer ».
      *
      * @param action action à exécuter à chaque clic
      */
-    void setOnImport(Runnable action);
+    void definirActionImportPlan(Runnable action);
 
     /**
      * Demande à l'utilisateur de choisir un fichier XML.
      *
      * @return le fichier choisi, ou vide si l'utilisateur annule
      */
-    Optional<File> chooseXmlFile();
+    Optional<File> choisirFichierPlan();
 
     /**
      * Affiche la carte d'un plan.
      *
      * @param plan plan à afficher
      */
-    void showPlan(Plan plan);
+    void afficherPlan(Plan plan);
 
     /**
      * Ouvre la fenêtre d'information « fichier XML invalide ».
      *
      * @param detail explication de l'erreur
      */
-    void showInvalidXml(String detail);
+    void afficherErreurXml(String detail);
 
     /**
      * Retire de la page les informations du plan et de la tournée (carte
      * vide).
      */
-    void reset();
+    void reinitialiser();
 
     /**
      * Définit l'action déclenchée par le bouton « Calculer ».

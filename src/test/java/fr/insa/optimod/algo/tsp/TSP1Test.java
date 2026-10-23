@@ -46,7 +46,7 @@ public class TSP1Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP1 renvoie le cout de la meilleur solution. */
@@ -54,9 +54,9 @@ public class TSP1Test {
     public void testTSP1() {
         // Test TSP1 sur un graphe complet à 10 sommet et vérifie le resultat
         // System.out.println("Cout graphe : " +
-        // Integer.toString(tsp1.getCoutSolution()));
-        System.out.println("Duree TPS1 : " + Long.toString(tsp1.getDureeCalcul()) + "ms");
-        assertEquals(145, tsp1.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        // Integer.toString(tsp1.obtenirCoutSolution()));
+        System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) + "ms");
+        assertEquals(145, tsp1.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
 
     /** Le 4e indice de la meilleure solution */
@@ -64,15 +64,15 @@ public class TSP1Test {
     public void testGetSolution() {
         // Test TSP1 sur un graphe complet à 10 sommet et vérifie l'indice du sommet n°4
         // System.out.println("Solution a l'indice 4 : " +
-        // Integer.toString(tsp1.getSolution(4)));
-        assertEquals(tsp1.getSolution(4), Integer.valueOf(9));
+        // Integer.toString(tsp1.obtenirSommetSolution(4)));
+        assertEquals(tsp1.obtenirSommetSolution(4), Integer.valueOf(9));
     }
 
     /** Test de la fonction bound de TSP1 */
     @Test
     public void testBound() {
         // TSP1 n'utilise pas la fonction Bound, elle renvoie toujours 0
-        assertEquals(0, tsp1.bound(null, null));
+        assertEquals(0, tsp1.calculerBorneInferieure(null, null));
     }
 
     /** Test de la fonction croisementArc de TSP1 */

@@ -19,6 +19,37 @@ import fr.insa.optimod.model.Plan;
  */
 public final class MainController {
 
+    /** Crée le contrôleur d'import. @param ecran écran à piloter */
+    public MainController(MapScreen ecran) {
+        this(ecran, (plan, livraison) -> {
+            throw new IllegalStateException(
+                    "Le calcul de la tournée n'est pas encore branché.");
+        }, Runnable::run, Runnable::run);
+    }
+
+    /** @return livraison chargée, ou null avant son import */
+    public Livraison obtenirLivraison() {
+        return livraison;
+    }
+
+    /** Charge les demandes sans modifier le plan affiché. */
+    private void importerLivraison(MapScreen ecran) {
+        if (plan == null) {
+            return;
+        }
+        File fichier = ecran.choisirFichierLivraison().orElse(null);
+        if (fichier == null) {
+            return;
+        }
+        try {
+            setLivraison(new Livraison(fichier.getPath()));
+            ecran.afficherLivraisonChargee();
+        } catch (IOException | SAXException | IllegalArgumentException erreur) {
+            ecran.afficherErreurXml(erreur.getMessage());
+        }
+    }
+
+
     /** Calcul de la tournée. */
     private final CalculateurTournee calculateur;
 
@@ -58,7 +89,8 @@ public final class MainController {
         this.interfaceUtilisateur = interfaceUtilisateur;
         this.actualiserBoutonCalculer = () -> screen.setCalculateEnabled(
                 plan != null && livraison != null && !calculEnCours);
-        screen.setOnImport(() -> importPlan(screen));
+        screen.definirActionImportPlan(() -> importerPlan(screen));
+        screen.definirActionImportLivraison(() -> importerLivraison(screen));
         screen.setOnCalculate(() -> calculer(screen));
         actualiserBoutonCalculer.run();
     }
@@ -68,7 +100,7 @@ public final class MainController {
      *
      * @return le plan, ou {@code null} si aucun plan n'est chargé
      */
-    public Plan getPlan() {
+    public Plan obtenirPlan() {
         return plan;
     }
 
@@ -89,20 +121,20 @@ public final class MainController {
      * Si l'utilisateur annule le choix, rien ne change. Un nouveau plan rend
      * le lot de requêtes précédent caduc.
      */
-    private void importPlan(MapScreen screen) {
-        File fichier = screen.chooseXmlFile().orElse(null);
+    private void importerPlan(MapScreen screen) {
+        File fichier = screen.choisirFichierPlan().orElse(null);
         if (fichier == null) {
             return;
         }
         try {
             plan = new Plan(fichier.getPath());
             livraison = null;
-            screen.showPlan(plan);
+            screen.afficherPlan(plan);
         } catch (IOException | SAXException | IllegalArgumentException e) {
-            screen.showInvalidXml(e.getMessage());
+            screen.afficherErreurXml(e.getMessage());
             plan = null;
             livraison = null;
-            screen.reset();
+            screen.reinitialiser();
         }
         actualiserBoutonCalculer.run();
     }
@@ -125,12 +157,12 @@ public final class MainController {
                 List<Passage> tournee = calculateur.calculer(planCalcule,
                         lotCalcule);
                 interfaceUtilisateur.execute(() -> finirCalcul(screen,
-                        planCalcule, tournee, null));
+                        planCalcule, lotCalcule, tournee, null));
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
                 interfaceUtilisateur.execute(() -> finirCalcul(screen,
-                        planCalcule, null, detail));
+                        planCalcule, lotCalcule, null, detail));
             }
         });
     }
@@ -140,11 +172,11 @@ public final class MainController {
      * ignoré si un autre plan a été chargé entre-temps.
      */
     private void finirCalcul(MapScreen screen, Plan planCalcule,
-            List<Passage> tournee, String erreur) {
+            Livraison lotCalcule, List<Passage> tournee, String erreur) {
         calculEnCours = false;
         screen.showWaiting(false);
         actualiserBoutonCalculer.run();
-        if (planCalcule != plan) {
+        if (planCalcule != plan || lotCalcule != livraison) {
             return;
         }
         if (tournee != null) {

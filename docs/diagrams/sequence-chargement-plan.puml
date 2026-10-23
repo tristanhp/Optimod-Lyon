@@ -1,0 +1,59 @@
+@startuml sequence-chargement-plan
+title Charger et afficher le plan urbain
+autonumber
+actor Utilisateur as U
+boundary "vue : MainView" as V
+control "controleur : MainController" as C
+entity "plan : Plan" as P
+participant "carte : MapCanvas" as M
+participant "projection : MapProjection" as R
+note over V,C : definirActionImportPlan(action) relie le bouton à importerPlan(ecran).
+U -> V : Cliquer sur « Importer le Plan »
+V -> C : importerPlan(ecran) [action enregistrée]
+C -> V : choisirFichierPlan()
+V -> V : choisirFichierXml(titre)
+V -> U : Ouvrir le sélecteur XML
+U --> V : Sélectionner un fichier / annuler
+V --> C : Optional<File>
+alt Annulation
+  note over V,C : État précédent conservé
+else Fichier sélectionné
+  C -> P : new Plan(cheminFichierXml)
+  P -> P : creerLecteurXml().parse(fichier)
+  P -> P : Plan(documentXml)
+  loop Balises noeud
+    P -> P : new Noeud(identifiant, longitude, latitude)
+  end
+  loop Balises troncon
+    P -> P : trouverNoeud(origine), trouverNoeud(destination)
+    P -> P : new Troncon(origine, destination, longueur, nomRue)
+  end
+  alt Lecture réussie
+    P --> C : Plan construit
+    note right of C : plan = résultat ; livraison = null
+    C -> V : afficherPlan(plan)
+    V -> M : afficherPlan(plan)
+    M -> M : dessinerCarte()
+    M -> P : obtenirNoeuds(), obtenirTroncons()
+    P --> M : Nœuds et tronçons
+    M -> R : new MapProjection(noeuds, largeur, hauteur, margeInterieure)
+    loop Coordonnées des tronçons et nœuds
+      M -> R : calculerAbscisseEcran(longitude)
+      M -> R : calculerOrdonneeEcran(latitude)
+      R --> M : Coordonnées en pixels
+    end
+    M --> U : Carte dessinée
+    note right of V : Effacer messageLivraison ; activer boutonImporterLivraison
+    note right of C : planCharge = true
+  else Erreur de lecture
+    P --> C : IOException / SAXException / IllegalArgumentException
+    C -> V : afficherErreurXml(erreur.getMessage())
+    V --> U : Alerte « Fichier XML invalide »
+    note right of C : plan = null ; livraison = null
+    C -> V : reinitialiser()
+    V -> M : effacerCarte()
+    note right of V : Effacer le message ; désactiver l'import des livraisons
+    note right of C : planCharge = false
+  end
+end
+@enduml

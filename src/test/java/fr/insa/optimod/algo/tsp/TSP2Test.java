@@ -46,7 +46,7 @@ public class TSP2Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp2 = new TSP2();
-        tsp2.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP2 renvoie le cout de la meilleur solution. */
@@ -54,9 +54,9 @@ public class TSP2Test {
     public void testTSP2() {
         // Test TSP2 sur un graphe complet à 10 sommet et vérifie le resultat
         // System.out.println("Cout graphe : " +
-        // Integer.toString(tsp2.getCoutSolution()));
-        System.out.println("Duree TPS1 : " + Long.toString(tsp2.getDureeCalcul()) + "ms");
-        assertEquals(145, tsp2.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        // Integer.toString(tsp2.obtenirCoutSolution()));
+        System.out.println("Duree TPS1 : " + Long.toString(tsp2.obtenirDureeCalcul()) + "ms");
+        assertEquals(145, tsp2.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
 
     /** Le 4e indice de la meilleure solution */
@@ -64,16 +64,16 @@ public class TSP2Test {
     public void testGetSolution() {
         // Test TSP2 sur un graphe complet à 10 sommet et vérifie l'indice du sommet n°4
         // System.out.println("Solution a l'indice 4 : " +
-        // Integer.toString(tsp2.getSolution(4)));
-        assertEquals(tsp2.getSolution(4), Integer.valueOf(9));
+        // Integer.toString(tsp2.obtenirSommetSolution(4)));
+        assertEquals(tsp2.obtenirSommetSolution(4), Integer.valueOf(9));
     }
 
     /** Test de la fonction bound de TSP2 */
     @Test
     public void testBound() {
         // Verification que la borne inferieur calcule est la bonne
-        assertEquals(125, tsp2.bound(0, Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9)));
-        assertEquals(93, tsp2.bound(3, Arrays.asList(2, 4, 5, 7, 8, 9)));
+        assertEquals(125, tsp2.calculerBorneInferieure(0, Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9)));
+        assertEquals(93, tsp2.calculerBorneInferieure(3, Arrays.asList(2, 4, 5, 7, 8, 9)));
     }
 
     /** Test de la fonction croisementArc de TSP2 */

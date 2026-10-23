@@ -7,25 +7,25 @@ public interface Graphe {
      *
      * @return le nombre de sommets de <code>this</code>
      */
-    public abstract int getNbSommets();
+    public abstract int obtenirNombreSommets();
 
     /**
      * Permet d'obtenir le cout d'un arc du graphe
      *
-     * @param i sommet
-     * @param j sommet
-     * @return le cout de l'arc (i,j) si (i,j) est un arc ; -1 sinon
+     * @param indiceSommet sommet
+     * @param indiceDestination sommet
+     * @return le cout de l'arc (indiceSommet,indiceDestination) si (indiceSommet,indiceDestination) est un arc ; -1 sinon
      */
-    public abstract int getCout(int i, int j);
+    public abstract int obtenirCoutArc(int indiceSommet, int indiceDestination);
 
     /**
-     * Permet de vérifier s'il y a un arc entre 2 sommet
+     * Permet de vérifier sommetCandidat'il y a un arc entre 2 sommet
      *
-     * @param i sommet
-     * @param j sommet
-     * @return true si <code>(i,j)</code> est un arc de <code>this</code>
+     * @param indiceSommet sommet
+     * @param indiceDestination sommet
+     * @return true si <code>(indiceSommet,indiceDestination)</code> est un arc de <code>this</code>
      */
-    public abstract boolean estArc(int i, int j);
+    public abstract boolean estArc(int indiceSommet, int indiceDestination);
 
     /**
      * Retourne la depandance d'un sommet

@@ -14,12 +14,12 @@ public class GrapheDepandance implements Graphe {
     }
 
     @Override
-    public int getNbSommets() {
+    public int obtenirNombreSommets() {
         return nbSommets;
     }
 
     @Override
-    public int getCout(int i, int j) {
+    public int obtenirCoutArc(int i, int j) {
         if (i < 0 || i >= nbSommets || j < 0 || j >= nbSommets)
             return -1;
         return cout[i][j];

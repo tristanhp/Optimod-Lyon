@@ -75,9 +75,9 @@ public final class AEtoile {
             if (courante.distance() > distances.get(noeud)) {
                 continue;
             }
-            for (Troncon troncon : plan.getTronconsSortants(noeud)) {
-                Noeud voisin = troncon.getNoeudDestination();
-                double distance = courante.distance() + troncon.getLongueur();
+            for (Troncon troncon : plan.obtenirTronconsSortants(noeud)) {
+                Noeud voisin = troncon.obtenirNoeudDestination();
+                double distance = courante.distance() + troncon.obtenirLongueur();
                 if (distance < distances.getOrDefault(voisin,
                         Double.POSITIVE_INFINITY)) {
                     distances.put(voisin, distance);
@@ -108,7 +108,7 @@ public final class AEtoile {
         for (Noeud noeud = cible; !noeud.equals(source);) {
             Troncon troncon = predecesseurs.get(noeud);
             troncons.add(troncon);
-            noeud = troncon.getNoeudOrigine();
+            noeud = troncon.obtenirNoeudOrigine();
         }
         Collections.reverse(troncons);
         return new Chemin(longueur, troncons);
@@ -124,10 +124,10 @@ public final class AEtoile {
      * @return une borne inférieure de la longueur restante, en mètres
      */
     static double heuristique(Noeud noeud, Noeud cible) {
-        double latitudeA = Math.toRadians(noeud.getLatitude());
-        double latitudeB = Math.toRadians(cible.getLatitude());
+        double latitudeA = Math.toRadians(noeud.obtenirLatitude());
+        double latitudeB = Math.toRadians(cible.obtenirLatitude());
         double ecartLatitude = latitudeB - latitudeA;
-        double ecartLongitude = Math.toRadians(cible.getLongitude() - noeud.getLongitude());
+        double ecartLongitude = Math.toRadians(cible.obtenirLongitude() - noeud.obtenirLongitude());
         double h = Math.pow(Math.sin(ecartLatitude / 2), 2)
                 + Math.cos(latitudeA) * Math.cos(latitudeB)
                         * Math.pow(Math.sin(ecartLongitude / 2), 2);

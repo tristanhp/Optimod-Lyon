@@ -40,43 +40,43 @@ public class PlanTest {
     @Test
     public void noeudsLus() throws Exception {
         Plan plan = lire(PETIT_PLAN);
-        assertEquals(3, plan.getNoeuds().size());
-        Noeud noeud = plan.getNoeud(1);
-        assertEquals(45.75, noeud.getLatitude(), 1e-9);
-        assertEquals(4.85, noeud.getLongitude(), 1e-9);
+        assertEquals(3, plan.obtenirNoeuds().size());
+        Noeud noeud = plan.obtenirNoeud(1);
+        assertEquals(45.75, noeud.obtenirLatitude(), 1e-9);
+        assertEquals(4.85, noeud.obtenirLongitude(), 1e-9);
     }
 
     /** Les ids qui dépassent un int sont acceptés. */
     @Test
     public void grandIdAccepte() throws Exception {
-        assertNotNull(lire(PETIT_PLAN).getNoeud(2129259178L));
+        assertNotNull(lire(PETIT_PLAN).obtenirNoeud(2129259178L));
     }
 
     /** Les tronçons relient les bons noeuds. */
     @Test
     public void tronconsLus() throws Exception {
         Plan plan = lire(PETIT_PLAN);
-        assertEquals(3, plan.getTroncons().size());
-        Troncon troncon = plan.getTroncons().get(0);
-        assertEquals(1, troncon.getNoeudOrigine().getId());
-        assertEquals(2129259178L, troncon.getNoeudDestination().getId());
-        assertEquals(69.9, troncon.getLongueur(), 1e-9);
-        assertEquals("Rue Danton", troncon.getNomRue());
+        assertEquals(3, plan.obtenirTroncons().size());
+        Troncon troncon = plan.obtenirTroncons().get(0);
+        assertEquals(1, troncon.obtenirNoeudOrigine().obtenirIdentifiant());
+        assertEquals(2129259178L, troncon.obtenirNoeudDestination().obtenirIdentifiant());
+        assertEquals(69.9, troncon.obtenirLongueur(), 1e-9);
+        assertEquals("Rue Danton", troncon.obtenirNomRue());
     }
 
     /** Les tronçons sortants d'un noeud sont indexés. */
     @Test
     public void tronconsSortants() throws Exception {
         Plan plan = lire(PETIT_PLAN);
-        assertEquals(2, plan.getTronconsSortants(plan.getNoeud(2129259178L)).size());
-        assertTrue(plan.getTronconsSortants(plan.getNoeud(3)).isEmpty());
-        assertTrue(plan.getTronconsSortants(new Noeud(99, 0, 0)).isEmpty());
+        assertEquals(2, plan.obtenirTronconsSortants(plan.obtenirNoeud(2129259178L)).size());
+        assertTrue(plan.obtenirTronconsSortants(plan.obtenirNoeud(3)).isEmpty());
+        assertTrue(plan.obtenirTronconsSortants(new Noeud(99, 0, 0)).isEmpty());
     }
 
-    /** Un id inconnu ne renvoie pas de noeud. */
+    /** Un identifiant inconnu ne renvoie pas de noeud. */
     @Test
     public void noeudInconnu() throws Exception {
-        assertNull(lire(PETIT_PLAN).getNoeud(42));
+        assertNull(lire(PETIT_PLAN).obtenirNoeud(42));
     }
 
     /** Un tronçon vers un noeud absent est refusé. */
@@ -97,8 +97,8 @@ public class PlanTest {
     public void petitPlanFourni() throws Exception {
         try (InputStream xml = getClass().getResourceAsStream("/xml/petitPlan.xml")) {
             Plan plan = new Plan(xml);
-            assertFalse(plan.getNoeuds().isEmpty());
-            assertFalse(plan.getTroncons().isEmpty());
+            assertFalse(plan.obtenirNoeuds().isEmpty());
+            assertFalse(plan.obtenirTroncons().isEmpty());
         }
     }
 
@@ -108,6 +108,6 @@ public class PlanTest {
         File fichier = File.createTempFile("plan", ".xml");
         fichier.deleteOnExit();
         Files.writeString(fichier.toPath(), PETIT_PLAN);
-        assertEquals(3, new Plan(fichier.getPath()).getNoeuds().size());
+        assertEquals(3, new Plan(fichier.getPath()).obtenirNoeuds().size());
     }
 }

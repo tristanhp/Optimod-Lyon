@@ -46,13 +46,13 @@ public class GrapheDepandanceTest {
     /** Un graphe a bien le bon nombre de sommet. */
     @Test
     public void testNombreSommetGrapheDepandance() {
-        assertTrue(grapheDepandance.getNbSommets() == nbSommets);
+        assertTrue(grapheDepandance.obtenirNombreSommets() == nbSommets);
     }
 
     /** Un graphe a 10 sommet a le bon coup sur une arret avec la seed 1. */
     @Test
     public void testGetCoutGrapheDepandance() {
-        assertTrue(grapheDepandance.getCout(3, 7) == 37);
+        assertTrue(grapheDepandance.obtenirCoutArc(3, 7) == 37);
     }
 
     /** Un arc est entre deux sommets différents et pas 2 fois le meme sommet. */

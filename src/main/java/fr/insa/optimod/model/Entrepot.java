@@ -4,27 +4,27 @@ package fr.insa.optimod.model;
  * Entrepôt d'où partent et où reviennent les livreurs.
  */
 public final class Entrepot {
-    private final long id;
-    private final String heure;
+    private final long identifiant;
+    private final String heureDepart;
 
     /**
      * Crée un entrepôt.
      *
-     * @param id id du noeud où se trouve l'entrepôt
-     * @param heure heure de départ
+     * @param identifiant identifiant du noeud où se trouve l'entrepôt
+     * @param heureDepart heureDepart de départ
      */
-    public Entrepot(long id, String heure) {
-        this.id = id;
-        this.heure = heure;
+    public Entrepot(long identifiant, String heureDepart) {
+        this.identifiant = identifiant;
+        this.heureDepart = heureDepart;
     }
 
-    /** @return id du noeud où se trouve l'entrepôt */
-    public long getId() {
-        return id;
+    /** @return identifiant du noeud où se trouve l'entrepôt */
+    public long obtenirIdentifiant() {
+        return identifiant;
     }
 
-    /** @return heure de départ */
-    public String getHeure() {
-        return heure;
+    /** @return heureDepart de départ */
+    public String obtenirHeureDepart() {
+        return heureDepart;
     }
 }

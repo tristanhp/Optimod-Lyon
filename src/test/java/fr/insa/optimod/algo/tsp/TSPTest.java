@@ -47,13 +47,13 @@ public class TSPTest {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp2 = new TSP2();
-        tsp2.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp3 = new TSP3();
-        tsp3.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
     }
 
@@ -64,35 +64,35 @@ public class TSPTest {
 
         /*
          * System.out.println("Cout graphe : " +
-         * Integer.toString(tsp1.getCoutSolution()));
-         * System.out.println("Duree TPS1 : " + Long.toString(tsp1.getDureeCalcul()) +
+         * Integer.toString(tsp1.obtenirCoutSolution()));
+         * System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) +
          * "ms");
          *
          * System.out.println("Graphe : [\n");
          * for (int i = 0; i < 10; ++i) {
          * for (int j = 0; j < 10; ++j) {
-         * System.out.print(Integer.toString(grapheDepandance.getCout(i, j)) + ", ");
+         * System.out.print(Integer.toString(grapheDepandance.obtenirCoutArc(i, j)) + ", ");
          * }
          * System.out.println("");
          * }
          */
 
         // Performance TSP1
-        System.out.println("Duree TPS1 : " + Long.toString(tsp1.getDureeCalcul()) + "ms");
-        System.out.println("Duree TPS2 : " + Long.toString(tsp2.getDureeCalcul()) + "ms");
-        System.out.println("Duree TPS3 : " + Long.toString(tsp3.getDureeCalcul()) + "ms");
-        System.out.println("Solution TPS1 : " + Long.toString(tsp1.getCoutSolution()));
-        System.out.println("Solution TPS2 : " + Long.toString(tsp2.getCoutSolution()));
-        System.out.println("Solution TPS3 : " + Long.toString(tsp3.getCoutSolution()));
-        assertEquals(145, tsp1.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-        assertEquals(145, tsp2.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-        assertEquals(145, tsp3.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS2 : " + Long.toString(tsp2.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS3 : " + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
+        System.out.println("Solution TPS1 : " + Long.toString(tsp1.obtenirCoutSolution()));
+        System.out.println("Solution TPS2 : " + Long.toString(tsp2.obtenirCoutSolution()));
+        System.out.println("Solution TPS3 : " + Long.toString(tsp3.obtenirCoutSolution()));
+        assertEquals(145, tsp1.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp2.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp3.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
 
     /** Le 4e indice de la meilleure solution */
     @Test
     public void testGetSolution() {
-        assertEquals(tsp1.getSolution(4), Integer.valueOf(9));
+        assertEquals(tsp1.obtenirSommetSolution(4), Integer.valueOf(9));
     }
 
     /** Verifie les depandance de la solution */
@@ -102,10 +102,10 @@ public class TSPTest {
         for (int i = 0; i < nbSommets; ++i) {
             for (int indiceDejaVu = 0; indiceDejaVu < vus.size(); indiceDejaVu++) {
                 // i n'est pas une depandance d'un indice deja vus
-                assertTrue(grapheDepandance.getDepandance(indiceDejaVu) != tsp1.getSolution(i));
+                assertTrue(grapheDepandance.getDepandance(indiceDejaVu) != tsp1.obtenirSommetSolution(i));
             }
-            vus.add(tsp1.getSolution(i));
-            // System.out.print(tsp1.getSolution(i) + " ");
+            vus.add(tsp1.obtenirSommetSolution(i));
+            // System.out.print(tsp1.obtenirSommetSolution(i) + " ");
         }
         // System.out.println();
     }

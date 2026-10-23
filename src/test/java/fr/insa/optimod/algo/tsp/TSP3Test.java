@@ -48,7 +48,7 @@ public class TSP3Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp3 = new TSP3();
-        tsp3.chercheSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP3 renvoie le cout de la meilleur solution. */
@@ -56,9 +56,9 @@ public class TSP3Test {
     public void testTSP3() {
         // Test TSP3 sur un graphe complet à 10 sommet et vérifie le resultat
         // System.out.println("Cout graphe : " +
-        // Integer.toString(tsp3.getCoutSolution()));
-        System.out.println("Duree TPS1 : " + Long.toString(tsp3.getDureeCalcul()) + "ms");
-        assertEquals(145, tsp3.getCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        // Integer.toString(tsp3.obtenirCoutSolution()));
+        System.out.println("Duree TPS1 : " + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
+        assertEquals(145, tsp3.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
     }
 
     /** Le 4e indice de la meilleure solution */
@@ -66,16 +66,16 @@ public class TSP3Test {
     public void testGetSolution() {
         // Test TSP3 sur un graphe complet à 10 sommet et vérifie l'indice du sommet n°4
         // System.out.println("Solution a l'indice 4 : " +
-        // Integer.toString(tsp3.getSolution(4)));
-        assertEquals(tsp3.getSolution(4), Integer.valueOf(9));
+        // Integer.toString(tsp3.obtenirSommetSolution(4)));
+        assertEquals(tsp3.obtenirSommetSolution(4), Integer.valueOf(9));
     }
 
     /** Test de la fonction bound de TSP3 */
     @Test
     public void testBound() {
         // Verification que la borne inferieur calcule est la bonne
-        assertEquals(125, tsp3.bound(0, Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9)));
-        assertEquals(93, tsp3.bound(3, Arrays.asList(2, 4, 5, 7, 8, 9)));
+        assertEquals(125, tsp3.calculerBorneInferieure(0, Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9)));
+        assertEquals(93, tsp3.calculerBorneInferieure(3, Arrays.asList(2, 4, 5, 7, 8, 9)));
     }
 
     /** Test de la fonction croisementArc de TSP3 */
@@ -100,7 +100,7 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.getCout(sommetDepart, precedent) <= grapheDepandance.getCout(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
                     suivant));
             precedent = suivant;
         }
@@ -116,7 +116,7 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.getCout(sommetDepart, precedent) <= grapheDepandance.getCout(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
                     suivant));
             precedent = suivant;
         }

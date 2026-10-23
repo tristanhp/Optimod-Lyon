@@ -17,13 +17,13 @@ public class GrapheCompleTest {
     /** Un graphe a bien le bon nombre de sommet. */
     @Test
     public void testNombreSommetGrapheComplet() {
-        assertTrue(grapheComplet.getNbSommets() == 10);
+        assertTrue(grapheComplet.obtenirNombreSommets() == 10);
     }
 
     /** Un graphe a 10 sommet a le bon coup sur une arret avec la seed 1. */
     @Test
     public void testGetCoutGrapheComplet() {
-        assertTrue(grapheComplet.getCout(3, 7) == 37);
+        assertTrue(grapheComplet.obtenirCoutArc(3, 7) == 37);
     }
 
     /** Un arc est entre deux sommets différents et pas 2 fois le meme sommet. */

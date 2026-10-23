@@ -4,52 +4,52 @@ public class GrapheComplet implements Graphe {
 
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
-    int nbSommets;
-    int[][] cout;
+    int nombreSommets;
+    int[][] coutsArcs;
 
     /**
-     * Cree un graphe complet dont les aretes ont un cout compris entre COUT_MIN et
+     * Cree un graphe complet dont les aretes ont un coût compris entre COUT_MIN et
      * COUT_MAX
      *
-     * @param nbSommets
+     * @param nombreSommets
      */
-    public GrapheComplet(int nbSommets) {
-        this.nbSommets = nbSommets;
-        int iseed = 1;
-        cout = new int[nbSommets][nbSommets];
-        for (int i = 0; i < nbSommets; i++) {
-            for (int j = 0; j < nbSommets; j++) {
-                if (i == j)
-                    cout[i][j] = -1;
+    public GrapheComplet(int nombreSommets) {
+        this.nombreSommets = nombreSommets;
+        int graineAleatoire = 1;
+        coutsArcs = new int[nombreSommets][nombreSommets];
+        for (int indiceSommet = 0; indiceSommet < nombreSommets; indiceSommet++) {
+            for (int indiceDestination = 0; indiceDestination < nombreSommets; indiceDestination++) {
+                if (indiceSommet == indiceDestination)
+                    coutsArcs[indiceSommet][indiceDestination] = -1;
                 else {
-                    int it = 16807 * (iseed % 127773) - 2836 * (iseed / 127773);
-                    if (it > 0)
-                        iseed = it;
+                    int valeurAleatoire = 16807 * (graineAleatoire % 127773) - 2836 * (graineAleatoire / 127773);
+                    if (valeurAleatoire > 0)
+                        graineAleatoire = valeurAleatoire;
                     else
-                        iseed = 2147483647 + it;
-                    cout[i][j] = COUT_MIN + iseed % (COUT_MAX - COUT_MIN + 1);
+                        graineAleatoire = 2147483647 + valeurAleatoire;
+                    coutsArcs[indiceSommet][indiceDestination] = COUT_MIN + graineAleatoire % (COUT_MAX - COUT_MIN + 1);
                 }
             }
         }
     }
 
     @Override
-    public int getNbSommets() {
-        return nbSommets;
+    public int obtenirNombreSommets() {
+        return nombreSommets;
     }
 
     @Override
-    public int getCout(int i, int j) {
-        if (i < 0 || i >= nbSommets || j < 0 || j >= nbSommets)
+    public int obtenirCoutArc(int indiceSommet, int indiceDestination) {
+        if (indiceSommet < 0 || indiceSommet >= nombreSommets || indiceDestination < 0 || indiceDestination >= nombreSommets)
             return -1;
-        return cout[i][j];
+        return coutsArcs[indiceSommet][indiceDestination];
     }
 
     @Override
-    public boolean estArc(int i, int j) {
-        if (i < 0 || i >= nbSommets || j < 0 || j >= nbSommets)
+    public boolean estArc(int indiceSommet, int indiceDestination) {
+        if (indiceSommet < 0 || indiceSommet >= nombreSommets || indiceDestination < 0 || indiceDestination >= nombreSommets)
             return false;
-        return i != j;
+        return indiceSommet != indiceDestination;
     }
 
     @Override
