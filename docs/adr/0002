@@ -1,0 +1,86 @@
+Modifications à faire pour claude : 
+
+import com.gluonhq.maps.MapPoint;
+import com.gluonhq.maps.MapView;
+import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+public class MapApp extends Application {
+    @Override
+    public start(Stage primaryStage) {
+        // Définir la latitude et la longitude (ex: Paris)
+        double latitude = 48.8566;
+        double longitude = 2.3522;
+
+        MapView mapView = new MapView();
+        MapPoint center = new MapPoint(latitude, longitude);
+
+        mapView.setCenter(center);
+        mapView.setZoom(12);
+
+        Scene scene = new Scene(mapView, 800, 600);
+        primaryStage.setScene(scene);
+        primaryStage.setTitle("Carte JavaFX - Latitude/Longitude");
+        primaryStage.show();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+
+import com.gluonhq.maps.MapLayer;
+import com.gluonhq.maps.MapPoint;
+import javafx.scene.shape.Circle;
+import javafx.scene.shape.Line;
+import javafx.scene.paint.Color;
+import java.util.List;
+
+public class GraphLayer extends MapLayer {
+
+    private final List<MapPoint> points;
+
+    public GraphLayer(List<MapPoint> points) {
+        this.points = points;
+    }
+
+    @Override
+    protected void layoutChildren() {
+        // Effacer le rendu précédent pour éviter les doublons lors du déplacement
+        getChildren().clear();
+
+        if (points == null || points.isEmpty()) return;
+
+        // 1. Dessiner d'abord les lignes (liens) pour qu'elles passent sous les nœuds
+        for (int i = 0; i < points.size() - 1; i++) {
+            MapPoint p1 = points.get(i);
+            MapPoint p2 = points.get(i + 1);
+
+            // Conversion des coordonnées géographiques en coordonnées pixels (X, Y)
+            double x1 = getMapPointX(p1.getLatitude(), p1.getLongitude());
+            double y1 = getMapPointY(p1.getLatitude(), p1.getLongitude());
+            double x2 = getMapPointX(p2.getLatitude(), p2.getLongitude());
+            double y2 = getMapPointY(p2.getLatitude(), p2.getLongitude());
+
+            Line line = new Line(x1, y1, x2, y2);
+            line.setStroke(Color.BLUE);
+            line.setStrokeWidth(3);
+            
+            getChildren().add(line);
+        }
+
+        // 2. Dessiner les nœuds (points)
+        for (MapPoint p : points) {
+            double x = getMapPointX(p.getLatitude(), p.getLongitude());
+            double y = getMapPointY(p.getLatitude(), p.getLongitude());
+
+            Circle circle = new Circle(x, y, 6);
+            circle.setFill(Color.RED);
+            circle.setStroke(Color.WHITE);
+            circle.setStrokeWidth(2);
+
+            getChildren().add(circle);
+        }
+    }
+}
