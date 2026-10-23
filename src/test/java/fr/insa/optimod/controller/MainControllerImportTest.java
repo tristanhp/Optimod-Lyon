@@ -16,6 +16,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Plan;
 
 public class MainControllerImportTest {
@@ -38,6 +39,7 @@ public class MainControllerImportTest {
         private File fichierChoisi;
         private final List<String> evenements = new ArrayList<>();
         private Plan planAffiche;
+        private Livraison livraisonAffichee;
 
         @Override
         public void definirActionImportPlan(Runnable action) {
@@ -55,7 +57,8 @@ public class MainControllerImportTest {
         }
 
         @Override
-        public void afficherLivraisonChargee() {
+        public void afficherLivraisonChargee(Livraison livraison) {
+            livraisonAffichee = livraison;
             evenements.add("livraison chargée");
         }
 
@@ -147,7 +150,8 @@ public class MainControllerImportTest {
     }
 
     private void chargerLivraison() throws Exception {
-        ecran.fichierChoisi = ecrire(PLAN_VALIDE);
+        ecran.fichierChoisi = new File(getClass().getResource(
+                "/data/petitPlan.xml").toURI());
         ecran.actionImportPlan.run();
         ecran.fichierChoisi = new File(getClass().getResource(
                 "/data/demandePetit1.xml").toURI());
@@ -161,6 +165,19 @@ public class MainControllerImportTest {
         assertEquals(1, controleur.obtenirLivraison().obtenirDemandes().size());
         assertEquals("8:0:0", controleur.obtenirLivraison().obtenirHeureDepart());
         assertEquals(ecran.planAffiche, controleur.obtenirPlan());
+        assertEquals(controleur.obtenirLivraison(), ecran.livraisonAffichee);
+    }
+
+    @Test
+    public void livraisonHorsPlanRefusee() throws Exception {
+        ecran.fichierChoisi = ecrire(PLAN_VALIDE);
+        ecran.actionImportPlan.run();
+        ecran.fichierChoisi = new File(getClass().getResource(
+                "/data/demandePetit1.xml").toURI());
+        ecran.actionImportLivraison.run();
+        assertEquals(List.of("plan", "invalide"), ecran.evenements);
+        assertNull(controleur.obtenirLivraison());
+        assertNull(ecran.livraisonAffichee);
     }
 
     @Test

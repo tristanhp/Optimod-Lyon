@@ -8,6 +8,7 @@ import java.util.concurrent.Executor;
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.algo.CalculateurTournee;
+import fr.insa.optimod.model.Demande;
 import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Passage;
 import fr.insa.optimod.model.Plan;
@@ -42,13 +43,30 @@ public final class MainController {
             return;
         }
         try {
-            setLivraison(new Livraison(fichier.getPath()));
-            ecran.afficherLivraisonChargee();
+            Livraison nouvelle = new Livraison(fichier.getPath());
+            verifierNoeudsConnus(nouvelle);
+            setLivraison(nouvelle);
+            ecran.afficherLivraisonChargee(nouvelle);
         } catch (IOException | SAXException | IllegalArgumentException erreur) {
             ecran.afficherErreurXml(erreur.getMessage());
         }
     }
 
+    /** Refuse un lot dont une adresse n'est pas un noeud du plan chargé. */
+    private void verifierNoeudsConnus(Livraison lot) {
+        verifierNoeudConnu(lot.obtenirEntrepot().obtenirIdentifiant());
+        for (Demande demande : lot.obtenirDemandes()) {
+            verifierNoeudConnu(demande.obtenirIdentifiantCollecte());
+            verifierNoeudConnu(demande.obtenirIdentifiantLivraison());
+        }
+    }
+
+    private void verifierNoeudConnu(long identifiant) {
+        if (plan.obtenirNoeud(identifiant) == null) {
+            throw new IllegalArgumentException("Adresse " + identifiant
+                    + " absente du plan chargé");
+        }
+    }
 
     /** Calcul de la tournée. */
     private final CalculateurTournee calculateur;

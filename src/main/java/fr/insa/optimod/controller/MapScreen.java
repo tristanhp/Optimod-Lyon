@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
+import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Passage;
 import fr.insa.optimod.model.Plan;
 
@@ -19,8 +20,12 @@ public interface MapScreen {
     /** @return fichier XML de demandes choisi, ou vide après annulation */
     Optional<File> choisirFichierLivraison();
 
-    /** Affiche la confirmation du chargement des demandes. */
-    void afficherLivraisonChargee();
+    /**
+     * Affiche les demandes chargées sur la carte et dans une liste.
+     *
+     * @param livraison demandes et entrepôt chargés
+     */
+    void afficherLivraisonChargee(Livraison livraison);
 
 
     /**
