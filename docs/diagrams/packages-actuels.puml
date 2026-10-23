@@ -33,8 +33,10 @@ package "fr.insa.optimod.algo.tsp" as algorithmes {
  class GrapheComplet
  class RunTSP
 }
-package "JavaFX" as javafx <<bibliothèque>>
-package "Java XML / DOM / SAX" as lectureXml <<bibliothèque>>
+package "JavaFX" as javafx <<bibliothèque>> {
+}
+package "Java XML / DOM / SAX" as lectureXml <<bibliothèque>> {
+}
 vue ..> controleur : crée le contrôleur ; implémente MapScreen
 vue ..> modele : affiche le plan
 controleur ..> modele : construit Plan et Livraison
