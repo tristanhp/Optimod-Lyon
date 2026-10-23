@@ -46,7 +46,7 @@ public class MainControllerTest {
         }
 
         @Override
-        public void afficherLivraisonChargee() {
+        public void afficherLivraisonChargee(Livraison livraison) {
             events.add("livraison chargée");
         }
 
@@ -223,7 +223,9 @@ public class MainControllerTest {
 
     @Test
     public void importLivraisonActiveLeCalcul() throws Exception {
-        importerPlan();
+        screen.chosen = new File(getClass().getResource(
+                "/data/petitPlan.xml").toURI());
+        screen.onImport.run();
         screen.chosen = new File(getClass().getResource(
                 "/data/demandePetit1.xml").toURI());
         screen.actionImportLivraison.run();

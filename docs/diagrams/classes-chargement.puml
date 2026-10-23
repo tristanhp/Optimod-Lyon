@@ -10,7 +10,7 @@ package "fr.insa.optimod.controller" {
   +choisirFichierPlan() : Optional<File>
   +choisirFichierLivraison() : Optional<File>
   +afficherPlan(plan : Plan)
-  +afficherLivraisonChargee()
+  +afficherLivraisonChargee(livraison)
   +afficherErreurXml(detail : String)
   +reinitialiser()
  }
@@ -123,6 +123,7 @@ MainController --> "0..1" Plan : plan
 MainController --> "0..1" Livraison : livraison
 MainView *--> "1" MapCanvas : carte
 MapCanvas --> "0..1" Plan : plan
+MapCanvas --> "0..1" Livraison : demandes
 MapCanvas ..> MapProjection : crée
 MapProjection ..> Noeud : coordonnées
 Plan *--> "0..*" Noeud : noeuds

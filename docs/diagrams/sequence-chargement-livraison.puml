@@ -38,7 +38,7 @@ else Fichier sélectionné
   alt Lecture réussie
     L --> C : Livraison construite
     note right of C : Mémoriser livraison ; conserver plan
-    C -> V : afficherLivraisonChargee()
+    C -> V : afficherLivraisonChargee(livraison)
     V -> V : messageLivraison.setText("livraison chargée")
     V --> U : « livraison chargée » en bas de la fenêtre
   else Erreur de lecture

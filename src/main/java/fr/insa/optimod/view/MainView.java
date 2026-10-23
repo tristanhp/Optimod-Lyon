@@ -6,13 +6,17 @@ import java.util.List;
 import java.util.Optional;
 
 import fr.insa.optimod.controller.MapScreen;
+import fr.insa.optimod.model.Demande;
+import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Passage;
 import fr.insa.optimod.model.Plan;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.geometry.Insets;
+import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -27,6 +31,9 @@ final class MainView extends BorderPane implements MapScreen {
     /** Format des heures dans la liste de la tournée. */
     private static final DateTimeFormatter HEURE =
             DateTimeFormatter.ofPattern("HH:mm");
+
+    /** Largeur de la liste des demandes. */
+    private static final double DEMANDES_WIDTH = 330;
 
     /** Largeur de la liste de la tournée. */
     private static final double TOUR_WIDTH = 280;
@@ -48,6 +55,9 @@ final class MainView extends BorderPane implements MapScreen {
 
     /** Liste textuelle de la tournée. */
     private final ListView<String> tourList = new ListView<>();
+
+    /** Liste textuelle des demandes importées. */
+    private final ListView<String> demandesList = new ListView<>();
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
     private File lastDirectory;
@@ -74,6 +84,28 @@ final class MainView extends BorderPane implements MapScreen {
         tourList.setPrefWidth(TOUR_WIDTH);
         tourList.setVisible(false);
         tourList.setManaged(false);
+        demandesList.setPrefWidth(DEMANDES_WIDTH);
+        demandesList.setCellFactory(liste -> new ListCell<>() {
+            @Override
+            protected void updateItem(String texte, boolean vide) {
+                super.updateItem(texte, vide);
+                setText(vide ? null : texte);
+                setGraphic(vide ? null : new Rectangle(10, 10,
+                        MapCanvas.couleurDemande(getIndex())));
+            }
+        });
+        map.definirSurSurvol(indice -> {
+            if (indice >= 0) {
+                demandesList.getSelectionModel().select(indice);
+                demandesList.scrollTo(indice);
+            } else {
+                demandesList.getSelectionModel().clearSelection();
+            }
+        });
+        demandesList.getSelectionModel().selectedIndexProperty().addListener(
+                (observable, ancien, nouveau) -> map.mettreEnEvidence(nouveau.intValue()));
+        clearDemandes();
+        setLeft(demandesList);
         setTop(toolBar);
         setCenter(map);
         setRight(tourList);
@@ -126,6 +158,7 @@ final class MainView extends BorderPane implements MapScreen {
     @Override
     public void afficherPlan(Plan plan) {
         clearTour();
+        clearDemandes();
         map.afficherPlan(plan);
         messageLivraison.setText("");
         boutonImporterLivraison.setDisable(false);
@@ -167,6 +200,7 @@ final class MainView extends BorderPane implements MapScreen {
     @Override
     public void reinitialiser() {
         clearTour();
+        clearDemandes();
         map.effacerCarte();
         messageLivraison.setText("");
         boutonImporterLivraison.setDisable(true);
@@ -183,9 +217,25 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void afficherLivraisonChargee() {
+    public void afficherLivraisonChargee(Livraison livraison) {
         clearTour();
-        messageLivraison.setText("livraison chargée");
+        map.afficherLivraison(livraison);
+        demandesList.getItems().clear();
+        int rang = 1;
+        for (Demande demande : livraison.obtenirDemandes()) {
+            demandesList.getItems().add(LibellesDemandes.decrire(rang++, demande));
+        }
+        demandesList.setVisible(true);
+        demandesList.setManaged(true);
+        messageLivraison.setText("livraison chargée : "
+                + livraison.obtenirDemandes().size() + " demande(s)");
+    }
+
+    private void clearDemandes() {
+        map.afficherLivraison(null);
+        demandesList.getItems().clear();
+        demandesList.setVisible(false);
+        demandesList.setManaged(false);
     }
 
     private void clearTour() {
