@@ -165,6 +165,9 @@ optimod-lyon/
 
 ## Conventions de code
 
+Les règles de code, d'architecture et de workflow (pour l'équipe comme pour
+les agents IA) sont rassemblées dans [`AGENTS.md`](AGENTS.md).
+
 - Style : [conventions Java d'Oracle](https://www.oracle.com/java/technologies/javase/codeconventions-contents.html)
   (noms en `camelCase` / `PascalCase` / `MAJUSCULES_POUR_LES_CONSTANTES`,
   lignes de 80 caractères maximum si possible).
