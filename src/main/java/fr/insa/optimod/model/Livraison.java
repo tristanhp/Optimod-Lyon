@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.xml.XMLConstants;
@@ -18,9 +19,11 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 /**
- * Ensemble des demandes à livrer depuis un entrepôt.
+ * Ensemble des demandes à livrer depuis un entrepôt. Les demandes peuvent être
+ * ajoutées ou retirées après la lecture ; chaque modification prévient les
+ * observateurs (design pattern Observer).
  */
-public final class Livraison {
+public final class Livraison extends Observable {
     private final List<Demande> demandes;
     private final Entrepot entrepot;
     private final String heureDepart; // heure de départ de l'entrepôt
@@ -34,7 +37,7 @@ public final class Livraison {
      */
     public Livraison(List<Demande> demandes, Entrepot entrepot,
             String heureDepart) {
-        this.demandes = List.copyOf(demandes);
+        this.demandes = new ArrayList<>(demandes);
         this.entrepot = entrepot;
         this.heureDepart = heureDepart;
     }
@@ -105,7 +108,7 @@ public final class Livraison {
                 demandesLues.add(new Demande(collecte, livraison,
                         dureeCollecte, dureeLivraison));
             }
-            demandes = List.copyOf(demandesLues);
+            demandes = demandesLues;
         } catch (NumberFormatException erreur) {
             throw new SAXException("Adresse ou durée invalide", erreur);
         }
@@ -136,9 +139,41 @@ public final class Livraison {
         }
     }
 
-    /** @return demandes à livrer (non modifiable) */
+    /**
+     * Renvoie les demandes. La liste n'est pas modifiable par l'appelant mais
+     * suit les ajouts et retraits faits par {@link #ajouterDemande} et
+     * {@link #retirerDemande}.
+     *
+     * @return demandes à livrer, dans l'ordre (non modifiable)
+     */
     public List<Demande> obtenirDemandes() {
-        return demandes;
+        return Collections.unmodifiableList(demandes);
+    }
+
+    /**
+     * Insère une demande et prévient les observateurs.
+     *
+     * @param position rang de la nouvelle demande, entre 0 et le nombre de
+     *        demandes
+     * @param demande demande à ajouter
+     * @throws IndexOutOfBoundsException si la position est hors de la liste
+     */
+    public void ajouterDemande(int position, Demande demande) {
+        demandes.add(position, demande);
+        notifierObservateurs();
+    }
+
+    /**
+     * Retire une demande et prévient les observateurs.
+     *
+     * @param position rang de la demande à retirer
+     * @return la demande retirée
+     * @throws IndexOutOfBoundsException si la position est hors de la liste
+     */
+    public Demande retirerDemande(int position) {
+        Demande retiree = demandes.remove(position);
+        notifierObservateurs();
+        return retiree;
     }
 
     /** @return entrepôt de départ */

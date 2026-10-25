@@ -118,4 +118,36 @@ public class LivraisonTest {
                             xml.getBytes(StandardCharsets.UTF_8))));
         }
     }
+
+    /** Ajouter et retirer une demande modifie la liste et prévient les observateurs. */
+    @Test
+    public void ajouterEtRetirerPreviennentLesObservateurs() {
+        Demande premiere = new Demande(1, 2, 60, 60);
+        Demande seconde = new Demande(3, 4, 60, 60);
+        Livraison livraison = new Livraison(List.of(premiere),
+                new Entrepot(5, "8:0:0"));
+        List<Demande> vue = livraison.obtenirDemandes();
+        List<Integer> tailles = new ArrayList<>();
+        livraison.ajouterObservateur(source -> tailles.add(
+                ((Livraison) source).obtenirDemandes().size()));
+
+        livraison.ajouterDemande(0, seconde);
+        assertEquals(List.of(seconde, premiere), vue);
+        assertSame(seconde, livraison.retirerDemande(0));
+        assertEquals(List.of(premiere), vue);
+        assertEquals(List.of(2, 1), tailles);
+    }
+
+    /** Une position invalide est refusée sans prévenir les observateurs. */
+    @Test
+    public void positionInvalideRefusee() {
+        Livraison livraison = new Livraison(List.of(), new Entrepot(5, "8:0:0"));
+        List<Integer> appels = new ArrayList<>();
+        livraison.ajouterObservateur(source -> appels.add(1));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> livraison.retirerDemande(0));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> livraison.ajouterDemande(1, new Demande(1, 2, 0, 0)));
+        assertEquals(List.of(), appels);
+    }
 }

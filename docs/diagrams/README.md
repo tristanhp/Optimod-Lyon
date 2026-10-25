@@ -143,6 +143,28 @@ stateDiagram-v2
     EtatLivraisonChargee --> EtatPlanCharge : importerPlan [valide]
 ```
 
+## Observation des demandes (design pattern Observer)
+
+`Livraison` hérite de `Observable` (package `model`, sans JavaFX) et prévient
+ses observateurs à chaque `ajouterDemande` / `retirerDemande`. `MainView`
+implémente `Observateur` : elle s'inscrit sur les demandes affichées et
+redessine la liste et la carte à chaque changement (voir
+l'[ADR 0003](../adr/0003-design-pattern-observer-modele-vue.md)).
+
+```mermaid
+sequenceDiagram
+    participant X as Appelant (contrôleur, commande)
+    participant L as Livraison
+    participant V as MainView
+    participant M as MapCanvas
+    Note over V,L: afficherLivraisonChargee(livraison) : V s'inscrit sur L
+    X->>L: retirerDemande(position)
+    L->>L: notifierObservateurs()
+    L->>V: mettreAJour(livraison)
+    V->>M: afficherLivraison(livraison)
+    V->>V: reconstruit la liste des demandes
+```
+
 ## Diagramme de classes
 
 Source détaillée : [classes-chargement.puml](classes-chargement.puml).
@@ -263,6 +285,9 @@ classDiagram
     MainView ..|> MapScreen
     MainController ..> MapScreen : actions et affichage
     MainController --> "1" Etat : etat
+    MainView ..|> Observateur
+    Livraison --|> Observable
+    Observable o--> "0..*" Observateur : observateurs
     MainController --> "0..1" Plan : plan
     MainController --> "0..1" Livraison : livraison
     MainView *-- "1" MapCanvas : carte

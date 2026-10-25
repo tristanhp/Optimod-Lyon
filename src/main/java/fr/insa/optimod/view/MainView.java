@@ -8,6 +8,8 @@ import java.util.Optional;
 import fr.insa.optimod.controller.MapScreen;
 import fr.insa.optimod.model.Demande;
 import fr.insa.optimod.model.Livraison;
+import fr.insa.optimod.model.Observable;
+import fr.insa.optimod.model.Observateur;
 import fr.insa.optimod.model.Passage;
 import fr.insa.optimod.model.Plan;
 import javafx.scene.control.Alert;
@@ -23,10 +25,14 @@ import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 
 /**
- * Page principale : boutons « Importer » et « Calculer », carte du plan et
- * liste de la tournée calculée.
+ * Page principale : boutons « Importer » et « Calculer », carte du plan,
+ * liste des demandes et liste de la tournée calculée.
+ *
+ * <p>La vue observe les demandes affichées (design pattern Observer) : quand
+ * elles changent, la liste et la carte se redessinent sans que le contrôleur
+ * ait à le demander.
  */
-final class MainView extends BorderPane implements MapScreen {
+final class MainView extends BorderPane implements MapScreen, Observateur {
 
     /** Format des heures dans la liste de la tournée. */
     private static final DateTimeFormatter HEURE =
@@ -58,6 +64,9 @@ final class MainView extends BorderPane implements MapScreen {
 
     /** Liste textuelle des demandes importées. */
     private final ListView<String> demandesList = new ListView<>();
+
+    /** Demandes affichées et observées, ou {@code null}. */
+    private Livraison livraisonObservee;
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
     private File lastDirectory;
@@ -209,23 +218,51 @@ final class MainView extends BorderPane implements MapScreen {
     @Override
     public void afficherLivraisonChargee(Livraison livraison) {
         clearTour();
-        map.afficherLivraison(livraison);
-        demandesList.getItems().clear();
-        int rang = 1;
-        for (Demande demande : livraison.obtenirDemandes()) {
-            demandesList.getItems().add(LibellesDemandes.decrire(rang++, demande));
+        observer(livraison);
+    }
+
+    /** Les demandes observées ont changé : redessine la liste et la carte. */
+    @Override
+    public void mettreAJour(Observable source) {
+        dessinerDemandes();
+    }
+
+    /**
+     * Change les demandes observées et les dessine.
+     *
+     * @param livraison demandes à observer, ou {@code null} pour aucune
+     */
+    private void observer(Livraison livraison) {
+        if (livraisonObservee != null) {
+            livraisonObservee.retirerObservateur(this);
         }
-        demandesList.setVisible(true);
-        demandesList.setManaged(true);
+        livraisonObservee = livraison;
+        if (livraison != null) {
+            livraison.ajouterObservateur(this);
+        }
+        dessinerDemandes();
+    }
+
+    private void dessinerDemandes() {
+        map.afficherLivraison(livraisonObservee);
+        demandesList.getItems().clear();
+        boolean visible = livraisonObservee != null;
+        demandesList.setVisible(visible);
+        demandesList.setManaged(visible);
+        if (!visible) {
+            return;
+        }
+        int rang = 1;
+        for (Demande demande : livraisonObservee.obtenirDemandes()) {
+            demandesList.getItems().add(
+                    LibellesDemandes.decrire(rang++, demande));
+        }
         messageLivraison.setText("livraison chargée : "
-                + livraison.obtenirDemandes().size() + " demande(s)");
+                + livraisonObservee.obtenirDemandes().size() + " demande(s)");
     }
 
     private void clearDemandes() {
-        map.afficherLivraison(null);
-        demandesList.getItems().clear();
-        demandesList.setVisible(false);
-        demandesList.setManaged(false);
+        observer(null);
     }
 
     private void clearTour() {
