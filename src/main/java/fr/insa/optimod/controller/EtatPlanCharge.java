@@ -13,6 +13,6 @@ final class EtatPlanCharge implements Etat {
 
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
-        return EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_LIVRAISON);
+        return EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME);
     }
 }

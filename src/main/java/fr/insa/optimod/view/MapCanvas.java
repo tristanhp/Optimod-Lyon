@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
-import fr.insa.optimod.model.Demande;
-import fr.insa.optimod.model.Livraison;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Troncon;
@@ -76,7 +76,7 @@ final class MapCanvas extends Pane {
     private Plan plan;
 
     /** Demandes affichées, ou {@code null}. */
-    private Livraison livraison;
+    private ProgrammeLivraisons programme;
 
     /** Zoom courant ; 1 affiche le plan entier. */
     private double zoom = 1;
@@ -131,7 +131,7 @@ final class MapCanvas extends Pane {
                     && evenement.isStillSincePress()) {
                 Noeud noeud = trouverNoeud(evenement.getX(), evenement.getY());
                 if (noeud != null) {
-                    surClicNoeud.accept(noeud.obtenirIdentifiant());
+                    surClicNoeud.accept(noeud.identifiant());
                 }
             }
         });
@@ -210,15 +210,15 @@ final class MapCanvas extends Pane {
 
     /** Indice de la demande dont un point est sous la souris, ou -1. */
     private int trouverDemande(double x, double y) {
-        if (plan == null || livraison == null || projection == null) {
+        if (plan == null || programme == null || projection == null) {
             return -1;
         }
         double portee = TAILLE_MARQUEUR + TOLERANCE_SURVOL;
-        List<Demande> demandes = livraison.obtenirDemandes();
+        List<Demande> demandes = programme.obtenirDemandes();
         for (int indice = demandes.size() - 1; indice >= 0; indice--) {
             Demande demande = demandes.get(indice);
-            if (estProche(plan.obtenirNoeud(demande.obtenirIdentifiantCollecte()), x, y, portee)
-                    || estProche(plan.obtenirNoeud(demande.obtenirIdentifiantLivraison()), x, y, portee)) {
+            if (estProche(demande.collecte(), x, y, portee)
+                    || estProche(demande.livraison(), x, y, portee)) {
                 return indice;
             }
         }
@@ -233,8 +233,8 @@ final class MapCanvas extends Pane {
         Noeud plusProche = null;
         double meilleureDistance = TOLERANCE_CLIC * TOLERANCE_CLIC;
         for (Noeud noeud : plan.obtenirNoeuds()) {
-            double dx = ecranX(noeud.obtenirLongitude()) - x;
-            double dy = ecranY(noeud.obtenirLatitude()) - y;
+            double dx = ecranX(noeud.longitude()) - x;
+            double dy = ecranY(noeud.latitude()) - y;
             double distance = dx * dx + dy * dy;
             if (distance <= meilleureDistance) {
                 meilleureDistance = distance;
@@ -246,8 +246,8 @@ final class MapCanvas extends Pane {
 
     private boolean estProche(Noeud noeud, double x, double y, double portee) {
         return noeud != null
-                && Math.abs(ecranX(noeud.obtenirLongitude()) - x) <= portee
-                && Math.abs(ecranY(noeud.obtenirLatitude()) - y) <= portee;
+                && Math.abs(ecranX(noeud.longitude()) - x) <= portee
+                && Math.abs(ecranY(noeud.latitude()) - y) <= portee;
     }
 
     /**
@@ -257,7 +257,7 @@ final class MapCanvas extends Pane {
      */
     void afficherPlan(Plan nouveauPlan) {
         plan = nouveauPlan;
-        livraison = null;
+        programme = null;
         demandeEnEvidence = -1;
         zoom = 1;
         decalageX = 0;
@@ -268,10 +268,10 @@ final class MapCanvas extends Pane {
     /**
      * Superpose les demandes au plan : collectes en carré, livraisons en rond.
      *
-     * @param nouvelleLivraison demandes à dessiner, ou {@code null} pour les retirer
+     * @param nouveauProgramme demandes à dessiner, ou {@code null} pour les retirer
      */
-    void afficherLivraison(Livraison nouvelleLivraison) {
-        livraison = nouvelleLivraison;
+    void afficherProgramme(ProgrammeLivraisons nouveauProgramme) {
+        programme = nouveauProgramme;
         demandeEnEvidence = -1;
         dessinerCarte();
     }
@@ -279,7 +279,7 @@ final class MapCanvas extends Pane {
     /** Efface la carte. */
     void effacerCarte() {
         plan = null;
-        livraison = null;
+        programme = null;
         demandeEnEvidence = -1;
         zoom = 1;
         decalageX = 0;
@@ -309,25 +309,25 @@ final class MapCanvas extends Pane {
         contexteGraphique.setLineWidth(1);
         contexteGraphique.beginPath();
         for (Troncon troncon : plan.obtenirTroncons()) {
-            contexteGraphique.moveTo(ecranX(troncon.obtenirNoeudOrigine().obtenirLongitude()),
-                    ecranY(troncon.obtenirNoeudOrigine().obtenirLatitude()));
-            contexteGraphique.lineTo(ecranX(troncon.obtenirNoeudDestination().obtenirLongitude()),
-                    ecranY(troncon.obtenirNoeudDestination().obtenirLatitude()));
+            contexteGraphique.moveTo(ecranX(troncon.origine().longitude()),
+                    ecranY(troncon.origine().latitude()));
+            contexteGraphique.lineTo(ecranX(troncon.destination().longitude()),
+                    ecranY(troncon.destination().latitude()));
         }
         contexteGraphique.stroke();
         contexteGraphique.setFill(COULEUR_INTERSECTION);
         for (Noeud noeud : plan.obtenirNoeuds()) {
-            contexteGraphique.fillOval(ecranX(noeud.obtenirLongitude()) - RAYON_INTERSECTION,
-                    ecranY(noeud.obtenirLatitude()) - RAYON_INTERSECTION,
+            contexteGraphique.fillOval(ecranX(noeud.longitude()) - RAYON_INTERSECTION,
+                    ecranY(noeud.latitude()) - RAYON_INTERSECTION,
                     2 * RAYON_INTERSECTION, 2 * RAYON_INTERSECTION);
         }
-        if (livraison != null) {
+        if (programme != null) {
             dessinerDemandes(contexteGraphique);
         }
     }
 
     private void dessinerDemandes(GraphicsContext contexte) {
-        List<Demande> demandes = livraison.obtenirDemandes();
+        List<Demande> demandes = programme.obtenirDemandes();
         for (int indice = 0; indice < demandes.size(); indice++) {
             if (indice != demandeEnEvidence) {
                 dessinerDemande(contexte, indice, false);
@@ -341,12 +341,12 @@ final class MapCanvas extends Pane {
 
     /** Dessine l'entrepôt par-dessus le reste : losange étiqueté. */
     private void dessinerEntrepot(GraphicsContext contexte) {
-        Noeud depot = plan.obtenirNoeud(livraison.obtenirEntrepot().obtenirIdentifiant());
+        Noeud depot = programme.obtenirEntrepot();
         if (depot == null) {
             return;
         }
-        double x = ecranX(depot.obtenirLongitude());
-        double y = ecranY(depot.obtenirLatitude());
+        double x = ecranX(depot.longitude());
+        double y = ecranY(depot.latitude());
         double[] abscisses = {x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT};
         double[] ordonnees = {y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y};
         contexte.setFill(COULEUR_ENTREPOT);
@@ -362,24 +362,24 @@ final class MapCanvas extends Pane {
 
     /** Dessine la collecte (carré) et la livraison (rond) d'une demande. */
     private void dessinerDemande(GraphicsContext contexte, int indice, boolean enEvidence) {
-        Demande demande = livraison.obtenirDemandes().get(indice);
+        Demande demande = programme.obtenirDemandes().get(indice);
         double taille = enEvidence ? TAILLE_MARQUEUR * TAILLE_EN_EVIDENCE : TAILLE_MARQUEUR;
         contexte.setFill(couleurDemande(indice));
         contexte.setStroke(COULEUR_CONTOUR_EVIDENCE);
         contexte.setLineWidth(2);
-        Noeud collecte = plan.obtenirNoeud(demande.obtenirIdentifiantCollecte());
+        Noeud collecte = demande.collecte();
         if (collecte != null) {
-            double x = ecranX(collecte.obtenirLongitude()) - taille;
-            double y = ecranY(collecte.obtenirLatitude()) - taille;
+            double x = ecranX(collecte.longitude()) - taille;
+            double y = ecranY(collecte.latitude()) - taille;
             contexte.fillRect(x, y, 2 * taille, 2 * taille);
             if (enEvidence) {
                 contexte.strokeRect(x, y, 2 * taille, 2 * taille);
             }
         }
-        Noeud destination = plan.obtenirNoeud(demande.obtenirIdentifiantLivraison());
+        Noeud destination = demande.livraison();
         if (destination != null) {
-            double x = ecranX(destination.obtenirLongitude()) - taille;
-            double y = ecranY(destination.obtenirLatitude()) - taille;
+            double x = ecranX(destination.longitude()) - taille;
+            double y = ecranY(destination.latitude()) - taille;
             contexte.fillOval(x, y, 2 * taille, 2 * taille);
             if (enEvidence) {
                 contexte.strokeOval(x, y, 2 * taille, 2 * taille);

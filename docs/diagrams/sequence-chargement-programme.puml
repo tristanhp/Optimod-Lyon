@@ -1,0 +1,43 @@
+@startuml sequence-chargement-programme
+title Charger le programme de livraisons (fichier de demandes)
+autonumber
+actor Utilisateur as U
+boundary "vue : MainView" as V
+control "controleur : MainController" as C
+participant "etat : EtatPlanCharge" as E
+entity "programme : ProgrammeLivraisons" as L
+entity "plan : Plan" as P
+note over V,C : Précondition : un plan est chargé (bouton actif).
+U -> V : Cliquer sur « Importer les demandes »
+V -> C : action enregistrée
+C -> E : importerProgramme(controleur)
+E -> C : lireProgramme()
+C -> V : choisirFichierDemandes()
+V --> C : Optional<File>
+alt Annulation
+  C --> E : Lecture.ANNULEE
+  note over E : état inchangé
+else Fichier choisi
+  C -> L : new ProgrammeLivraisons(chemin, plan)
+  L -> L : lire l'entrepôt et l'heure de départ (8:0:0 ou 08:00)
+  loop Balises livraison
+    L -> P : obtenirNoeud(adresse)
+    P --> L : Noeud (ou null : adresse hors plan)
+    L -> L : new Demande(collecte, livraison, durées)
+  end
+  alt Lecture réussie
+    L --> C : programme
+    C -> C : oublierModifications()
+    C -> V : afficherProgramme(programme)
+    V -> L : ajouterObservateur(vue)
+    C --> E : Lecture.REUSSIE
+    E -> C : changerEtat(new EtatProgrammeCharge())
+    C -> V : activerActions(actions permises)
+  else Fichier invalide ou adresse hors plan
+    L --> C : IOException / SAXException
+    C -> V : afficherErreurXml(message)
+    C --> E : Lecture.ECHOUEE
+    note over E : programme précédent conservé
+  end
+end
+@enduml

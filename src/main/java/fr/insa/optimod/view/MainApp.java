@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import fr.insa.optimod.algo.CalculateurTournee;
+import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.controller.MainController;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -25,16 +25,6 @@ public final class MainApp extends Application {
     /** Hauteur initiale de la fenêtre. */
     private static final double HEIGHT = 760;
 
-    /**
-     * Calcul provisoire, à remplacer par le calcul de tournée du Cas 5
-     * (plus courts chemins puis TSP, puis {@code CalculHoraires}).
-     */
-    private static final CalculateurTournee CALCUL_PROVISOIRE =
-            (plan, livraison) -> {
-                throw new IllegalStateException(
-                        "Le calcul de la tournée n'est pas encore branché.");
-            };
-
     /** Exécute le calcul de la tournée hors du thread de l'interface. */
     private ExecutorService calcul;
 
@@ -49,7 +39,7 @@ public final class MainApp extends Application {
             t.setDaemon(true);
             return t;
         });
-        controller = new MainController(view, CALCUL_PROVISOIRE, calcul,
+        controller = new MainController(view, Plan::calculerTournee, calcul,
                 Platform::runLater);
         Scene scene = new Scene(view, WIDTH, HEIGHT);
         scene.getStylesheets().add(Objects.requireNonNull(

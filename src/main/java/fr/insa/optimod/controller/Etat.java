@@ -1,9 +1,8 @@
 package fr.insa.optimod.controller;
 
-import java.util.List;
 import java.util.Set;
 
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * État du contrôleur (design pattern State). {@link MainController} délègue
@@ -32,14 +31,14 @@ interface Etat {
     }
 
     /**
-     * Clic sur « Importer la livraison » : des demandes valides mènent à
-     * {@link EtatLivraisonChargee} ; sinon l'état ne change pas.
+     * Clic sur « Importer les demandes » : un programme valide mène à
+     * {@link EtatProgrammeCharge} ; sinon l'état ne change pas.
      *
      * @param controleur contrôleur à piloter
      */
-    default void importerLivraison(MainController controleur) {
-        if (controleur.lireLivraison() == MainController.Lecture.REUSSIE) {
-            controleur.changerEtat(new EtatLivraisonChargee());
+    default void importerProgramme(MainController controleur) {
+        if (controleur.lireProgramme() == MainController.Lecture.REUSSIE) {
+            controleur.changerEtat(new EtatProgrammeCharge());
         }
     }
 
@@ -59,7 +58,7 @@ interface Etat {
      * @param tournee tournée calculée, ou {@code null} en cas d'erreur
      * @param erreur explication de l'erreur, ou {@code null}
      */
-    default void finirCalcul(MainController controleur, List<Passage> tournee,
+    default void finirCalcul(MainController controleur, Tournee tournee,
             String erreur) {
     }
 

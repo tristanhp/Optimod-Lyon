@@ -1,8 +1,6 @@
-package fr.insa.optimod.algo;
+package fr.insa.optimod.model;
 
 import java.util.List;
-
-import fr.insa.optimod.model.Troncon;
 
 /**
  * Plus court chemin entre deux noeuds du plan.

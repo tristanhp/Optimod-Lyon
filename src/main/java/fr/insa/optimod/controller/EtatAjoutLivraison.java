@@ -4,7 +4,8 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import fr.insa.optimod.controller.MapScreen.Action;
-import fr.insa.optimod.model.Demande;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 
 /**
  * Ajout d'une demande, seconde étape : le point de collecte est choisi,
@@ -36,12 +37,12 @@ final class EtatAjoutLivraison implements Etat {
     }
 
     @Override
-    public void importerLivraison(MainController controleur) {
+    public void importerProgramme(MainController controleur) {
     }
 
     @Override
     public void ajouterDemande(MainController controleur) {
-        controleur.retrouverEtatLivraison();
+        controleur.retrouverEtatProgramme();
     }
 
     @Override
@@ -51,8 +52,13 @@ final class EtatAjoutLivraison implements Etat {
                     + "que la collecte. " + CONSIGNE);
             return;
         }
+        Noeud collecte = controleur.obtenirPlan().obtenirNoeud(idCollecte);
+        Noeud livraison = controleur.obtenirPlan().obtenirNoeud(idNoeud);
+        if (collecte == null || livraison == null) {
+            return; // clic hors du plan : ignoré
+        }
         controleur.executer(new CommandeAjouterDemande(
-                controleur.obtenirLivraison(), new Demande(idCollecte, idNoeud,
+                controleur.obtenirProgramme(), new Demande(collecte, livraison,
                         DUREE_PAR_DEFAUT, DUREE_PAR_DEFAUT)));
     }
 

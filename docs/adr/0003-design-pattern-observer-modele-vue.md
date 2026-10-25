@@ -22,7 +22,7 @@ Issue Linear : TIG-91.
    - `Observateur` : interface fonctionnelle `mettreAJour(Observable source)` ;
    - `Observable` : classe abstraite qui gère la liste des observateurs
      (`ajouterObservateur`, `retirerObservateur`, `notifierObservateurs`).
-2. `Livraison` hérite de `Observable`. Ses demandes deviennent modifiables via
+2. `ProgrammeLivraisons` hérite de `Observable`. Ses demandes deviennent modifiables via
    `ajouterDemande(position, demande)` et `retirerDemande(position)`, qui
    préviennent les observateurs. `obtenirDemandes()` reste non modifiable pour
    l'appelant.
@@ -45,8 +45,8 @@ Issue Linear : TIG-91.
 
 - Toute modification future du modèle (ex. tournée modifiable) peut réutiliser
   `Observable` sans changer la vue existante.
-- `Livraison` n'est plus immuable : les modifications se font sur le thread de
+- `ProgrammeLivraisons` n'est plus immuable : les modifications se font sur le thread de
   l'interface, et l'état `EtatCalculEnCours` (ADR 0002) bloque toute action
   pendant le calcul en arrière-plan, qui lit les demandes.
-- La vue doit se désinscrire de l'ancienne `Livraison` quand elle en affiche
+- La vue doit se désinscrire de l'ancienne `ProgrammeLivraisons` quand elle en affiche
   une autre ; c'est fait dans `MainView.observer(...)`.

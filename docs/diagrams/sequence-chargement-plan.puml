@@ -7,9 +7,9 @@ control "controleur : MainController" as C
 entity "plan : Plan" as P
 participant "carte : MapCanvas" as M
 participant "projection : MapProjection" as R
-note over V,C : definirActionImportPlan(action) relie le bouton à importerPlan(ecran).
-U -> V : Cliquer sur « Importer le Plan »
-V -> C : importerPlan(ecran) [action enregistrée]
+note over V,C : definirActionImportPlan(action) relie le bouton à etat.importerPlan(controleur).
+U -> V : Cliquer sur « Importer le plan »
+V -> C : etat.importerPlan(controleur) [action enregistrée]
 C -> V : choisirFichierPlan()
 V -> V : choisirFichierXml(titre)
 V -> U : Ouvrir le sélecteur XML
@@ -30,7 +30,7 @@ else Fichier sélectionné
   end
   alt Lecture réussie
     P --> C : Plan construit
-    note right of C : plan = résultat ; livraison = null
+    note right of C : plan = résultat ; programme = null
     C -> V : afficherPlan(plan)
     V -> M : afficherPlan(plan)
     M -> M : dessinerCarte()
@@ -43,16 +43,16 @@ else Fichier sélectionné
       R --> M : Coordonnées en pixels
     end
     M --> U : Carte dessinée
-    note right of V : Effacer messageLivraison ; activer boutonImporterLivraison
+    note right of V : Effacer le message
     note right of C : etat = EtatPlanCharge
   else Erreur de lecture
-    P --> C : IOException / SAXException / IllegalArgumentException
+    P --> C : IOException / SAXException
     C -> V : afficherErreurXml(erreur.getMessage())
     V --> U : Alerte « Fichier XML invalide »
-    note right of C : plan = null ; livraison = null
+    note right of C : plan = null ; programme = null
     C -> V : reinitialiser()
     V -> M : effacerCarte()
-    note right of V : Effacer le message ; désactiver l'import des livraisons
+    note right of V : Effacer le message
     note right of C : etat = EtatInitial
   end
 end

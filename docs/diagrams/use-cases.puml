@@ -8,15 +8,15 @@ actor "Planificateur\nde livraison" as Planificateur
 rectangle "Optimod'Lyon" {
     package "Initialisation et configuration" {
         usecase "Cas 1 : Charger et afficher\nla carte urbaine" as UC1
-        usecase "Cas 2 : Configurer la flotte\nde coursiers" as UC2
+        usecase "Cas 2 : Configurer le nombre\nde livreurs" as UC2
     }
-    package "Gestion des requêtes" {
-        usecase "Cas 3 : Importer un lot\nde requêtes (fichier)" as UC3
+    package "Gestion des demandes" {
+        usecase "Cas 3 : Importer le programme\nde livraisons (fichier)" as UC3
         usecase "Cas 4 : Modifier le programme\nde livraisons" as UC4
         usecase "Ajouter une livraison\n(saisie manuelle)" as UC4a
         usecase "Supprimer une livraison" as UC4b
-        usecase "Décaler un pickup" as UC4c
-        usecase "Déplacer un pickup\nou un delivery" as UC4d
+        usecase "Décaler une collecte" as UC4c
+        usecase "Déplacer une collecte\nou une livraison" as UC4d
         usecase "Changer l'ordre\nde passage" as UC4e
     }
     package "Optimisation" {

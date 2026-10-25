@@ -9,11 +9,11 @@ import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.controller.MapScreen;
-import fr.insa.optimod.model.Demande;
-import fr.insa.optimod.model.Livraison;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Observable;
 import fr.insa.optimod.model.Observateur;
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
@@ -52,10 +52,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private static final double TOUR_WIDTH = 280;
 
     /** Bouton de chargement du fichier XML. */
-    private final Button importButton = new Button("Importer le Plan");
+    private final Button importButton = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterLivraison = new Button("Importer la Livraison");
+    private final Button boutonImporterDemandes = new Button("Importer les demandes");
     private final Label messageLivraison = new Label();
 
     private final Button calculateButton = new Button("Calculer");
@@ -84,7 +84,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final ListView<String> demandesList = new ListView<>();
 
     /** Demandes affichées et observées, ou {@code null}. */
-    private Livraison livraisonObservee;
+    private ProgrammeLivraisons programmeObserve;
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
     private File lastDirectory;
@@ -95,12 +95,12 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         calculateButton.getStyleClass().add("accent-button");
         waitingIndicator.setPrefSize(24, 24);
         waitingIndicator.setVisible(false);
-        boutonImporterLivraison.getStyleClass().add("accent-button");
+        boutonImporterDemandes.getStyleClass().add("accent-button");
         messageLivraison.setPadding(new Insets(12));
         setBottom(messageLivraison);
         boutonAnnuler.setTooltip(new Tooltip("Ctrl+Z"));
         boutonRefaire.setTooltip(new Tooltip("Ctrl+Y"));
-        HBox toolBar = new HBox(8, importButton, boutonImporterLivraison,
+        HBox toolBar = new HBox(8, importButton, boutonImporterDemandes,
                 calculateButton, waitingIndicator, boutonAjouter,
                 boutonAnnuler, boutonRefaire, consigne);
         toolBar.getStyleClass().add("tool-bar-box");
@@ -158,15 +158,15 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void setOnCalculate(Runnable action) {
+    public void definirActionCalculer(Runnable action) {
         calculateButton.setOnAction(event -> action.run());
     }
 
     @Override
     public void activerActions(Set<Action> actions) {
         importButton.setDisable(!actions.contains(Action.IMPORTER_PLAN));
-        boutonImporterLivraison.setDisable(
-                !actions.contains(Action.IMPORTER_LIVRAISON));
+        boutonImporterDemandes.setDisable(
+                !actions.contains(Action.IMPORTER_PROGRAMME));
         calculateButton.setDisable(!actions.contains(Action.CALCULER));
         boutonAjouter.setDisable(!actions.contains(Action.AJOUTER_DEMANDE));
         boutonAnnuler.setDisable(!actions.contains(Action.ANNULER));
@@ -218,7 +218,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void showWaiting(boolean isWaiting) {
+    public void afficherAttente(boolean isWaiting) {
         waitingIndicator.setVisible(isWaiting);
     }
 
@@ -251,19 +251,19 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void showTour(List<Passage> passages) {
+    public void afficherTournee(Tournee tournee) {
         tourList.getItems().clear();
-        for (Passage p : passages) {
-            tourList.getItems().add(HEURE.format(p.arrivee()) + " → "
-                    + HEURE.format(p.depart()) + "   noeud "
-                    + p.etape().idNoeud());
+        for (Tournee.Arret arret : tournee.arrets()) {
+            tourList.getItems().add(HEURE.format(arret.arrivee()) + " → "
+                    + HEURE.format(arret.depart()) + "   nœud "
+                    + arret.noeud().identifiant());
         }
         tourList.setVisible(true);
         tourList.setManaged(true);
     }
 
     @Override
-    public void showCalculationError(String detail) {
+    public void afficherErreurCalcul(String detail) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Calcul de la tournée impossible");
@@ -292,19 +292,19 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void definirActionImportLivraison(Runnable action) {
-        boutonImporterLivraison.setOnAction(event -> action.run());
+    public void definirActionImportProgramme(Runnable action) {
+        boutonImporterDemandes.setOnAction(event -> action.run());
     }
 
     @Override
-    public Optional<File> choisirFichierLivraison() {
+    public Optional<File> choisirFichierDemandes() {
         return choisirFichierXml("Importer des demandes de livraison XML");
     }
 
     @Override
-    public void afficherLivraisonChargee(Livraison livraison) {
+    public void afficherProgramme(ProgrammeLivraisons programme) {
         clearTour();
-        observer(livraison);
+        observer(programme);
     }
 
     /** Les demandes observées ont changé : redessine la liste et la carte. */
@@ -316,35 +316,35 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /**
      * Change les demandes observées et les dessine.
      *
-     * @param livraison demandes à observer, ou {@code null} pour aucune
+     * @param programme programme à observer, ou {@code null} pour aucun
      */
-    private void observer(Livraison livraison) {
-        if (livraisonObservee != null) {
-            livraisonObservee.retirerObservateur(this);
+    private void observer(ProgrammeLivraisons programme) {
+        if (programmeObserve != null) {
+            programmeObserve.retirerObservateur(this);
         }
-        livraisonObservee = livraison;
-        if (livraison != null) {
-            livraison.ajouterObservateur(this);
+        programmeObserve = programme;
+        if (programme != null) {
+            programme.ajouterObservateur(this);
         }
         dessinerDemandes();
     }
 
     private void dessinerDemandes() {
-        map.afficherLivraison(livraisonObservee);
+        map.afficherProgramme(programmeObserve);
         demandesList.getItems().clear();
-        boolean visible = livraisonObservee != null;
+        boolean visible = programmeObserve != null;
         demandesList.setVisible(visible);
         demandesList.setManaged(visible);
         if (!visible) {
             return;
         }
         int rang = 1;
-        for (Demande demande : livraisonObservee.obtenirDemandes()) {
+        for (Demande demande : programmeObserve.obtenirDemandes()) {
             demandesList.getItems().add(
                     LibellesDemandes.decrire(rang++, demande));
         }
-        messageLivraison.setText("livraison chargée : "
-                + livraisonObservee.obtenirDemandes().size() + " demande(s)");
+        messageLivraison.setText("Programme chargé : "
+                + programmeObserve.obtenirDemandes().size() + " demande(s)");
     }
 
     private void clearDemandes() {

@@ -1,6 +1,6 @@
 package fr.insa.optimod.view;
 
-import fr.insa.optimod.model.Demande;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 
 /**
  * Textes de la liste des demandes importées.
@@ -18,8 +18,8 @@ final class LibellesDemandes {
      * @return texte de la ligne
      */
     static String decrire(int rang, Demande demande) {
-        return "Demande " + rang + " : collecte " + formaterDuree(demande.obtenirDureeCollecte())
-                + ", livraison " + formaterDuree(demande.obtenirDureeLivraison());
+        return "Demande " + rang + " : collecte " + formaterDuree(demande.dureeCollecte())
+                + ", livraison " + formaterDuree(demande.dureeLivraison());
     }
 
     /** @return durée en minutes, avec les secondes restantes s'il y en a */

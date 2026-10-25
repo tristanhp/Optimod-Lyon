@@ -18,19 +18,19 @@ Issue Linear : TIG-92.
 1. Chaque modification est une `Commande` (`executer()`, `annuler()`, package
    `controller`) : `CommandeAjouterDemande` (ajout en fin de liste) et
    `CommandeSupprimerDemande` (garde la demande retirée et son rang pour la
-   remettre). Les commandes modifient `Livraison`, qui prévient la vue
+   remettre). Les commandes modifient `ProgrammeLivraisons`, qui prévient la vue
    (Observer, ADR 0003).
 2. `ListeDeCommandes` garde l'historique : `executer`, `annuler`, `refaire`,
    `vider`. Exécuter une nouvelle commande oublie les commandes annulées.
    L'historique est vidé quand un plan ou des demandes sont importés.
 3. **Cache des tournées** : le contrôleur garde les tournées calculées dans une
-   `Map<List<Demande>, List<Passage>>` indexée par la liste des demandes. Après
+   `Map<List<Demande>, Tournee>` indexée par la liste des demandes. Après
    une commande, une annulation ou un rétablissement,
-   `retrouverEtatLivraison()` réaffiche la tournée en cache
-   (`EtatTourneeCalculee`) ou retire la tournée (`EtatLivraisonChargee`). Le
+   `retrouverEtatProgramme()` réaffiche la tournée en cache
+   (`EtatTourneeCalculee`) ou retire la tournée (`EtatProgrammeCharge`). Le
    cache est vidé avec l'historique.
 4. Les états décident quand une commande est possible (ADR 0002) :
-   modifications, annulation et rétablissement dans `EtatLivraisonChargee` et
+   modifications, annulation et rétablissement dans `EtatProgrammeCharge` et
    `EtatTourneeCalculee` (qui en hérite), rien pendant le calcul. L'ajout passe
    par deux états, `EtatAjoutCollecte` puis `EtatAjoutLivraison`, l'utilisateur
    cliquant sur deux intersections de la carte.

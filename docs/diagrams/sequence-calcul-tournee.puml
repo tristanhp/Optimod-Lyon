@@ -1,32 +1,41 @@
 @startuml sequence-calcul-tournee
-title Calcul d'une tournée (brouillon à compléter)
-
-actor Utilisateur
-participant "view" as V
-participant "controller" as C
-participant "xml" as X
-participant "algo" as A
-participant "model" as M
-
-Utilisateur -> V : charge le plan (XML)
-V -> C : chargerPlan(fichier)
-C -> X : lirePlan(fichier)
-X --> C : Plan
-C -> M : stocke le plan
-
-Utilisateur -> V : charge les demandes (XML)
-V -> C : chargerDemandes(fichier)
-C -> X : lireDemandes(fichier)
-X --> C : Demandes
-C -> M : stocke les demandes
-
-Utilisateur -> V : calcule la tournée
-V -> C : calculerTournee()
-C -> A : plusCourtsChemins(plan, demandes)
-A --> C : graphe complet
-C -> A : tsp(graphe, précédences)
-A --> C : ordre de passage
-C -> M : stocke la tournée
-C --> V : tournée avec horaires
-V --> Utilisateur : affiche la carte
+title Calculer la tournée
+autonumber
+actor Utilisateur as U
+boundary "vue : MainView" as V
+control "controleur : MainController" as C
+participant "etat : EtatProgrammeCharge" as E
+entity "plan : Plan" as P
+participant "tsp : TSP3" as T
+U -> V : Cliquer sur « Calculer »
+V -> C : action enregistrée
+C -> E : calculer(controleur)
+E -> C : changerEtat(new EtatCalculEnCours())
+note right of C : tous les boutons désactivés
+E -> C : lancerCalcul()
+C -> V : afficherAttente(true)
+group Thread d'arrière-plan
+  C -> P : calculerTournee(programme)
+  P -> P : calculerPlusCourtsChemins(adresses)
+  note right of P : A* entre chaque couple d'adresses\n(entrepôt, collectes, livraisons)
+  P -> T : chercherSolution(10 s, GrapheDepandance)
+  note right of T : séparation et évaluation,\ncollecte avant livraison
+  T --> P : ordre de passage
+  P -> P : calculerHeuresDePassage(...)
+  note right of P : 15 km/h, durées sur place,\nretour avant 13:00 sinon erreur
+  P --> C : Tournee (ou IllegalStateException)
+end
+group Thread de l'interface
+  C -> C : mémoriser la tournée dans le cache
+  C -> C : etat.finirCalcul(tournee, erreur)
+  alt Tournée calculée
+    C -> C : changerEtat(new EtatTourneeCalculee())
+    C -> V : afficherTournee(tournee)
+    V --> U : arrêts et heures de passage
+  else Aucune tournée possible
+    C -> C : changerEtat(new EtatProgrammeCharge())
+    C -> V : afficherErreurCalcul(message)
+    V --> U : alerte « Calcul de la tournée impossible »
+  end
+end
 @enduml
