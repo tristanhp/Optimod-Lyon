@@ -29,3 +29,7 @@ replay_pid*
 # Système
 .DS_Store
 Thumbs.db
+
+# Images des diagrammes : générées par ./scripts/render-diagrams.sh et publiées
+# sur GitHub Pages, jamais versionnées (le rendu dépend des polices installées).
+docs/diagrams/out/

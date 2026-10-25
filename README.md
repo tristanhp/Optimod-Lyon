@@ -60,11 +60,13 @@ Si VS Code ne trouve pas le bon JDK, pointe `JAVA_HOME` vers
   Gutters : commande *Coverage Gutters: Display Coverage* dans VS Code)
 - Javadoc : `target/reports/apidocs/index.html`
 
-- Diagrammes PlantUML : sources dans `docs/diagrams/*.puml`, images (SVG)
-  versionnées dans `docs/diagrams/out/`. Sur une PR, la CI régénère les images
-  quand un `.puml` change et les pousse sur la branche : il suffit de
-  récupérer le commit (`git pull`). Extension VS Code optionnelle :
-  *PlantUML* (`jebbs.plantuml`).
+- Diagrammes PlantUML : seules les sources `docs/diagrams/*.puml` sont
+  versionnées. Les images (SVG) sont publiées sur
+  [GitHub Pages](https://tristanhp.github.io/Optimod-Lyon/) à chaque merge sur
+  `main` et jointes à chaque exécution de la CI (artefact `diagrammes`). Pour
+  les voir en local : `./scripts/render-diagrams.sh` (sortie dans
+  `docs/diagrams/out/`, ignoré par git) ou l'extension VS Code *PlantUML*
+  (`jebbs.plantuml`).
 
 Les mêmes actions sont disponibles dans VS Code via *Terminal > Run Task*
 (`.vscode/tasks.json`).
@@ -226,7 +228,7 @@ Le check **CI OK** doit être vert avant de merger. Il regroupe :
 | Build, tests et couverture | `mvn clean verify` (JDK 27), seuil de couverture JaCoCo, Javadoc, test du jar |
 | Qualité | Checkstyle (avertissements) et SpotBugs |
 | Hygiène | EditorConfig, lint Markdown, liens, XML bien formés |
-| Diagrammes | rendu des `.puml` (échoue sur une erreur de syntaxe ou si les images committées sont périmées) |
+| Diagrammes | rendu des `.puml` (échoue sur une erreur de syntaxe) ; SVG en artefact |
 | Secrets | détection de secrets (gitleaks) |
 
 Autres workflows : règles de nommage des branches et des titres de PR, analyse

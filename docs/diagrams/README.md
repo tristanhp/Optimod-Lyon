@@ -386,18 +386,14 @@ par exemple `obtenirIdentifiantCollecte` et `obtenirNombreSommets`.
 
 ## Export PlantUML
 
-La commande `./scripts/render-diagrams.sh` génère les SVG dans
-`docs/diagrams/out/` avec Java et PlantUML. Elle nécessite l'accès à Maven Central
-si le JAR PlantUML n'est pas présent. Les nouveaux SVG n'ont pas été produits dans
-cette session : le JAR est absent et le téléchargement est bloqué.
+Seules les sources `.puml` sont versionnées : le rendu SVG dépend des polices
+installées et différait d'une machine à l'autre. Les images sont :
+
+- publiées sur [GitHub Pages](https://tristanhp.github.io/Optimod-Lyon/) à
+  chaque merge sur `main` ;
+- jointes à chaque exécution de la CI (artefact `diagrammes`) ;
+- générables en local avec `./scripts/render-diagrams.sh` (sortie dans
+  `docs/diagrams/out/`, ignoré par git).
 
 Les anciens fichiers `architecture-mvc` et `sequence-calcul-tournee` décrivent
 une conception prévisionnelle ; ils ne font pas partie des présents livrables.
-
-## Vérification du code
-
-Après renommage, la reconstruction complète sous Java 27 réussit :
-37 tests passent et le seuil de couverture JaCoCo est satisfait.
-La génération de la Javadoc réussit également (avertissements de documentation).
-Les noms de méthodes figurant dans les sources PlantUML ont été comparés au code.
-Le rendu visuel des diagrammes reste à vérifier avec un moteur Mermaid ou PlantUML.
