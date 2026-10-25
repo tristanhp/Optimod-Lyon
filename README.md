@@ -127,7 +127,7 @@ carte vide.
 | Rôle | Classes |
 | --- | --- |
 | Modèle (`model`) | `Plan` (qui lit aussi le XML du plan), `Noeud`, `Troncon` |
-| Contrôleur (`controller`) | `MainController` ; interface `MapScreen` qui décrit ce que le contrôleur attend de l'écran |
+| Contrôleur (`controller`) | `MainController` ; interface `MapScreen` qui décrit ce que le contrôleur attend de l'écran ; `Etat` et ses implémentations (design pattern State, [ADR 0002](docs/adr/0002-design-pattern-state-controleur.md)) |
 | Vue (`view`) | `MainView` (bouton et fenêtres), `MapCanvas` (dessin), `MapProjection` (latitude/longitude vers pixels), `MainApp` et `AppLauncher` (démarrage) |
 
 La vue ne lit pas les fichiers : le clic sur **Importer** appelle le

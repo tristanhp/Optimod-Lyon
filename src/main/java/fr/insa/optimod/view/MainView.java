@@ -62,12 +62,6 @@ final class MainView extends BorderPane implements MapScreen {
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
     private File lastDirectory;
 
-    /** Vrai si le calcul est autorisé (lot de requêtes chargé). */
-    private boolean calculateEnabled;
-
-    /** Vrai pendant le calcul. */
-    private boolean waiting;
-
     /** Construit la page vide. */
     MainView() {
         importButton.getStyleClass().add("accent-button");
@@ -75,7 +69,6 @@ final class MainView extends BorderPane implements MapScreen {
         waitingIndicator.setPrefSize(24, 24);
         waitingIndicator.setVisible(false);
         boutonImporterLivraison.getStyleClass().add("accent-button");
-        boutonImporterLivraison.setDisable(true);
         messageLivraison.setPadding(new Insets(12));
         setBottom(messageLivraison);
         HBox toolBar = new HBox(8, importButton, boutonImporterLivraison, calculateButton,
@@ -109,7 +102,6 @@ final class MainView extends BorderPane implements MapScreen {
         setTop(toolBar);
         setCenter(map);
         setRight(tourList);
-        updateCalculateButton();
     }
 
     @Override
@@ -123,16 +115,16 @@ final class MainView extends BorderPane implements MapScreen {
     }
 
     @Override
-    public void setCalculateEnabled(boolean enabled) {
-        calculateEnabled = enabled;
-        updateCalculateButton();
+    public void activerActions(boolean importPlan, boolean importLivraison,
+            boolean calcul) {
+        importButton.setDisable(!importPlan);
+        boutonImporterLivraison.setDisable(!importLivraison);
+        calculateButton.setDisable(!calcul);
     }
 
     @Override
     public void showWaiting(boolean isWaiting) {
-        waiting = isWaiting;
         waitingIndicator.setVisible(isWaiting);
-        updateCalculateButton();
     }
 
     @Override
@@ -161,7 +153,6 @@ final class MainView extends BorderPane implements MapScreen {
         clearDemandes();
         map.afficherPlan(plan);
         messageLivraison.setText("");
-        boutonImporterLivraison.setDisable(false);
     }
 
     @Override
@@ -203,7 +194,6 @@ final class MainView extends BorderPane implements MapScreen {
         clearDemandes();
         map.effacerCarte();
         messageLivraison.setText("");
-        boutonImporterLivraison.setDisable(true);
     }
 
     @Override
@@ -242,9 +232,5 @@ final class MainView extends BorderPane implements MapScreen {
         tourList.getItems().clear();
         tourList.setVisible(false);
         tourList.setManaged(false);
-    }
-
-    private void updateCalculateButton() {
-        calculateButton.setDisable(!calculateEnabled || waiting);
     }
 }

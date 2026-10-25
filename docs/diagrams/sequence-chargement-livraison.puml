@@ -13,7 +13,7 @@ definirActionImportLivraison(action) relie le bouton à importerLivraison(ecran)
 end note
 U -> V : Cliquer sur « Importer la Livraison »
 V -> C : importerLivraison(ecran) [action enregistrée]
-note right of C : Si planCharge = false : retour immédiat (bouton désactivé).
+note right of C : Dans EtatInitial : ignoré (bouton désactivé).
 C -> V : choisirFichierLivraison()
 V -> V : choisirFichierXml(titre)
 V -> U : Ouvrir le sélecteur XML

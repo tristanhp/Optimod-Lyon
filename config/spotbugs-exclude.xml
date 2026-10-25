@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Exclusions SpotBugs. Chaque exclusion doit être ciblée (une classe, un
+    type de bug) et justifiée : on n'exclut pas un vrai bug pour faire passer
+    la CI.
+-->
+<FindBugsFilter>
+    <!--
+        Le contrôleur garde une référence vers l'écran qu'il pilote
+        (MapScreen) : c'est voulu, ce n'est pas une fuite de représentation.
+    -->
+    <Match>
+        <Class name="fr.insa.optimod.controller.MainController"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>

@@ -13,15 +13,35 @@ package "fr.insa.optimod.controller" {
   +afficherLivraisonChargee(livraison)
   +afficherErreurXml(detail : String)
   +reinitialiser()
+  +activerActions(importPlan, importLivraison, calcul)
  }
  class MainController {
-  -planCharge : Boolean
   +MainController(ecran : MapScreen)
   +obtenirPlan() : Plan
   +obtenirLivraison() : Livraison
-  -importerPlan(ecran : MapScreen)
-  -importerLivraison(ecran : MapScreen)
+  ~changerEtat(nouvelEtat : Etat)
+  ~lirePlan() : Lecture
+  ~lireLivraison() : Lecture
+  ~lancerCalcul()
  }
+ interface Etat {
+  +importerPlan(controleur)
+  +importerLivraison(controleur)
+  +calculer(controleur)
+  +finirCalcul(controleur, tournee, erreur)
+  +activerActions(ecran : MapScreen)
+ }
+ class EtatInitial
+ class EtatPlanCharge
+ class EtatLivraisonChargee
+ class EtatCalculEnCours
+ class EtatTourneeCalculee
+ EtatInitial ..|> Etat
+ EtatPlanCharge ..|> Etat
+ EtatLivraisonChargee ..|> Etat
+ EtatCalculEnCours ..|> Etat
+ EtatTourneeCalculee ..|> Etat
+ MainController --> "1" Etat : etat
 }
 package "fr.insa.optimod.view" {
  class AppLauncher {

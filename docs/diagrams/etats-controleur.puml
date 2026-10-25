@@ -1,0 +1,30 @@
+@startuml etats-controleur
+!pragma layout smetana
+title États du contrôleur (design pattern State)
+hide empty description
+[*] --> EtatInitial
+EtatInitial : boutons : Plan
+EtatPlanCharge : boutons : Plan, Livraison
+EtatLivraisonChargee : boutons : Plan, Livraison, Calculer
+EtatCalculEnCours : boutons : aucun
+EtatTourneeCalculee : boutons : Plan, Livraison, Calculer
+
+EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
+EtatPlanCharge --> EtatLivraisonChargee : importerLivraison [demandes valides]
+EtatLivraisonChargee --> EtatCalculEnCours : calculer
+EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+EtatCalculEnCours --> EtatLivraisonChargee : finirCalcul [erreur]
+EtatTourneeCalculee --> EtatCalculEnCours : calculer
+EtatLivraisonChargee --> EtatLivraisonChargee : importerLivraison [demandes valides]
+EtatTourneeCalculee --> EtatLivraisonChargee : importerLivraison [demandes valides]
+
+state "Tout état sauf EtatCalculEnCours" as tous
+tous --> EtatPlanCharge : importerPlan [plan valide]
+tous --> EtatInitial : importerPlan [plan invalide]
+
+note bottom of tous
+Règles par défaut de l'interface Etat. Une annulation
+du sélecteur de fichier ne change jamais l'état ; des
+demandes invalides laissent l'état inchangé.
+end note
+@enduml

@@ -251,6 +251,7 @@
                 <configuration>
                     <effort>Max</effort>
                     <threshold>Medium</threshold>
+                    <excludeFilterFile>config/spotbugs-exclude.xml</excludeFilterFile>
                 </configuration>
             </plugin>
 
