@@ -38,11 +38,12 @@ de couverture JaCoCo est `jacoco.line.minimum` dans le `pom.xml`.
 src/main/java/fr/insa/optimod/
 ├── Main.java     point d'entrée du jar (--version : pas d'interface)
 ├── model/        données métier et lecture XML : Plan, Noeud, Troncon,
-│                 Livraison, Demande, Entrepot, Etape, Passage
+│                 Livraison, Demande, Entrepot, Etape, Passage,
+│                 Observable, Observateur
 ├── algo/         plus courts chemins (AEtoile), GrapheChemins, CalculHoraires,
 │   └── tsp/      TSP avec précédence (TemplateTSP et ses variantes)
-├── controller/   MainController et MapScreen (ce que le contrôleur attend
-│                 de l'écran)
+├── controller/   MainController, MapScreen (ce que le contrôleur attend
+│                 de l'écran), états (Etat*) et commandes (Commande*)
 └── view/         JavaFX : MainView, MapCanvas, MapProjection,
                   LibellesDemandes, MainApp, AppLauncher
 ```
@@ -59,6 +60,27 @@ Règles de dépendance, à ne pas casser :
 - Le calcul long tourne hors du thread JavaFX : le contrôleur reçoit deux
   `Executor` (arrière-plan, interface) pour rester testable.
 - Lancer l'interface via `AppLauncher`, jamais `MainApp` directement.
+
+### Design patterns
+
+Trois patterns structurent l'application (ADR 0002 à 0004 dans
+[`docs/adr/`](docs/adr/README.md)). Toute nouvelle fonctionnalité passe par
+eux plutôt que de les contourner.
+
+- **State** (`controller/Etat` et `Etat*`) : `MainController` délègue chaque
+  action de l'utilisateur à son état courant, qui décide si l'action est
+  permise, quels boutons sont actifs (`MapScreen.activerActions`) et quel est
+  l'état suivant. Une nouvelle action = une méthode par défaut dans `Etat`
+  (ignorée), redéfinie dans les états où elle est permise. Pas de booléen
+  d'état dans le contrôleur.
+- **Observer** (`model/Observable`, `model/Observateur`) : le modèle prévient
+  la vue quand il change ; la vue se redessine seule. Une méthode qui modifie
+  un objet observable appelle `notifierObservateurs()`.
+- **Command** (`controller/Commande`, `ListeDeCommandes`) : toute
+  modification des demandes faite par l'utilisateur est une `Commande`
+  réversible, exécutée par `MainController.executer(...)`, pour qu'Annuler et
+  Rétablir fonctionnent. Ne jamais modifier le modèle directement depuis un
+  état ou la vue.
 
 Les décisions d'architecture sont dans [`docs/adr/`](docs/adr/README.md) ; une
 nouvelle décision structurante = un nouvel ADR (copier `docs/adr/modele.md`).
@@ -121,11 +143,16 @@ Voir [l'ADR 0001](docs/adr/0001-organisation-des-tests-unitaires.md).
 
 ## Diagrammes
 
-- Sources PlantUML dans `docs/diagrams/*.puml`. Les SVG de
-  `docs/diagrams/out/` sont **générés** : ne pas les éditer à la main. Sur une
-  PR, la CI les régénère et les pousse ; en local, `./scripts/render-diagrams.sh`.
+- Seules les sources PlantUML `docs/diagrams/*.puml` sont versionnées. Les SVG
+  ne le sont pas (leur rendu dépend des polices de la machine) : ils sont
+  publiés sur GitHub Pages et joints en artefact à chaque CI. En local,
+  `./scripts/render-diagrams.sh` les génère dans `docs/diagrams/out/` (ignoré
+  par git) ; ne jamais les committer.
+- Les diagrammes qui ne sont pas de séquence contiennent
+  `!pragma layout smetana` (pas de Graphviz).
 - Mettre à jour les diagrammes quand l'architecture change (nouvelle classe,
-  nouveau pattern, nouvelle séquence).
+  nouveau pattern, nouvelle séquence), ainsi que les blocs Mermaid de
+  `docs/diagrams/README.md` qui en sont la copie lisible sur GitHub.
 
 ## Workflow git et PR
 
@@ -143,7 +170,7 @@ Voir [l'ADR 0001](docs/adr/0001-organisation-des-tests-unitaires.md).
 ## À ne pas faire
 
 - Modifier `docs/code-fourni/` (code TSP fourni, en lecture seule).
-- Éditer `docs/diagrams/out/` à la main.
+- Committer des SVG de diagrammes (`docs/diagrams/out/`).
 - Committer des réglages locaux (`JAVA_HOME`, chemins absolus, `target/`).
 - Désactiver un test, baisser le seuil de couverture ou ajouter une exclusion
   SpotBugs/Checkstyle pour faire passer la CI.
