@@ -1,18 +1,44 @@
 @startuml architecture-mvc
 !pragma layout smetana
-title Architecture MVC d'Optimod'Lyon
+title Architecture MVC d'Optimod'Lyon (packages)
 
-package "view" as view
-package "controller" as controller
-package "model" as model
-package "algo" as algo
-package "xml" as xml
+package "fr.insa.optimod" as principal {
+  class Main
+}
+package "view (JavaFX)" as view {
+  class MainApp
+  class MainView
+  class MapCanvas
+}
+package "controller" as controller {
+  class MainController
+  interface MapScreen
+  interface Etat
+  interface Commande
+}
+package "model" as model {
+  class Plan
+  class ProgrammeLivraisons
+  class Tournee
+  abstract class Observable
+}
+package "algo.tsp" as tsp {
+  abstract class TemplateTSP
+  class TSP3
+}
 
-view --> controller : actions utilisateur
-controller --> view : mises à jour
-controller --> model : lit / modifie
-controller --> algo : calcule les tournées
-controller --> xml : charge plan et demandes
-algo --> model
-xml --> model
+principal ..> view : lance
+view ..> controller : crée le contrôleur,\nimplémente MapScreen
+view ..> model : observe et dessine
+controller ..> model : lit et modifie\n(par des commandes)
+model ..> tsp : ordre de passage
+
+note bottom of model
+Ne dépend ni de controller, ni de view, ni de JavaFX.
+Plan lit le fichier de plan et calcule la tournée.
+end note
+note bottom of controller
+Ne connaît la vue que par MapScreen :
+testé sans fenêtre.
+end note
 @enduml

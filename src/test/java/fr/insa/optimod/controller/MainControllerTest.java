@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -25,18 +26,17 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import fr.insa.optimod.algo.CalculateurTournee;
 import fr.insa.optimod.controller.MapScreen.Action;
-import fr.insa.optimod.model.Demande;
-import fr.insa.optimod.model.Etape;
-import fr.insa.optimod.model.Livraison;
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 
 public class MainControllerTest {
 
     /** Écran factice qui enregistre ce que le contrôleur lui demande. */
-    private static final class FakeScreen implements MapScreen {
+    private static final class EcranFactice implements MapScreen {
         private Runnable actionImportPlan;
         private Runnable actionImportLivraison;
         private Runnable actionCalculer;
@@ -49,10 +49,10 @@ public class MainControllerTest {
         private File fichierChoisi;
         private final List<String> evenements = new ArrayList<>();
         private Plan planAffiche;
-        private Livraison livraisonAffichee;
+        private ProgrammeLivraisons programmeAffiche;
         private Set<Action> actions;
         private boolean attente;
-        private List<Passage> tournee;
+        private Tournee tournee;
         private String erreurCalcul;
 
         @Override
@@ -61,12 +61,12 @@ public class MainControllerTest {
         }
 
         @Override
-        public void definirActionImportLivraison(Runnable action) {
+        public void definirActionImportProgramme(Runnable action) {
             actionImportLivraison = action;
         }
 
         @Override
-        public void setOnCalculate(Runnable action) {
+        public void definirActionCalculer(Runnable action) {
             actionCalculer = action;
         }
 
@@ -117,7 +117,7 @@ public class MainControllerTest {
         }
 
         @Override
-        public Optional<File> choisirFichierLivraison() {
+        public Optional<File> choisirFichierDemandes() {
             return Optional.ofNullable(fichierChoisi);
         }
 
@@ -128,9 +128,9 @@ public class MainControllerTest {
         }
 
         @Override
-        public void afficherLivraisonChargee(Livraison livraison) {
-            livraisonAffichee = livraison;
-            evenements.add("livraison chargée");
+        public void afficherProgramme(ProgrammeLivraisons programme) {
+            programmeAffiche = programme;
+            evenements.add("programme");
         }
 
         @Override
@@ -141,24 +141,24 @@ public class MainControllerTest {
         @Override
         public void reinitialiser() {
             planAffiche = null;
-            livraisonAffichee = null;
+            programmeAffiche = null;
             evenements.add("reinitialiser");
         }
 
         @Override
-        public void showWaiting(boolean enAttente) {
+        public void afficherAttente(boolean enAttente) {
             attente = enAttente;
             evenements.add("attente:" + enAttente);
         }
 
         @Override
-        public void showTour(List<Passage> passages) {
+        public void afficherTournee(Tournee passages) {
             tournee = passages;
             evenements.add("tournee");
         }
 
         @Override
-        public void showCalculationError(String detail) {
+        public void afficherErreurCalcul(String detail) {
             erreurCalcul = detail;
             evenements.add("erreur");
         }
@@ -172,27 +172,33 @@ public class MainControllerTest {
             + "<noeud id=\"1\" latitude=\"45.75\" longitude=\"4.85\"/>"
             + "</reseau>";
 
-    private static final List<Passage> TOURNEE = List.of(new Passage(
-            new Etape(1, 0), LocalTime.of(8, 0), LocalTime.of(8, 0)));
+    private static final Tournee TOURNEE = new Tournee(List.of(
+            new Tournee.Arret(new Noeud(1, 4.85, 45.75), LocalTime.of(8, 0),
+                    LocalTime.of(8, 0))), List.of());
+
+    /** Deux nœuds du petit plan fourni, pour ajouter une demande. */
+    private static final long NOEUD_A = 25175791L;
+    private static final long NOEUD_B = 2129259178L;
 
     /** Actions permises avec des demandes chargées, sans historique. */
     private static final Set<Action> MODIFIABLE = EnumSet.of(
-            Action.IMPORTER_PLAN, Action.IMPORTER_LIVRAISON, Action.CALCULER,
+            Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
 
-    private FakeScreen ecran;
+    private EcranFactice ecran;
     private MainController controleur;
     private final Queue<Runnable> arrierePlan = new ArrayDeque<>();
     private Plan planRecu;
-    private Livraison lotRecu;
+    private ProgrammeLivraisons lotRecu;
     private RuntimeException erreurDeCalcul;
 
     @Before
     public void creer() {
-        ecran = new FakeScreen();
-        CalculateurTournee calcul = (plan, livraison) -> {
+        ecran = new EcranFactice();
+        BiFunction<Plan, ProgrammeLivraisons, Tournee> calcul =
+                (plan, programme) -> {
             planRecu = plan;
-            lotRecu = livraison;
+            lotRecu = programme;
             if (erreurDeCalcul != null) {
                 throw erreurDeCalcul;
             }
@@ -217,7 +223,7 @@ public class MainControllerTest {
         ecran.actionImportPlan.run();
     }
 
-    private void importerLivraison(File fichier) {
+    private void importerProgramme(File fichier) {
         ecran.fichierChoisi = fichier;
         ecran.actionImportLivraison.run();
     }
@@ -225,19 +231,19 @@ public class MainControllerTest {
     /** Charge petitPlan.xml puis demandePetit1.xml, et vide les événements. */
     private void chargerPlanEtLivraison() throws Exception {
         importerPlan(ressource("/data/petitPlan.xml"));
-        importerLivraison(ressource("/data/demandePetit1.xml"));
+        importerProgramme(ressource("/data/demandePetit1.xml"));
         ecran.evenements.clear();
     }
 
     /** Charge petitPlan.xml puis demandePetit2.xml (2 demandes). */
     private void chargerDeuxDemandes() throws Exception {
         importerPlan(ressource("/data/petitPlan.xml"));
-        importerLivraison(ressource("/data/demandePetit2.xml"));
+        importerProgramme(ressource("/data/demandePetit2.xml"));
         ecran.evenements.clear();
     }
 
     private List<Demande> demandes() {
-        return controleur.obtenirLivraison().obtenirDemandes();
+        return controleur.obtenirProgramme().obtenirDemandes();
     }
 
     private void executerArrierePlan() {
@@ -264,10 +270,10 @@ public class MainControllerTest {
     }
 
     @Test
-    public void livraisonSansPlanIgnoree() {
+    public void programmeSansPlanIgnore() {
         ecran.actionImportLivraison.run();
         ecran.actionCalculer.run();
-        assertNull(controleur.obtenirLivraison());
+        assertNull(controleur.obtenirProgramme());
         assertTrue(ecran.evenements.isEmpty());
         assertTrue(arrierePlan.isEmpty());
     }
@@ -282,7 +288,7 @@ public class MainControllerTest {
         assertSame(ecran.planAffiche, controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_LIVRAISON), ecran.actions);
+                Action.IMPORTER_PROGRAMME), ecran.actions);
     }
 
     @Test
@@ -309,17 +315,17 @@ public class MainControllerTest {
     public void nouveauPlanOublieLaLivraison() throws Exception {
         chargerPlanEtLivraison();
         importerPlan(ecrire(PLAN_MINUSCULE));
-        assertNull(controleur.obtenirLivraison());
+        assertNull(controleur.obtenirProgramme());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_LIVRAISON), ecran.actions);
+                Action.IMPORTER_PROGRAMME), ecran.actions);
     }
 
     @Test
     public void planInvalideOublieLaLivraison() throws Exception {
         chargerPlanEtLivraison();
         importerPlan(ecrire("<reseau>"));
-        assertNull(controleur.obtenirLivraison());
+        assertNull(controleur.obtenirProgramme());
         assertNull(controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
     }
@@ -329,43 +335,43 @@ public class MainControllerTest {
     @Test
     public void importeLesDemandesEtActiveLeCalcul() throws Exception {
         importerPlan(ressource("/data/petitPlan.xml"));
-        importerLivraison(ressource("/data/demandePetit1.xml"));
-        assertEquals(List.of("plan", "livraison chargée"), ecran.evenements);
-        assertEquals(1, controleur.obtenirLivraison().obtenirDemandes().size());
-        assertEquals("8:0:0",
-                controleur.obtenirLivraison().obtenirHeureDepart());
-        assertSame(controleur.obtenirLivraison(), ecran.livraisonAffichee);
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        importerProgramme(ressource("/data/demandePetit1.xml"));
+        assertEquals(List.of("plan", "programme"), ecran.evenements);
+        assertEquals(1, controleur.obtenirProgramme().obtenirDemandes().size());
+        assertEquals(LocalTime.of(8, 0),
+                controleur.obtenirProgramme().obtenirHeureDepart());
+        assertSame(controleur.obtenirProgramme(), ecran.programmeAffiche);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertEquals(MODIFIABLE, ecran.actions);
     }
 
     @Test
-    public void livraisonHorsPlanRefusee() throws Exception {
+    public void programmeHorsPlanRefuse() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
-        importerLivraison(ressource("/data/demandePetit1.xml"));
+        importerProgramme(ressource("/data/demandePetit1.xml"));
         assertEquals(List.of("plan", "invalide"), ecran.evenements);
-        assertNull(controleur.obtenirLivraison());
-        assertNull(ecran.livraisonAffichee);
+        assertNull(controleur.obtenirProgramme());
+        assertNull(ecran.programmeAffiche);
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
     }
 
     @Test
-    public void livraisonInvalideConserveLesDemandes() throws Exception {
+    public void programmeInvalideConserveLePrecedent() throws Exception {
         chargerPlanEtLivraison();
-        Livraison precedente = controleur.obtenirLivraison();
-        importerLivraison(ecrire(PLAN_MINUSCULE));
+        ProgrammeLivraisons precedente = controleur.obtenirProgramme();
+        importerProgramme(ecrire(PLAN_MINUSCULE));
         assertEquals(List.of("invalide"), ecran.evenements);
-        assertSame(precedente, controleur.obtenirLivraison());
+        assertSame(precedente, controleur.obtenirProgramme());
         assertNotNull(controleur.obtenirPlan());
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 
     @Test
     public void annulerLImportDesDemandesLesConserve() throws Exception {
         chargerPlanEtLivraison();
-        Livraison precedente = controleur.obtenirLivraison();
-        importerLivraison(null);
-        assertSame(precedente, controleur.obtenirLivraison());
+        ProgrammeLivraisons precedente = controleur.obtenirProgramme();
+        importerProgramme(null);
+        assertSame(precedente, controleur.obtenirProgramme());
         assertTrue(ecran.evenements.isEmpty());
     }
 
@@ -398,7 +404,7 @@ public class MainControllerTest {
                 ecran.evenements);
         assertSame(TOURNEE, ecran.tournee);
         assertSame(controleur.obtenirPlan(), planRecu);
-        assertSame(controleur.obtenirLivraison(), lotRecu);
+        assertSame(controleur.obtenirProgramme(), lotRecu);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertEquals(MODIFIABLE, ecran.actions);
     }
@@ -415,12 +421,12 @@ public class MainControllerTest {
     public void importsIgnoresPendantLeCalcul() throws Exception {
         chargerPlanEtLivraison();
         Plan plan = controleur.obtenirPlan();
-        Livraison livraison = controleur.obtenirLivraison();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
         ecran.actionCalculer.run();
         importerPlan(ecrire(PLAN_MINUSCULE));
-        importerLivraison(ressource("/data/demandePetit1.xml"));
+        importerProgramme(ressource("/data/demandePetit1.xml"));
         assertSame(plan, controleur.obtenirPlan());
-        assertSame(livraison, controleur.obtenirLivraison());
+        assertSame(programme, controleur.obtenirProgramme());
         executerArrierePlan();
         assertSame(TOURNEE, ecran.tournee);
     }
@@ -435,7 +441,7 @@ public class MainControllerTest {
                 ecran.evenements);
         assertEquals("Tournée impossible", ecran.erreurCalcul);
         assertNull(ecran.tournee);
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertEquals(MODIFIABLE, ecran.actions);
     }
 
@@ -459,12 +465,15 @@ public class MainControllerTest {
     }
 
     @Test
-    public void controleurSansCalculAfficheUneErreur() throws Exception {
+    public void controleurParDefautCalculeLaTourneeAvecLePlan()
+            throws Exception {
         controleur = new MainController(ecran);
         chargerPlanEtLivraison();
         ecran.actionCalculer.run();
-        assertEquals("Le calcul de la tournée n'est pas encore branché.",
-                ecran.erreurCalcul);
+        assertNull(ecran.erreurCalcul);
+        assertNotNull(ecran.tournee);
+        assertEquals(4, ecran.tournee.arrets().size());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
     // --- Modification des demandes (design pattern Command) ---
@@ -485,7 +494,7 @@ public class MainControllerTest {
         ecran.actionSupprimer.accept(0);
         assertEquals(List.of(avant.get(1)), demandes());
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_LIVRAISON, Action.CALCULER,
+                Action.IMPORTER_PROGRAMME, Action.CALCULER,
                 Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
                 Action.ANNULER), ecran.actions);
 
@@ -496,7 +505,7 @@ public class MainControllerTest {
 
         ecran.actionRefaire.run();
         assertEquals(List.of(avant.get(1)), demandes());
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 
     @Test
@@ -525,7 +534,7 @@ public class MainControllerTest {
         ecran.evenements.clear();
 
         ecran.actionSupprimer.accept(1);
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertNull(ecran.tournee);
 
         ecran.actionAnnuler.run();
@@ -542,7 +551,7 @@ public class MainControllerTest {
         ecran.actionCalculer.run();
         executerArrierePlan();
         ecran.actionAnnuler.run();
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         ecran.actionRefaire.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertSame(TOURNEE, ecran.tournee);
@@ -564,7 +573,7 @@ public class MainControllerTest {
     public void nouvellesDemandesOublientLHistorique() throws Exception {
         chargerDeuxDemandes();
         ecran.actionSupprimer.accept(0);
-        importerLivraison(ressource("/data/demandePetit2.xml"));
+        importerProgramme(ressource("/data/demandePetit2.xml"));
         assertEquals(MODIFIABLE, ecran.actions);
         ecran.actionAnnuler.run();
         assertEquals(2, demandes().size());
@@ -578,19 +587,19 @@ public class MainControllerTest {
         assertEquals(EtatAjoutCollecte.CONSIGNE, ecran.consigne);
         assertEquals(EnumSet.of(Action.AJOUTER_DEMANDE), ecran.actions);
 
-        ecran.actionClicNoeud.accept(11L);
+        ecran.actionClicNoeud.accept(NOEUD_A);
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
         assertEquals(EtatAjoutLivraison.CONSIGNE, ecran.consigne);
 
-        ecran.actionClicNoeud.accept(22L);
+        ecran.actionClicNoeud.accept(NOEUD_B);
         assertEquals(3, demandes().size());
         Demande ajoutee = demandes().get(2);
-        assertEquals(11L, ajoutee.obtenirIdentifiantCollecte());
-        assertEquals(22L, ajoutee.obtenirIdentifiantLivraison());
+        assertEquals(NOEUD_A, ajoutee.collecte().identifiant());
+        assertEquals(NOEUD_B, ajoutee.livraison().identifiant());
         assertEquals(EtatAjoutLivraison.DUREE_PAR_DEFAUT,
-                ajoutee.obtenirDureeCollecte());
+                ajoutee.dureeCollecte());
         assertEquals("", ecran.consigne);
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
 
         ecran.actionAnnuler.run();
         assertEquals(2, demandes().size());
@@ -600,8 +609,8 @@ public class MainControllerTest {
     public void livraisonAuMemeEndroitQueLaCollecteRefusee() throws Exception {
         chargerDeuxDemandes();
         ecran.actionAjouter.run();
-        ecran.actionClicNoeud.accept(11L);
-        ecran.actionClicNoeud.accept(11L);
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_A);
         assertEquals(2, demandes().size());
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
         assertTrue(ecran.consigne.startsWith("La livraison doit"));
@@ -611,9 +620,9 @@ public class MainControllerTest {
     public void unSecondClicSurAjouterAnnuleLAjout() throws Exception {
         chargerDeuxDemandes();
         ecran.actionAjouter.run();
-        ecran.actionClicNoeud.accept(11L);
+        ecran.actionClicNoeud.accept(NOEUD_A);
         ecran.actionAjouter.run();
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertEquals("", ecran.consigne);
         assertEquals(2, demandes().size());
         assertEquals(MODIFIABLE, ecran.actions);
@@ -625,7 +634,7 @@ public class MainControllerTest {
         Plan plan = controleur.obtenirPlan();
         ecran.actionAjouter.run();
         importerPlan(ecrire(PLAN_MINUSCULE));
-        importerLivraison(ressource("/data/demandePetit1.xml"));
+        importerProgramme(ressource("/data/demandePetit1.xml"));
         assertSame(plan, controleur.obtenirPlan());
         assertEquals(2, demandes().size());
     }
@@ -633,8 +642,8 @@ public class MainControllerTest {
     @Test
     public void clicSurLaCarteHorsAjoutIgnore() throws Exception {
         chargerDeuxDemandes();
-        ecran.actionClicNoeud.accept(11L);
+        ecran.actionClicNoeud.accept(NOEUD_A);
         assertEquals(2, demandes().size());
-        assertTrue(controleur.obtenirEtat() instanceof EtatLivraisonChargee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 }

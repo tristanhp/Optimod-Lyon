@@ -4,39 +4,39 @@ title États du contrôleur (design pattern State)
 hide empty description
 [*] --> EtatInitial
 EtatInitial : boutons : Plan
-EtatPlanCharge : boutons : Plan, Livraison
-EtatLivraisonChargee : boutons : Plan, Livraison, Calculer,
-EtatLivraisonChargee : Ajouter, Supprimer, Annuler*, Rétablir*
+EtatPlanCharge : boutons : Plan, Demandes
+EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
+EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatCalculEnCours : boutons : aucun
-EtatTourneeCalculee : boutons : comme EtatLivraisonChargee
+EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : (sous-classe)
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : idCollecte : long
 
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
-EtatPlanCharge --> EtatLivraisonChargee : importerLivraison [demandes valides]
-EtatLivraisonChargee --> EtatCalculEnCours : calculer
+EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
+EtatProgrammeCharge --> EtatCalculEnCours : calculer
 EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
-EtatCalculEnCours --> EtatLivraisonChargee : finirCalcul [erreur]
+EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
 EtatTourneeCalculee --> EtatCalculEnCours : calculer
-EtatLivraisonChargee --> EtatLivraisonChargee : importerLivraison [demandes valides]
-EtatTourneeCalculee --> EtatLivraisonChargee : importerLivraison [demandes valides]
+EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
+EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
 state "Choix de l'état selon le cache" as cache <<choice>>
-EtatLivraisonChargee --> cache : supprimerDemande / annuler / refaire
+EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
 cache --> EtatTourneeCalculee : [tournée des demandes en cache]
-cache --> EtatLivraisonChargee : [sinon]
+cache --> EtatProgrammeCharge : [sinon]
 
-EtatLivraisonChargee --> EtatAjoutCollecte : ajouterDemande
+EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
 EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
 EtatAjoutLivraison --> cache : cliquerNoeud [autre noeud] / CommandeAjouterDemande
 EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
 EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
 
-state "EtatInitial, EtatPlanCharge, EtatLivraisonChargee, EtatTourneeCalculee" as tous
+state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]
 tous --> EtatInitial : importerPlan [plan invalide]
 

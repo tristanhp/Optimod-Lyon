@@ -1,11 +1,10 @@
 package fr.insa.optimod.controller;
 
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 
 import fr.insa.optimod.controller.MapScreen.Action;
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Calcul de la tournée en cours : toutes les actions sont bloquées jusqu'au
@@ -19,22 +18,22 @@ final class EtatCalculEnCours implements Etat {
     }
 
     @Override
-    public void importerLivraison(MainController controleur) {
+    public void importerProgramme(MainController controleur) {
     }
 
     /**
      * Affiche la tournée ({@link EtatTourneeCalculee}) ou l'erreur (retour à
-     * {@link EtatLivraisonChargee}).
+     * {@link EtatProgrammeCharge}).
      */
     @Override
-    public void finirCalcul(MainController controleur, List<Passage> tournee,
+    public void finirCalcul(MainController controleur, Tournee tournee,
             String erreur) {
         controleur.arreterAttente();
         if (tournee != null) {
             controleur.changerEtat(new EtatTourneeCalculee());
             controleur.afficherTournee(tournee);
         } else {
-            controleur.changerEtat(new EtatLivraisonChargee());
+            controleur.changerEtat(new EtatProgrammeCharge());
             controleur.afficherErreurCalcul(erreur);
         }
     }

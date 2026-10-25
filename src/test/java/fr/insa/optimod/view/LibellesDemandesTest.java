@@ -4,13 +4,15 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import fr.insa.optimod.model.Demande;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 
 public class LibellesDemandesTest {
 
     @Test
     public void decritLeNumeroEtLesDureesSansAdresse() {
-        Demande demande = new Demande(10, 20, 180, 240);
+        Demande demande = new Demande(new Noeud(10, 0, 0), new Noeud(20, 0, 0),
+                180, 240);
         assertEquals("Demande 3 : collecte 3 min, livraison 4 min",
                 LibellesDemandes.decrire(3, demande));
     }

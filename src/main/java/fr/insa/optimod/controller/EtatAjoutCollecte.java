@@ -20,12 +20,12 @@ final class EtatAjoutCollecte implements Etat {
     }
 
     @Override
-    public void importerLivraison(MainController controleur) {
+    public void importerProgramme(MainController controleur) {
     }
 
     @Override
     public void ajouterDemande(MainController controleur) {
-        controleur.retrouverEtatLivraison();
+        controleur.retrouverEtatProgramme();
     }
 
     @Override

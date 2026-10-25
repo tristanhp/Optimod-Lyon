@@ -1,0 +1,147 @@
+@startuml classes
+!pragma layout smetana
+title Classes d'Optimod'Lyon
+skinparam classAttributeIconSize 0
+hide empty members
+
+package "model" {
+  class Plan {
+    +{static} VITESSE_KMH : double = 15
+    +{static} HEURE_LIMITE_RETOUR : LocalTime = 13:00
+    +Plan(cheminFichierXml : String)
+    +obtenirNoeuds() : Collection<Noeud>
+    +obtenirNoeud(identifiant : long) : Noeud
+    +obtenirTroncons() : List<Troncon>
+    +calculerTournee(programme : ProgrammeLivraisons) : Tournee
+    -calculerPlusCourtsChemins(adresses) : Chemin[][]
+    -calculerOrdreDePassage(chemins) : List<Integer>
+    -calculerHeuresDePassage(...) : Tournee
+    ~plusCourtChemin(source : Noeud, cible : Noeud) : Chemin
+  }
+  class Noeud <<record>> {
+    identifiant : long
+    longitude : double
+    latitude : double
+  }
+  class Troncon <<record>> {
+    origine : Noeud
+    destination : Noeud
+    longueur : double
+    nomRue : String
+  }
+  class Chemin <<record>> {
+    longueur : double
+    troncons : List<Troncon>
+    +estAccessible() : boolean
+  }
+  abstract class Observable {
+    +ajouterObservateur(observateur : Observateur)
+    +retirerObservateur(observateur : Observateur)
+    #notifierObservateurs()
+  }
+  interface Observateur {
+    +mettreAJour(source : Observable)
+  }
+  class ProgrammeLivraisons {
+    +ProgrammeLivraisons(cheminFichierXml : String, plan : Plan)
+    +obtenirEntrepot() : Noeud
+    +obtenirHeureDepart() : LocalTime
+    +obtenirDemandes() : List<Demande>
+    +ajouterDemande(position : int, demande : Demande)
+    +retirerDemande(position : int) : Demande
+  }
+  class "ProgrammeLivraisons.Demande" as Demande <<record>> {
+    collecte : Noeud
+    livraison : Noeud
+    dureeCollecte : int
+    dureeLivraison : int
+  }
+  class Tournee <<record>> {
+    arrets : List<Arret>
+    chemins : List<Chemin>
+    +obtenirHeureRetour() : LocalTime
+  }
+  class "Tournee.Arret" as Arret <<record>> {
+    noeud : Noeud
+    arrivee : LocalTime
+    depart : LocalTime
+  }
+}
+
+package "algo.tsp" {
+  abstract class TemplateTSP
+  class TSP3
+  class GrapheDepandance
+}
+
+package "controller" {
+  class MainController {
+    +MainController(ecran : MapScreen)
+    +obtenirPlan() : Plan
+    +obtenirProgramme() : ProgrammeLivraisons
+    ~changerEtat(nouvelEtat : Etat)
+    ~executer(commande : Commande)
+    -tourneesCalculees : Map<List<Demande>, Tournee>
+  }
+  interface MapScreen
+  interface Etat
+  class EtatInitial
+  class EtatPlanCharge
+  class EtatProgrammeCharge
+  class EtatTourneeCalculee
+  class EtatCalculEnCours
+  class EtatAjoutCollecte
+  class EtatAjoutLivraison
+  interface Commande {
+    +executer()
+    +annuler()
+  }
+  class ListeDeCommandes
+  class CommandeAjouterDemande
+  class CommandeSupprimerDemande
+}
+
+package "view" {
+  class MainView
+  class MapCanvas
+  class MapProjection
+}
+
+Plan *--> "*" Noeud
+Plan *--> "*" Troncon
+Troncon --> "2" Noeud
+Chemin o--> "*" Troncon
+Plan ..> ProgrammeLivraisons : calculerTournee
+Plan ..> Tournee : crée
+Plan ..> TSP3 : ordre de passage
+TSP3 --|> TemplateTSP
+TemplateTSP ..> GrapheDepandance
+ProgrammeLivraisons --|> Observable
+Observable o--> "*" Observateur
+ProgrammeLivraisons *--> "*" Demande
+ProgrammeLivraisons --> "1" Noeud : entrepot
+Demande --> "2" Noeud
+Tournee *--> "*" Arret
+Tournee o--> "*" Chemin
+
+MainController --> "1" MapScreen : ecran
+MainController --> "1" Etat : etat
+MainController *--> "1" ListeDeCommandes : historique
+MainController --> "0..1" Plan
+MainController --> "0..1" ProgrammeLivraisons
+EtatInitial ..|> Etat
+EtatPlanCharge ..|> Etat
+EtatProgrammeCharge ..|> Etat
+EtatTourneeCalculee --|> EtatProgrammeCharge
+EtatCalculEnCours ..|> Etat
+EtatAjoutCollecte ..|> Etat
+EtatAjoutLivraison ..|> Etat
+ListeDeCommandes o--> "*" Commande
+CommandeAjouterDemande ..|> Commande
+CommandeSupprimerDemande ..|> Commande
+
+MainView ..|> MapScreen
+MainView ..|> Observateur
+MainView *--> "1" MapCanvas
+MapCanvas ..> MapProjection
+@enduml

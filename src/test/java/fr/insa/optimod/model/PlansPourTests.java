@@ -1,10 +1,9 @@
-package fr.insa.optimod.algo;
+package fr.insa.optimod.model;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-import fr.insa.optimod.model.Plan;
 
 /**
  * Plans partagés par les tests des algorithmes.
@@ -64,7 +63,7 @@ final class PlansPourTests {
      */
     static Plan petitPlan() throws Exception {
         try (InputStream xml = PlansPourTests.class
-                .getResourceAsStream("/xml/petitPlan.xml")) {
+                .getResourceAsStream("/data/petitPlan.xml")) {
             return new Plan(xml);
         }
     }

@@ -18,18 +18,18 @@ Issue Linear : TIG-90.
 
 1. Le contrôleur délègue chaque clic à son **état courant**, une
    implémentation de l'interface `Etat` (package `controller`, visibilité
-   package) : `EtatInitial`, `EtatPlanCharge`, `EtatLivraisonChargee`,
+   package) : `EtatInitial`, `EtatPlanCharge`, `EtatProgrammeCharge`,
    `EtatCalculEnCours`, `EtatTourneeCalculee`.
 2. L'état décide si l'action est permise et quel est l'état suivant
    (`controleur.changerEtat(...)`). Le contrôleur ne fournit que les
-   opérations élémentaires : lire un fichier (`lirePlan`, `lireLivraison`, qui
+   opérations élémentaires : lire un fichier (`lirePlan`, `lireProgramme`, qui
    renvoient `Lecture.ANNULEE | REUSSIE | ECHOUEE`), lancer le calcul, mettre
    à jour l'écran.
 3. Les règles communes sont des **méthodes par défaut** de `Etat` (importer un
    plan ou des demandes est possible, calculer ne l'est pas) ; chaque état ne
    redéfinit que ses exceptions.
 4. L'état fixe aussi les **boutons actifs** via
-   `MapScreen.activerActions(importPlan, importLivraison, calcul)` : la vue ne
+   `MapScreen.activerActions(...)` : la vue ne
    décide plus elle-même quel bouton activer.
 5. Pendant `EtatCalculEnCours`, tous les imports sont bloqués : le plan et les
    demandes ne peuvent plus changer pendant le calcul.

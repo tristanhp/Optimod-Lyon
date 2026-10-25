@@ -9,7 +9,7 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * Un plan et des demandes sont chargés : on peut calculer la tournée, modifier
  * les demandes (ajout, suppression) et annuler ou rétablir ces modifications.
  */
-class EtatLivraisonChargee implements Etat {
+class EtatProgrammeCharge implements Etat {
 
     @Override
     public void calculer(MainController controleur) {
@@ -26,9 +26,9 @@ class EtatLivraisonChargee implements Etat {
     @Override
     public void supprimerDemande(MainController controleur, int position) {
         if (position >= 0 && position
-                < controleur.obtenirLivraison().obtenirDemandes().size()) {
+                < controleur.obtenirProgramme().obtenirDemandes().size()) {
             controleur.executer(new CommandeSupprimerDemande(
-                    controleur.obtenirLivraison(), position));
+                    controleur.obtenirProgramme(), position));
         }
     }
 
@@ -45,7 +45,7 @@ class EtatLivraisonChargee implements Etat {
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
         Set<Action> actions = EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_LIVRAISON, Action.CALCULER,
+                Action.IMPORTER_PROGRAMME, Action.CALCULER,
                 Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
         if (controleur.peutAnnuler()) {
             actions.add(Action.ANNULER);

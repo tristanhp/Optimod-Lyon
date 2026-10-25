@@ -11,7 +11,7 @@ import fr.insa.optimod.controller.MapScreen.Action;
 final class EtatInitial implements Etat {
 
     @Override
-    public void importerLivraison(MainController controleur) {
+    public void importerProgramme(MainController controleur) {
     }
 
     @Override

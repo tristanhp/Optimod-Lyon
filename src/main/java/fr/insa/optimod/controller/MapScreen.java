@@ -1,14 +1,13 @@
 package fr.insa.optimod.controller;
 
 import java.io.File;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
-import fr.insa.optimod.model.Livraison;
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 
 /**
@@ -21,8 +20,8 @@ public interface MapScreen {
     enum Action {
         /** Bouton « Importer le plan ». */
         IMPORTER_PLAN,
-        /** Bouton « Importer la livraison ». */
-        IMPORTER_LIVRAISON,
+        /** Bouton « Importer les demandes » (programme de livraisons). */
+        IMPORTER_PROGRAMME,
         /** Bouton « Calculer ». */
         CALCULER,
         /** Bouton « Ajouter une demande » (ou annuler l'ajout en cours). */
@@ -36,17 +35,17 @@ public interface MapScreen {
     }
 
     /** Définit l'action d'import des demandes. @param action action au clic */
-    void definirActionImportLivraison(Runnable action);
+    void definirActionImportProgramme(Runnable action);
 
     /** @return fichier XML de demandes choisi, ou vide après annulation */
-    Optional<File> choisirFichierLivraison();
+    Optional<File> choisirFichierDemandes();
 
     /**
      * Affiche les demandes chargées sur la carte et dans une liste.
      *
-     * @param livraison demandes et entrepôt chargés
+     * @param programme programme de livraisons chargé
      */
-    void afficherLivraisonChargee(Livraison livraison);
+    void afficherProgramme(ProgrammeLivraisons programme);
 
 
     /**
@@ -88,7 +87,7 @@ public interface MapScreen {
      *
      * @param action action à exécuter à chaque clic
      */
-    void setOnCalculate(Runnable action);
+    void definirActionCalculer(Runnable action);
 
     /**
      * Active les boutons des actions permises et désactive les autres. C'est
@@ -150,19 +149,19 @@ public interface MapScreen {
      *
      * @param waiting {@code true} tant que le calcul est en cours
      */
-    void showWaiting(boolean waiting);
+    void afficherAttente(boolean waiting);
 
     /**
      * Affiche la tournée calculée.
      *
-     * @param passages points de la tournée avec leurs heures, dans l'ordre
+     * @param tournee arrêts de la tournée avec leurs heures de passage
      */
-    void showTour(List<Passage> passages);
+    void afficherTournee(Tournee tournee);
 
     /**
      * Signale que le calcul a échoué.
      *
      * @param detail explication de l'erreur
      */
-    void showCalculationError(String detail);
+    void afficherErreurCalcul(String detail);
 }

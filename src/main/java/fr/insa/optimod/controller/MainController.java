@@ -6,19 +6,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.function.BiFunction;
 
 import org.xml.sax.SAXException;
 
-import fr.insa.optimod.algo.CalculateurTournee;
-import fr.insa.optimod.model.Demande;
-import fr.insa.optimod.model.Livraison;
-import fr.insa.optimod.model.Passage;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 
 /**
- * Contrôleur de la page principale : importe un plan puis des demandes XML
- * dans le modèle, demande à la vue de les afficher, puis lance le calcul de la
- * tournée quand l'utilisateur clique sur « Calculer ».
+ * Contrôleur de la page principale : importe un plan puis un programme de
+ * livraisons (fichiers XML) dans le modèle, demande à la vue de les afficher,
+ * puis lance le calcul de la tournée quand l'utilisateur clique sur
+ * « Calculer ».
  *
  * <p>Les clics sont délégués à l'état courant ({@link Etat}, design pattern
  * State) : c'est lui qui décide si l'action est permise et quel est l'état
@@ -45,8 +46,8 @@ public final class MainController {
     /** Écran piloté. */
     private final MapScreen ecran;
 
-    /** Calcul de la tournée. */
-    private final CalculateurTournee calculateur;
+    /** Calcul de la tournée ({@link Plan#calculerTournee} hors tests). */
+    private final BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee;
 
     /** Exécute le calcul hors du thread de l'interface. */
     private final Executor arrierePlan;
@@ -60,8 +61,8 @@ public final class MainController {
     /** Plan actuellement chargé, ou {@code null}. */
     private Plan plan;
 
-    /** Demandes actuellement chargées, ou {@code null}. */
-    private Livraison livraison;
+    /** Programme de livraisons actuellement chargé, ou {@code null}. */
+    private ProgrammeLivraisons programme;
 
     /** Modifications des demandes, pour annuler et rétablir. */
     private final ListeDeCommandes historique = new ListeDeCommandes();
@@ -70,20 +71,16 @@ public final class MainController {
      * Tournées déjà calculées pour le plan et les demandes chargés, indexées
      * par la liste des demandes (dans l'ordre).
      */
-    private final Map<List<Demande>, List<Passage>> tourneesCalculees =
+    private final Map<List<Demande>, Tournee> tourneesCalculees =
             new HashMap<>();
 
     /**
-     * Crée un contrôleur sans calcul de tournée (le clic sur « Calculer »
-     * affiche une erreur).
+     * Crée un contrôleur qui calcule la tournée sur le thread appelant.
      *
      * @param ecran écran à piloter
      */
     public MainController(MapScreen ecran) {
-        this(ecran, (plan, livraison) -> {
-            throw new IllegalStateException(
-                    "Le calcul de la tournée n'est pas encore branché.");
-        }, Runnable::run, Runnable::run);
+        this(ecran, Plan::calculerTournee, Runnable::run, Runnable::run);
     }
 
     /**
@@ -91,20 +88,22 @@ public final class MainController {
      * l'état initial (seul l'import d'un plan est possible).
      *
      * @param ecran écran à piloter
-     * @param calculateur calcul de la tournée
+     * @param calculTournee calcul de la tournée d'un programme sur un plan
+     *        ({@code Plan::calculerTournee} ; remplaçable dans les tests)
      * @param arrierePlan exécute le calcul hors du thread de l'interface
      * @param interfaceUtilisateur exécute les mises à jour de la vue sur le
      *        thread de l'interface
      */
-    public MainController(MapScreen ecran, CalculateurTournee calculateur,
+    public MainController(MapScreen ecran,
+            BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee,
             Executor arrierePlan, Executor interfaceUtilisateur) {
         this.ecran = ecran;
-        this.calculateur = calculateur;
+        this.calculTournee = calculTournee;
         this.arrierePlan = arrierePlan;
         this.interfaceUtilisateur = interfaceUtilisateur;
         ecran.definirActionImportPlan(() -> etat.importerPlan(this));
-        ecran.definirActionImportLivraison(() -> etat.importerLivraison(this));
-        ecran.setOnCalculate(() -> etat.calculer(this));
+        ecran.definirActionImportProgramme(() -> etat.importerProgramme(this));
+        ecran.definirActionCalculer(() -> etat.calculer(this));
         ecran.definirActionAjouterDemande(() -> etat.ajouterDemande(this));
         ecran.definirActionSupprimerDemande(
                 position -> etat.supprimerDemande(this, position));
@@ -120,9 +119,9 @@ public final class MainController {
         return plan;
     }
 
-    /** @return demandes chargées, ou {@code null} avant leur import */
-    public Livraison obtenirLivraison() {
-        return livraison;
+    /** @return programme de livraisons chargé, ou {@code null} */
+    public ProgrammeLivraisons obtenirProgramme() {
+        return programme;
     }
 
     /** @return état courant (pour les tests) */
@@ -141,9 +140,9 @@ public final class MainController {
     }
 
     /**
-     * Fait choisir un plan XML et l'affiche. Un nouveau plan rend les demandes
-     * précédentes caduques ; un plan invalide ouvre la fenêtre d'erreur et
-     * vide la page.
+     * Fait choisir un fichier de plan et l'affiche. Un nouveau plan rend le
+     * programme précédent caduc ; un plan invalide ouvre la fenêtre d'erreur
+     * et vide la page.
      *
      * @return l'issue de la lecture
      */
@@ -152,7 +151,7 @@ public final class MainController {
         if (fichier == null) {
             return Lecture.ANNULEE;
         }
-        livraison = null;
+        programme = null;
         oublierModifications();
         try {
             plan = new Plan(fichier.getPath());
@@ -167,43 +166,25 @@ public final class MainController {
     }
 
     /**
-     * Fait choisir des demandes XML et les affiche, sans modifier le plan. Des
-     * demandes invalides ou hors du plan ouvrent la fenêtre d'erreur et les
-     * demandes précédentes sont conservées.
+     * Fait choisir un fichier de demandes et affiche le programme, sans
+     * modifier le plan. Un fichier invalide ou une adresse absente du plan
+     * ouvre la fenêtre d'erreur ; le programme précédent est conservé.
      *
      * @return l'issue de la lecture
      */
-    Lecture lireLivraison() {
-        File fichier = ecran.choisirFichierLivraison().orElse(null);
+    Lecture lireProgramme() {
+        File fichier = ecran.choisirFichierDemandes().orElse(null);
         if (fichier == null) {
             return Lecture.ANNULEE;
         }
         try {
-            Livraison nouvelle = new Livraison(fichier.getPath());
-            verifierNoeudsConnus(nouvelle);
-            livraison = nouvelle;
+            programme = new ProgrammeLivraisons(fichier.getPath(), plan);
             oublierModifications();
-            ecran.afficherLivraisonChargee(nouvelle);
+            ecran.afficherProgramme(programme);
             return Lecture.REUSSIE;
-        } catch (IOException | SAXException | IllegalArgumentException e) {
+        } catch (IOException | SAXException e) {
             ecran.afficherErreurXml(e.getMessage());
             return Lecture.ECHOUEE;
-        }
-    }
-
-    /** Refuse des demandes dont une adresse n'est pas un noeud du plan. */
-    private void verifierNoeudsConnus(Livraison lot) {
-        verifierNoeudConnu(lot.obtenirEntrepot().obtenirIdentifiant());
-        for (Demande demande : lot.obtenirDemandes()) {
-            verifierNoeudConnu(demande.obtenirIdentifiantCollecte());
-            verifierNoeudConnu(demande.obtenirIdentifiantLivraison());
-        }
-    }
-
-    private void verifierNoeudConnu(long identifiant) {
-        if (plan.obtenirNoeud(identifiant) == null) {
-            throw new IllegalArgumentException("Adresse " + identifiant
-                    + " absente du plan chargé");
         }
     }
 
@@ -214,14 +195,14 @@ public final class MainController {
      */
     void lancerCalcul() {
         Plan planCalcule = plan;
-        Livraison lotCalcule = livraison;
+        ProgrammeLivraisons programmeCalcule = programme;
         List<Demande> demandesCalculees = List.copyOf(
-                livraison.obtenirDemandes());
-        ecran.showWaiting(true);
+                programme.obtenirDemandes());
+        ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
-                List<Passage> tournee = calculateur.calculer(planCalcule,
-                        lotCalcule);
+                Tournee tournee = calculTournee.apply(planCalcule,
+                        programmeCalcule);
                 interfaceUtilisateur.execute(() -> {
                     tourneesCalculees.put(demandesCalculees, tournee);
                     etat.finirCalcul(this, tournee, null);
@@ -237,17 +218,17 @@ public final class MainController {
 
     /** Retire l'indicateur d'attente du calcul. */
     void arreterAttente() {
-        ecran.showWaiting(false);
+        ecran.afficherAttente(false);
     }
 
     /** @param tournee tournée calculée à afficher */
-    void afficherTournee(List<Passage> tournee) {
-        ecran.showTour(tournee);
+    void afficherTournee(Tournee tournee) {
+        ecran.afficherTournee(tournee);
     }
 
     /** @param detail explication de l'échec du calcul */
     void afficherErreurCalcul(String detail) {
-        ecran.showCalculationError(detail);
+        ecran.afficherErreurCalcul(detail);
     }
 
     /** @param consigne consigne à afficher, vide pour l'effacer */
@@ -262,19 +243,19 @@ public final class MainController {
      */
     void executer(Commande commande) {
         historique.executer(commande);
-        retrouverEtatLivraison();
+        retrouverEtatProgramme();
     }
 
     /** Annule la dernière modification des demandes. */
     void annulerCommande() {
         historique.annuler();
-        retrouverEtatLivraison();
+        retrouverEtatProgramme();
     }
 
     /** Rétablit la dernière modification annulée. */
     void refaireCommande() {
         historique.refaire();
-        retrouverEtatLivraison();
+        retrouverEtatProgramme();
     }
 
     /** @return vrai s'il reste une modification à annuler */
@@ -288,20 +269,20 @@ public final class MainController {
     }
 
     /**
-     * Revient à l'état qui correspond aux demandes actuelles : si leur tournée
+     * Revient à l'état qui correspond au programme actuel : si leur tournée
      * a déjà été calculée, elle est réaffichée depuis le cache
      * ({@link EtatTourneeCalculee}) ; sinon la tournée est retirée
-     * ({@link EtatLivraisonChargee}).
+     * ({@link EtatProgrammeCharge}).
      */
-    void retrouverEtatLivraison() {
+    void retrouverEtatProgramme() {
         ecran.afficherConsigne("");
-        List<Passage> tournee = tourneesCalculees.get(
-                List.copyOf(livraison.obtenirDemandes()));
+        Tournee tournee = tourneesCalculees.get(
+                List.copyOf(programme.obtenirDemandes()));
         if (tournee != null) {
             changerEtat(new EtatTourneeCalculee());
-            ecran.showTour(tournee);
+            ecran.afficherTournee(tournee);
         } else {
-            changerEtat(new EtatLivraisonChargee());
+            changerEtat(new EtatProgrammeCharge());
             ecran.effacerTournee();
         }
     }

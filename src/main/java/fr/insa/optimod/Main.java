@@ -10,10 +10,10 @@ import fr.insa.optimod.view.AppLauncher;
 public final class Main {
 
     /** Nom affiché de l'application. */
-    private static final String APP_NAME = "Optimod'Lyon";
+    private static final String NOM_APPLICATION = "Optimod'Lyon";
 
     /** Option qui affiche le message de démarrage sans ouvrir l'interface. */
-    public static final String VERSION_OPTION = "--version";
+    public static final String OPTION_VERSION = "--version";
 
     private Main() {
     }
@@ -24,28 +24,28 @@ public final class Main {
      * @return le message de démarrage
      */
     public static String obtenirMessageDemarrage() {
-        return APP_NAME + " - optimisation de tournées de livraison à vélo";
+        return NOM_APPLICATION + " - optimisation de tournées de livraison à vélo";
     }
 
     /**
      * Indique si l'interface graphique doit être ouverte.
      *
      * @param args arguments de la ligne de commande
-     * @return {@code false} si {@link #VERSION_OPTION} est présent
+     * @return {@code false} si {@link #OPTION_VERSION} est présent
      */
-    static boolean shouldLaunchGui(String[] args) {
-        return !Arrays.asList(args).contains(VERSION_OPTION);
+    static boolean doitOuvrirInterface(String[] args) {
+        return !Arrays.asList(args).contains(OPTION_VERSION);
     }
 
     /**
      * Démarre l'application : affiche le message de démarrage puis ouvre
-     * l'interface graphique, sauf avec {@link #VERSION_OPTION}.
+     * l'interface graphique, sauf avec {@link #OPTION_VERSION}.
      *
      * @param args arguments de la ligne de commande
      */
     public static void main(String[] args) {
         System.out.println(obtenirMessageDemarrage());
-        if (shouldLaunchGui(args)) {
+        if (doitOuvrirInterface(args)) {
             AppLauncher.main(args);
         }
     }

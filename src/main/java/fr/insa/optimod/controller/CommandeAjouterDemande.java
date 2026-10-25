@@ -1,36 +1,36 @@
 package fr.insa.optimod.controller;
 
-import fr.insa.optimod.model.Demande;
-import fr.insa.optimod.model.Livraison;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.ProgrammeLivraisons;
 
 /**
  * Ajoute une demande à la fin des demandes ; l'annulation la retire.
  */
 final class CommandeAjouterDemande implements Commande {
 
-    private final Livraison livraison;
+    private final ProgrammeLivraisons programme;
     private final Demande demande;
 
     /** Rang de la demande ajoutée, connu après l'exécution. */
     private int position;
 
     /**
-     * @param livraison demandes à modifier
+     * @param programme demandes à modifier
      * @param demande demande à ajouter
      */
-    CommandeAjouterDemande(Livraison livraison, Demande demande) {
-        this.livraison = livraison;
+    CommandeAjouterDemande(ProgrammeLivraisons programme, Demande demande) {
+        this.programme = programme;
         this.demande = demande;
     }
 
     @Override
     public void executer() {
-        position = livraison.obtenirDemandes().size();
-        livraison.ajouterDemande(position, demande);
+        position = programme.obtenirDemandes().size();
+        programme.ajouterDemande(position, demande);
     }
 
     @Override
     public void annuler() {
-        livraison.retirerDemande(position);
+        programme.retirerDemande(position);
     }
 }

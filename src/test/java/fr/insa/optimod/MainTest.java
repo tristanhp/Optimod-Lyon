@@ -24,13 +24,13 @@ public class MainTest {
     /** Sans option, le jar ouvre l'interface graphique. */
     @Test
     public void launchesGuiByDefault() {
-        assertTrue(Main.shouldLaunchGui(new String[0]));
+        assertTrue(Main.doitOuvrirInterface(new String[0]));
     }
 
     /** Avec --version, le jar n'ouvre pas l'interface graphique. */
     @Test
     public void versionOptionDoesNotLaunchGui() {
-        assertFalse(Main.shouldLaunchGui(new String[] {Main.VERSION_OPTION}));
+        assertFalse(Main.doitOuvrirInterface(new String[] {Main.OPTION_VERSION}));
     }
 
     /** Avec --version, le démarrage affiche seulement le message. */
@@ -40,7 +40,7 @@ public class MainTest {
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
         try {
-            Main.main(new String[] {Main.VERSION_OPTION});
+            Main.main(new String[] {Main.OPTION_VERSION});
         } finally {
             System.setOut(originalOut);
         }

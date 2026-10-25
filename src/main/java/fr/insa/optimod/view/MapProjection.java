@@ -43,10 +43,10 @@ final class MapProjection {
         double longitudeMinimaleLue = Double.POSITIVE_INFINITY;
         double longitudeMaximale = Double.NEGATIVE_INFINITY;
         for (Noeud noeud : noeuds) {
-            latitudeMinimale = Math.min(latitudeMinimale, noeud.obtenirLatitude());
-            latitudeMaximaleLue = Math.max(latitudeMaximaleLue, noeud.obtenirLatitude());
-            longitudeMinimaleLue = Math.min(longitudeMinimaleLue, noeud.obtenirLongitude());
-            longitudeMaximale = Math.max(longitudeMaximale, noeud.obtenirLongitude());
+            latitudeMinimale = Math.min(latitudeMinimale, noeud.latitude());
+            latitudeMaximaleLue = Math.max(latitudeMaximaleLue, noeud.latitude());
+            longitudeMinimaleLue = Math.min(longitudeMinimaleLue, noeud.longitude());
+            longitudeMaximale = Math.max(longitudeMaximale, noeud.longitude());
         }
         correctionLongitude = Math.cos(Math.toRadians((latitudeMinimale + latitudeMaximaleLue) / 2));
         double etendueHorizontale = Math.max((longitudeMaximale - longitudeMinimaleLue) * correctionLongitude, 1e-9);

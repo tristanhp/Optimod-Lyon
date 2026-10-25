@@ -35,8 +35,8 @@ public class MapProjectionTest {
         Noeud secondNoeud = noeud(2, 45.80, 4.95);
         MapProjection projection = new MapProjection(List.of(premierNoeud, secondNoeud), LARGEUR, HAUTEUR, MARGE);
         for (Noeud noeud : List.of(premierNoeud, secondNoeud)) {
-            double abscisse = projection.calculerAbscisseEcran(noeud.obtenirLongitude());
-            double ordonnee = projection.calculerOrdonneeEcran(noeud.obtenirLatitude());
+            double abscisse = projection.calculerAbscisseEcran(noeud.longitude());
+            double ordonnee = projection.calculerOrdonneeEcran(noeud.latitude());
             assertTrue(abscisse >= MARGE - 1e-6 && abscisse <= LARGEUR - MARGE + 1e-6);
             assertTrue(ordonnee >= MARGE - 1e-6 && ordonnee <= HAUTEUR - MARGE + 1e-6);
         }
