@@ -2,6 +2,7 @@ package fr.insa.optimod.view;
 
 import java.util.List;
 import java.util.function.IntConsumer;
+import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.Demande;
 import fr.insa.optimod.model.Livraison;
@@ -49,6 +50,9 @@ final class MapCanvas extends Pane {
     /** Marge de tolérance autour d'un marqueur pour le survol, en pixels. */
     private static final double TOLERANCE_SURVOL = 3;
 
+    /** Distance maximale entre un clic et l'intersection choisie, en pixels. */
+    private static final double TOLERANCE_CLIC = 10;
+
     /** Une couleur par demande, réutilisées en boucle. */
     private static final Color[] COULEURS_DEMANDES = {
         Color.web("#d93025"), Color.web("#1a73e8"), Color.web("#188038"),
@@ -94,6 +98,9 @@ final class MapCanvas extends Pane {
     /** Prévenu de l'indice de la demande survolée (-1 hors d'un point). */
     private IntConsumer surSurvol = indice -> { };
 
+    /** Prévenu de l'identifiant de l'intersection cliquée. */
+    private LongConsumer surClicNoeud = idNoeud -> { };
+
     /** Crée une carte vide. */
     MapCanvas() {
         getChildren().add(canevas);
@@ -120,6 +127,12 @@ final class MapCanvas extends Pane {
         setOnMouseClicked(evenement -> {
             if (evenement.getClickCount() == 2) {
                 reinitialiserZoom();
+            } else if (evenement.getButton() == MouseButton.PRIMARY
+                    && evenement.isStillSincePress()) {
+                Noeud noeud = trouverNoeud(evenement.getX(), evenement.getY());
+                if (noeud != null) {
+                    surClicNoeud.accept(noeud.obtenirIdentifiant());
+                }
             }
         });
         setOnMouseMoved(evenement -> signalerSurvol(
@@ -134,6 +147,15 @@ final class MapCanvas extends Pane {
      */
     void definirSurSurvol(IntConsumer action) {
         surSurvol = action;
+    }
+
+    /**
+     * Définit l'action déclenchée par un clic sur une intersection.
+     *
+     * @param action reçoit l'identifiant du noeud le plus proche du clic
+     */
+    void definirSurClicNoeud(LongConsumer action) {
+        surClicNoeud = action;
     }
 
     /**
@@ -201,6 +223,25 @@ final class MapCanvas extends Pane {
             }
         }
         return -1;
+    }
+
+    /** Intersection la plus proche d'un point de l'écran, ou null si trop loin. */
+    private Noeud trouverNoeud(double x, double y) {
+        if (plan == null || projection == null) {
+            return null;
+        }
+        Noeud plusProche = null;
+        double meilleureDistance = TOLERANCE_CLIC * TOLERANCE_CLIC;
+        for (Noeud noeud : plan.obtenirNoeuds()) {
+            double dx = ecranX(noeud.obtenirLongitude()) - x;
+            double dy = ecranY(noeud.obtenirLatitude()) - y;
+            double distance = dx * dx + dy * dy;
+            if (distance <= meilleureDistance) {
+                meilleureDistance = distance;
+                plusProche = noeud;
+            }
+        }
+        return plusProche;
     }
 
     private boolean estProche(Noeud noeud, double x, double y, double portee) {

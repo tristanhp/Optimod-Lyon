@@ -1,6 +1,7 @@
 package fr.insa.optimod.controller;
 
 import java.util.List;
+import java.util.Set;
 
 import fr.insa.optimod.model.Passage;
 
@@ -10,8 +11,8 @@ import fr.insa.optimod.model.Passage;
  * permis et de l'état suivant.
  *
  * <p>Les méthodes par défaut donnent la règle générale : importer un plan ou
- * des demandes est possible, calculer ne l'est pas. Chaque état ne redéfinit
- * que ses exceptions.
+ * des demandes est possible, les autres actions sont ignorées. Chaque état ne
+ * redéfinit que ses exceptions.
  */
 interface Etat {
 
@@ -63,9 +64,53 @@ interface Etat {
     }
 
     /**
-     * Active les boutons permis dans cet état.
+     * Clic sur « Ajouter une demande ». Ignoré par défaut.
      *
-     * @param ecran écran dont on règle les boutons
+     * @param controleur contrôleur à piloter
      */
-    void activerActions(MapScreen ecran);
+    default void ajouterDemande(MainController controleur) {
+    }
+
+    /**
+     * Clic sur « Supprimer la demande ». Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param position rang de la demande sélectionnée
+     */
+    default void supprimerDemande(MainController controleur, int position) {
+    }
+
+    /**
+     * Clic sur une intersection de la carte. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param idNoeud identifiant du noeud cliqué
+     */
+    default void cliquerNoeud(MainController controleur, long idNoeud) {
+    }
+
+    /**
+     * « Annuler » (Ctrl+Z). Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     */
+    default void annuler(MainController controleur) {
+    }
+
+    /**
+     * « Rétablir » (Ctrl+Y). Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     */
+    default void refaire(MainController controleur) {
+    }
+
+    /**
+     * Donne les actions permises dans cet état, pour activer les boutons.
+     *
+     * @param controleur contrôleur (pour savoir s'il reste des commandes à
+     *        annuler ou à rétablir)
+     * @return actions permises
+     */
+    Set<MapScreen.Action> actionsPermises(MainController controleur);
 }

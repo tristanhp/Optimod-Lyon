@@ -13,7 +13,14 @@ package "fr.insa.optimod.controller" {
   +afficherLivraisonChargee(livraison)
   +afficherErreurXml(detail : String)
   +reinitialiser()
-  +activerActions(importPlan, importLivraison, calcul)
+  +activerActions(actions : Set<Action>)
+  +definirActionAjouterDemande(action : Runnable)
+  +definirActionSupprimerDemande(action : IntConsumer)
+  +definirActionAnnuler(action : Runnable)
+  +definirActionRefaire(action : Runnable)
+  +definirActionClicNoeud(action : LongConsumer)
+  +afficherConsigne(consigne : String)
+  +effacerTournee()
  }
  class MainController {
   +MainController(ecran : MapScreen)
@@ -23,24 +30,65 @@ package "fr.insa.optimod.controller" {
   ~lirePlan() : Lecture
   ~lireLivraison() : Lecture
   ~lancerCalcul()
+  ~executer(commande : Commande)
+  ~annulerCommande()
+  ~refaireCommande()
+  ~retrouverEtatLivraison()
+  -tourneesCalculees : Map<List<Demande>, List<Passage>>
  }
  interface Etat {
   +importerPlan(controleur)
   +importerLivraison(controleur)
   +calculer(controleur)
   +finirCalcul(controleur, tournee, erreur)
-  +activerActions(ecran : MapScreen)
+  +ajouterDemande(controleur)
+  +supprimerDemande(controleur, position)
+  +cliquerNoeud(controleur, idNoeud)
+  +annuler(controleur)
+  +refaire(controleur)
+  +actionsPermises(controleur) : Set<Action>
  }
  class EtatInitial
  class EtatPlanCharge
  class EtatLivraisonChargee
  class EtatCalculEnCours
  class EtatTourneeCalculee
+ class EtatAjoutCollecte
+ class EtatAjoutLivraison {
+  -idCollecte : long
+ }
+ interface Commande {
+  +executer()
+  +annuler()
+ }
+ class ListeDeCommandes {
+  -nombreAppliquees : int
+  ~executer(commande : Commande)
+  ~annuler()
+  ~refaire()
+  ~peutAnnuler() : boolean
+  ~peutRefaire() : boolean
+  ~vider()
+ }
+ class CommandeAjouterDemande {
+  -position : int
+ }
+ class CommandeSupprimerDemande {
+  -position : int
+ }
+ EtatAjoutCollecte ..|> Etat
+ EtatAjoutLivraison ..|> Etat
+ CommandeAjouterDemande ..|> Commande
+ CommandeSupprimerDemande ..|> Commande
+ ListeDeCommandes o--> "0..*" Commande : commandes
+ MainController *--> "1" ListeDeCommandes : historique
+ EtatAjoutLivraison ..> CommandeAjouterDemande : crée
+ EtatLivraisonChargee ..> CommandeSupprimerDemande : crée
  EtatInitial ..|> Etat
  EtatPlanCharge ..|> Etat
  EtatLivraisonChargee ..|> Etat
  EtatCalculEnCours ..|> Etat
- EtatTourneeCalculee ..|> Etat
+ EtatTourneeCalculee --|> EtatLivraisonChargee
  MainController --> "1" Etat : etat
 }
 package "fr.insa.optimod.view" {

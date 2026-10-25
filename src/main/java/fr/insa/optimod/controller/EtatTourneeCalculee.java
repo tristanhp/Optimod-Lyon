@@ -1,19 +1,9 @@
 package fr.insa.optimod.controller;
 
 /**
- * La tournée est calculée et affichée : on peut la recalculer ou importer un
- * autre plan ou d'autres demandes.
+ * La tournée des demandes actuelles est calculée et affichée. Les actions
+ * sont celles de {@link EtatLivraisonChargee} : recalculer, importer, modifier
+ * les demandes (ce qui retire la tournée affichée), annuler ou rétablir.
  */
-final class EtatTourneeCalculee implements Etat {
-
-    @Override
-    public void calculer(MainController controleur) {
-        controleur.changerEtat(new EtatCalculEnCours());
-        controleur.lancerCalcul();
-    }
-
-    @Override
-    public void activerActions(MapScreen ecran) {
-        ecran.activerActions(true, true, true);
-    }
+final class EtatTourneeCalculee extends EtatLivraisonChargee {
 }
