@@ -1,6 +1,6 @@
 # 0002. Design pattern State dans le contrôleur
 
-- **Statut** : Proposée
+- **Statut** : Acceptée
 - **Date** : 2026-10-25
 
 ## Contexte
