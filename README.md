@@ -126,7 +126,7 @@ carte vide.
 
 | Rôle | Classes |
 | --- | --- |
-| Modèle (`model`) | `Plan` (qui lit aussi le XML du plan), `Noeud`, `Troncon` |
+| Modèle (`model`) | `Plan` (qui lit aussi le XML du plan), `Noeud`, `Troncon`, `Livraison` (demandes observables), `Observable` et `Observateur` (design pattern Observer, [ADR 0003](docs/adr/0003-design-pattern-observer-modele-vue.md)) |
 | Contrôleur (`controller`) | `MainController` ; interface `MapScreen` qui décrit ce que le contrôleur attend de l'écran ; `Etat` et ses implémentations (design pattern State, [ADR 0002](docs/adr/0002-design-pattern-state-controleur.md)) |
 | Vue (`view`) | `MainView` (bouton et fenêtres), `MapCanvas` (dessin), `MapProjection` (latitude/longitude vers pixels), `MainApp` et `AppLauncher` (démarrage) |
 

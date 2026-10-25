@@ -104,6 +104,14 @@ package "fr.insa.optimod.model" {
   +obtenirLongueur() : double
   +obtenirNomRue() : String
  }
+ interface Observateur {
+  +mettreAJour(source : Observable)
+ }
+ abstract class Observable {
+  +ajouterObservateur(observateur : Observateur)
+  +retirerObservateur(observateur : Observateur)
+  #notifierObservateurs()
+ }
  class Livraison {
   -heureDepart : String
   +Livraison(cheminFichierXml : String)
@@ -114,6 +122,8 @@ package "fr.insa.optimod.model" {
   -{static} creerLecteurXml() : DocumentBuilder
   -{static} lireAttributObligatoire(element, nom) : String
   +obtenirDemandes() : List<Demande>
+  +ajouterDemande(position : int, demande : Demande)
+  +retirerDemande(position : int) : Demande
   +obtenirEntrepot() : Entrepot
   +obtenirHeureDepart() : String
  }
@@ -138,6 +148,10 @@ AppLauncher ..> MainApp : lance
 MainApp --> "1" MainController : controleur
 MainApp ..> MainView : crée
 MainView ..|> MapScreen
+MainView ..|> Observateur
+MainView --> "0..1" Livraison : livraisonObservee
+Livraison --|> Observable
+Observable o--> "0..*" Observateur : observateurs
 MainController ..> MapScreen : actions et affichage
 MainController --> "0..1" Plan : plan
 MainController --> "0..1" Livraison : livraison

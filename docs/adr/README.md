@@ -11,6 +11,7 @@ correcteur) comprenne **pourquoi** le projet est organisé ainsi.
 | --- | --- | --- |
 | [0001](0001-organisation-des-tests-unitaires.md) | Organisation des tests unitaires | Acceptée |
 | [0002](0002-design-pattern-state-controleur.md) | Design pattern State dans le contrôleur | Proposée |
+| [0003](0003-design-pattern-observer-modele-vue.md) | Design pattern Observer entre le modèle et la vue | Proposée |
 
 ## Ajouter un ADR
 

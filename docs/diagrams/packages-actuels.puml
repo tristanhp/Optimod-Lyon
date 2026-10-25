@@ -20,6 +20,8 @@ package "fr.insa.optimod.controller" as controleur {
 package "fr.insa.optimod.model" as modele {
  class Plan
  class Livraison
+ abstract class Observable
+ interface Observateur
  class Noeud
  class Troncon
  class Demande
