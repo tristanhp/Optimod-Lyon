@@ -15,6 +15,7 @@ package "fr.insa.optimod.view" as vue {
 package "fr.insa.optimod.controller" as controleur {
  class MainController
  interface MapScreen
+ interface Etat
 }
 package "fr.insa.optimod.model" as modele {
  class Plan

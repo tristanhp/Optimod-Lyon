@@ -70,12 +70,15 @@ public interface MapScreen {
     void setOnCalculate(Runnable action);
 
     /**
-     * Active ou désactive le bouton « Calculer » (désactivé tant qu'aucun lot
-     * de requêtes n'est importé).
+     * Active ou désactive les boutons. C'est l'état du contrôleur qui décide
+     * des actions permises ; la vue se contente de les appliquer.
      *
-     * @param enabled {@code true} pour autoriser le calcul
+     * @param importPlan {@code true} pour autoriser l'import d'un plan
+     * @param importLivraison {@code true} pour autoriser l'import de demandes
+     * @param calcul {@code true} pour autoriser le calcul de la tournée
      */
-    void setCalculateEnabled(boolean enabled);
+    void activerActions(boolean importPlan, boolean importLivraison,
+            boolean calcul);
 
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.

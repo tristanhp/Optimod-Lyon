@@ -10,6 +10,7 @@ correcteur) comprenne **pourquoi** le projet est organisé ainsi.
 | N° | Titre | Statut |
 | --- | --- | --- |
 | [0001](0001-organisation-des-tests-unitaires.md) | Organisation des tests unitaires | Acceptée |
+| [0002](0002-design-pattern-state-controleur.md) | Design pattern State dans le contrôleur | Proposée |
 
 ## Ajouter un ADR
 

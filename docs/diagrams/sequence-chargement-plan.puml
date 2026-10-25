@@ -44,7 +44,7 @@ else Fichier sélectionné
     end
     M --> U : Carte dessinée
     note right of V : Effacer messageLivraison ; activer boutonImporterLivraison
-    note right of C : planCharge = true
+    note right of C : etat = EtatPlanCharge
   else Erreur de lecture
     P --> C : IOException / SAXException / IllegalArgumentException
     C -> V : afficherErreurXml(erreur.getMessage())
@@ -53,7 +53,7 @@ else Fichier sélectionné
     C -> V : reinitialiser()
     V -> M : effacerCarte()
     note right of V : Effacer le message ; désactiver l'import des livraisons
-    note right of C : planCharge = false
+    note right of C : etat = EtatInitial
   end
 end
 @enduml

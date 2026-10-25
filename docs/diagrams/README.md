@@ -51,7 +51,7 @@ sequenceDiagram
             end
             M-->>U: Carte affichée
             Note right of V: Effacer messageLivraison<br/>Activer boutonImporterLivraison
-            Note right of C: planCharge = true
+            Note right of C: etat = EtatPlanCharge
         else Erreur de lecture
             P-->>C: IOException, SAXException ou IllegalArgumentException
             C->>V: afficherErreurXml(erreur.getMessage())
@@ -60,7 +60,7 @@ sequenceDiagram
             C->>V: reinitialiser()
             V->>M: effacerCarte()
             Note right of V: Effacer le message et désactiver l'import des livraisons
-            Note right of C: planCharge = false
+            Note right of C: etat = EtatInitial
         end
     end
 ```
@@ -82,7 +82,7 @@ sequenceDiagram
     Note over V,C: Précondition : plan chargé<br/>definirActionImportLivraison(action) branche le bouton
     U->>V: Cliquer sur Importer la Livraison
     V->>C: importerLivraison(ecran) via l'action enregistrée
-    Note right of C: Retour immédiat si planCharge = false<br/>Le bouton est désactivé dans cet état
+    Note right of C: Ignoré dans EtatInitial<br/>Le bouton est désactivé dans cet état
     C->>V: choisirFichierLivraison()
     V->>V: choisirFichierXml(titre)
     V-->>C: Optional de fichier
@@ -121,6 +121,28 @@ Les méthodes privées du contrôleur sont invoquées par les actions enregistr�
 dans son constructeur, pas par un appel direct depuis la vue. Les imports
 n'effectuent aucun calcul de tournée et ne dessinent pas les demandes sur la carte.
 
+## États du contrôleur (design pattern State)
+
+Source : [etats-controleur.puml](etats-controleur.puml). `MainController`
+délègue chaque clic à son état courant (`Etat`), qui décide si l'action est
+permise, quels boutons sont actifs et quel est l'état suivant. Les règles
+communes sont des méthodes par défaut de `Etat` ; chaque état ne redéfinit que
+ses exceptions (voir l'[ADR 0002](../adr/0002-design-pattern-state-controleur.md)).
+
+```mermaid
+stateDiagram-v2
+    [*] --> EtatInitial
+    EtatInitial --> EtatPlanCharge : importerPlan [valide]
+    EtatPlanCharge --> EtatLivraisonChargee : importerLivraison [valide]
+    EtatLivraisonChargee --> EtatCalculEnCours : calculer
+    EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+    EtatCalculEnCours --> EtatLivraisonChargee : finirCalcul [erreur]
+    EtatTourneeCalculee --> EtatCalculEnCours : calculer
+    EtatTourneeCalculee --> EtatLivraisonChargee : importerLivraison [valide]
+    EtatPlanCharge --> EtatInitial : importerPlan [invalide]
+    EtatLivraisonChargee --> EtatPlanCharge : importerPlan [valide]
+```
+
 ## Diagramme de classes
 
 Source détaillée : [classes-chargement.puml](classes-chargement.puml).
@@ -134,17 +156,27 @@ classDiagram
         +choisirFichierPlan() Optional~File~
         +choisirFichierLivraison() Optional~File~
         +afficherPlan(Plan plan)
-        +afficherLivraisonChargee()
+        +afficherLivraisonChargee(Livraison livraison)
         +afficherErreurXml(String detail)
         +reinitialiser()
+        +activerActions(boolean importPlan, boolean importLivraison, boolean calcul)
     }
     class MainController {
-        -Boolean planCharge
         +MainController(MapScreen ecran)
         +obtenirPlan() Plan
         +obtenirLivraison() Livraison
-        -importerPlan(MapScreen ecran)
-        -importerLivraison(MapScreen ecran)
+        ~changerEtat(Etat nouvelEtat)
+        ~lirePlan() Lecture
+        ~lireLivraison() Lecture
+        ~lancerCalcul()
+    }
+    class Etat {
+        <<interface>>
+        +importerPlan(MainController controleur)
+        +importerLivraison(MainController controleur)
+        +calculer(MainController controleur)
+        +finirCalcul(MainController controleur, List tournee, String erreur)
+        +activerActions(MapScreen ecran)
     }
     class AppLauncher {
         +main(String[] arguments)$
@@ -230,6 +262,7 @@ classDiagram
     MainApp ..> MainView : crée
     MainView ..|> MapScreen
     MainController ..> MapScreen : actions et affichage
+    MainController --> "1" Etat : etat
     MainController --> "0..1" Plan : plan
     MainController --> "0..1" Livraison : livraison
     MainView *-- "1" MapCanvas : carte
