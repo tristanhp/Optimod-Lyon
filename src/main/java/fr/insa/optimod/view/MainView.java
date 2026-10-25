@@ -4,6 +4,9 @@ import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.IntConsumer;
+import java.util.function.LongConsumer;
 
 import fr.insa.optimod.controller.MapScreen;
 import fr.insa.optimod.model.Demande;
@@ -20,13 +23,17 @@ import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Tooltip;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 
 /**
- * Page principale : boutons « Importer » et « Calculer », carte du plan,
- * liste des demandes et liste de la tournée calculée.
+ * Page principale : boutons d'import, de calcul et de modification des
+ * demandes, carte du plan, liste des demandes et liste de la tournée calculée.
  *
  * <p>La vue observe les demandes affichées (design pattern Observer) : quand
  * elles changent, la liste et la carte se redessinent sans que le contrôleur
@@ -52,6 +59,17 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Label messageLivraison = new Label();
 
     private final Button calculateButton = new Button("Calculer");
+
+    private final Button boutonAjouter = new Button("Ajouter une demande");
+    private final Button boutonSupprimer = new Button("Supprimer la demande");
+    private final Button boutonAnnuler = new Button("Annuler");
+    private final Button boutonRefaire = new Button("Rétablir");
+
+    /** Consigne pour l'utilisateur (ex. pendant l'ajout d'une demande). */
+    private final Label consigne = new Label();
+
+    /** Vrai si l'état du contrôleur permet de supprimer une demande. */
+    private boolean suppressionPermise;
 
     /** Indicateur d'attente affiché pendant le calcul. */
     private final ProgressIndicator waitingIndicator = new ProgressIndicator();
@@ -80,8 +98,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterLivraison.getStyleClass().add("accent-button");
         messageLivraison.setPadding(new Insets(12));
         setBottom(messageLivraison);
-        HBox toolBar = new HBox(8, importButton, boutonImporterLivraison, calculateButton,
-                waitingIndicator);
+        boutonAnnuler.setTooltip(new Tooltip("Ctrl+Z"));
+        boutonRefaire.setTooltip(new Tooltip("Ctrl+Y"));
+        HBox toolBar = new HBox(8, importButton, boutonImporterLivraison,
+                calculateButton, waitingIndicator, boutonAjouter,
+                boutonAnnuler, boutonRefaire, consigne);
         toolBar.getStyleClass().add("tool-bar-box");
         tourList.setPrefWidth(TOUR_WIDTH);
         tourList.setVisible(false);
@@ -105,9 +126,27 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             }
         });
         demandesList.getSelectionModel().selectedIndexProperty().addListener(
-                (observable, ancien, nouveau) -> map.mettreEnEvidence(nouveau.intValue()));
+                (observable, ancien, nouveau) -> {
+                    map.mettreEnEvidence(nouveau.intValue());
+                    actualiserBoutonSupprimer();
+                });
+        VBox.setVgrow(demandesList, Priority.ALWAYS);
+        boutonSupprimer.setMaxWidth(Double.MAX_VALUE);
+        VBox panneauDemandes = new VBox(4, demandesList, boutonSupprimer);
+        panneauDemandes.visibleProperty().bind(demandesList.visibleProperty());
+        panneauDemandes.managedProperty().bind(demandesList.managedProperty());
         clearDemandes();
-        setLeft(demandesList);
+        sceneProperty().addListener((observable, ancienne, scene) -> {
+            if (scene != null) {
+                scene.getAccelerators().put(KeyCombination.keyCombination(
+                        "Shortcut+Z"), boutonAnnuler::fire);
+                scene.getAccelerators().put(KeyCombination.keyCombination(
+                        "Shortcut+Y"), boutonRefaire::fire);
+                scene.getAccelerators().put(KeyCombination.keyCombination(
+                        "Shortcut+Shift+Z"), boutonRefaire::fire);
+            }
+        });
+        setLeft(panneauDemandes);
         setTop(toolBar);
         setCenter(map);
         setRight(tourList);
@@ -124,11 +163,58 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void activerActions(boolean importPlan, boolean importLivraison,
-            boolean calcul) {
-        importButton.setDisable(!importPlan);
-        boutonImporterLivraison.setDisable(!importLivraison);
-        calculateButton.setDisable(!calcul);
+    public void activerActions(Set<Action> actions) {
+        importButton.setDisable(!actions.contains(Action.IMPORTER_PLAN));
+        boutonImporterLivraison.setDisable(
+                !actions.contains(Action.IMPORTER_LIVRAISON));
+        calculateButton.setDisable(!actions.contains(Action.CALCULER));
+        boutonAjouter.setDisable(!actions.contains(Action.AJOUTER_DEMANDE));
+        boutonAnnuler.setDisable(!actions.contains(Action.ANNULER));
+        boutonRefaire.setDisable(!actions.contains(Action.REFAIRE));
+        suppressionPermise = actions.contains(Action.SUPPRIMER_DEMANDE);
+        actualiserBoutonSupprimer();
+    }
+
+    /** Supprimer demande une action permise et une demande sélectionnée. */
+    private void actualiserBoutonSupprimer() {
+        boutonSupprimer.setDisable(!suppressionPermise
+                || demandesList.getSelectionModel().getSelectedIndex() < 0);
+    }
+
+    @Override
+    public void definirActionAjouterDemande(Runnable action) {
+        boutonAjouter.setOnAction(event -> action.run());
+    }
+
+    @Override
+    public void definirActionSupprimerDemande(IntConsumer action) {
+        boutonSupprimer.setOnAction(event -> action.accept(
+                demandesList.getSelectionModel().getSelectedIndex()));
+    }
+
+    @Override
+    public void definirActionAnnuler(Runnable action) {
+        boutonAnnuler.setOnAction(event -> action.run());
+    }
+
+    @Override
+    public void definirActionRefaire(Runnable action) {
+        boutonRefaire.setOnAction(event -> action.run());
+    }
+
+    @Override
+    public void definirActionClicNoeud(LongConsumer action) {
+        map.definirSurClicNoeud(action);
+    }
+
+    @Override
+    public void afficherConsigne(String texte) {
+        consigne.setText(texte);
+    }
+
+    @Override
+    public void effacerTournee() {
+        clearTour();
     }
 
     @Override

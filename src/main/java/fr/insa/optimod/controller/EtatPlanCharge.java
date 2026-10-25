@@ -1,5 +1,10 @@
 package fr.insa.optimod.controller;
 
+import java.util.EnumSet;
+import java.util.Set;
+
+import fr.insa.optimod.controller.MapScreen.Action;
+
 /**
  * Un plan est chargé, sans demandes : on peut importer un autre plan ou des
  * demandes de livraison.
@@ -7,7 +12,7 @@ package fr.insa.optimod.controller;
 final class EtatPlanCharge implements Etat {
 
     @Override
-    public void activerActions(MapScreen ecran) {
-        ecran.activerActions(true, true, false);
+    public Set<Action> actionsPermises(MainController controleur) {
+        return EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_LIVRAISON);
     }
 }

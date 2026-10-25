@@ -1,7 +1,10 @@
 package fr.insa.optimod.controller;
 
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
+import fr.insa.optimod.controller.MapScreen.Action;
 import fr.insa.optimod.model.Passage;
 
 /**
@@ -37,7 +40,7 @@ final class EtatCalculEnCours implements Etat {
     }
 
     @Override
-    public void activerActions(MapScreen ecran) {
-        ecran.activerActions(false, false, false);
+    public Set<Action> actionsPermises(MainController controleur) {
+        return EnumSet.noneOf(Action.class);
     }
 }

@@ -3,6 +3,9 @@ package fr.insa.optimod.controller;
 import java.io.File;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.IntConsumer;
+import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.Livraison;
 import fr.insa.optimod.model.Passage;
@@ -13,6 +16,24 @@ import fr.insa.optimod.model.Plan;
  * de la vue JavaFX permet de tester le contrôleur sans afficher de fenêtre.
  */
 public interface MapScreen {
+
+    /** Actions de l'utilisateur que l'écran peut activer ou désactiver. */
+    enum Action {
+        /** Bouton « Importer le plan ». */
+        IMPORTER_PLAN,
+        /** Bouton « Importer la livraison ». */
+        IMPORTER_LIVRAISON,
+        /** Bouton « Calculer ». */
+        CALCULER,
+        /** Bouton « Ajouter une demande » (ou annuler l'ajout en cours). */
+        AJOUTER_DEMANDE,
+        /** Bouton « Supprimer la demande » (demande sélectionnée). */
+        SUPPRIMER_DEMANDE,
+        /** Bouton « Annuler » (Ctrl+Z). */
+        ANNULER,
+        /** Bouton « Rétablir » (Ctrl+Y). */
+        REFAIRE
+    }
 
     /** Définit l'action d'import des demandes. @param action action au clic */
     void definirActionImportLivraison(Runnable action);
@@ -70,15 +91,59 @@ public interface MapScreen {
     void setOnCalculate(Runnable action);
 
     /**
-     * Active ou désactive les boutons. C'est l'état du contrôleur qui décide
-     * des actions permises ; la vue se contente de les appliquer.
+     * Active les boutons des actions permises et désactive les autres. C'est
+     * l'état du contrôleur qui décide des actions permises ; la vue se
+     * contente de les appliquer.
      *
-     * @param importPlan {@code true} pour autoriser l'import d'un plan
-     * @param importLivraison {@code true} pour autoriser l'import de demandes
-     * @param calcul {@code true} pour autoriser le calcul de la tournée
+     * @param actions actions permises
      */
-    void activerActions(boolean importPlan, boolean importLivraison,
-            boolean calcul);
+    void activerActions(Set<Action> actions);
+
+    /**
+     * Définit l'action du bouton « Ajouter une demande ».
+     *
+     * @param action action à exécuter à chaque clic
+     */
+    void definirActionAjouterDemande(Runnable action);
+
+    /**
+     * Définit l'action du bouton « Supprimer la demande ».
+     *
+     * @param action reçoit le rang de la demande sélectionnée
+     */
+    void definirActionSupprimerDemande(IntConsumer action);
+
+    /**
+     * Définit l'action du bouton « Annuler » et de Ctrl+Z.
+     *
+     * @param action action à exécuter
+     */
+    void definirActionAnnuler(Runnable action);
+
+    /**
+     * Définit l'action du bouton « Rétablir » et de Ctrl+Y.
+     *
+     * @param action action à exécuter
+     */
+    void definirActionRefaire(Runnable action);
+
+    /**
+     * Définit l'action d'un clic sur une intersection de la carte.
+     *
+     * @param action reçoit l'identifiant du noeud cliqué
+     */
+    void definirActionClicNoeud(LongConsumer action);
+
+    /**
+     * Affiche une consigne pour l'utilisateur (ex. « cliquez sur le point de
+     * collecte »).
+     *
+     * @param consigne texte à afficher, vide pour l'effacer
+     */
+    void afficherConsigne(String consigne);
+
+    /** Retire la tournée affichée (elle ne correspond plus aux demandes). */
+    void effacerTournee();
 
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.

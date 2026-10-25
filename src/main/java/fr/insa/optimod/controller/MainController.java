@@ -2,7 +2,9 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executor;
 
 import org.xml.sax.SAXException;
@@ -22,6 +24,11 @@ import fr.insa.optimod.model.Plan;
  * State) : c'est lui qui décide si l'action est permise et quel est l'état
  * suivant. Le contrôleur fournit aux états les opérations élémentaires (lire
  * un fichier, lancer le calcul, mettre à jour l'écran).
+ *
+ * <p>Les modifications des demandes passent par des commandes annulables
+ * ({@link Commande}, design pattern Command). Les tournées déjà calculées sont
+ * gardées en cache par liste de demandes : annuler ou rétablir une
+ * modification réaffiche la tournée correspondante sans la recalculer.
  */
 public final class MainController {
 
@@ -56,6 +63,16 @@ public final class MainController {
     /** Demandes actuellement chargées, ou {@code null}. */
     private Livraison livraison;
 
+    /** Modifications des demandes, pour annuler et rétablir. */
+    private final ListeDeCommandes historique = new ListeDeCommandes();
+
+    /**
+     * Tournées déjà calculées pour le plan et les demandes chargés, indexées
+     * par la liste des demandes (dans l'ordre).
+     */
+    private final Map<List<Demande>, List<Passage>> tourneesCalculees =
+            new HashMap<>();
+
     /**
      * Crée un contrôleur sans calcul de tournée (le clic sur « Calculer »
      * affiche une erreur).
@@ -88,6 +105,13 @@ public final class MainController {
         ecran.definirActionImportPlan(() -> etat.importerPlan(this));
         ecran.definirActionImportLivraison(() -> etat.importerLivraison(this));
         ecran.setOnCalculate(() -> etat.calculer(this));
+        ecran.definirActionAjouterDemande(() -> etat.ajouterDemande(this));
+        ecran.definirActionSupprimerDemande(
+                position -> etat.supprimerDemande(this, position));
+        ecran.definirActionClicNoeud(
+                idNoeud -> etat.cliquerNoeud(this, idNoeud));
+        ecran.definirActionAnnuler(() -> etat.annuler(this));
+        ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
     }
 
@@ -113,7 +137,7 @@ public final class MainController {
      */
     void changerEtat(Etat nouvelEtat) {
         etat = nouvelEtat;
-        etat.activerActions(ecran);
+        ecran.activerActions(etat.actionsPermises(this));
     }
 
     /**
@@ -129,6 +153,7 @@ public final class MainController {
             return Lecture.ANNULEE;
         }
         livraison = null;
+        oublierModifications();
         try {
             plan = new Plan(fichier.getPath());
             ecran.afficherPlan(plan);
@@ -157,6 +182,7 @@ public final class MainController {
             Livraison nouvelle = new Livraison(fichier.getPath());
             verifierNoeudsConnus(nouvelle);
             livraison = nouvelle;
+            oublierModifications();
             ecran.afficherLivraisonChargee(nouvelle);
             return Lecture.REUSSIE;
         } catch (IOException | SAXException | IllegalArgumentException e) {
@@ -189,13 +215,17 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         Livraison lotCalcule = livraison;
+        List<Demande> demandesCalculees = List.copyOf(
+                livraison.obtenirDemandes());
         ecran.showWaiting(true);
         arrierePlan.execute(() -> {
             try {
                 List<Passage> tournee = calculateur.calculer(planCalcule,
                         lotCalcule);
-                interfaceUtilisateur.execute(
-                        () -> etat.finirCalcul(this, tournee, null));
+                interfaceUtilisateur.execute(() -> {
+                    tourneesCalculees.put(demandesCalculees, tournee);
+                    etat.finirCalcul(this, tournee, null);
+                });
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
@@ -218,5 +248,67 @@ public final class MainController {
     /** @param detail explication de l'échec du calcul */
     void afficherErreurCalcul(String detail) {
         ecran.showCalculationError(detail);
+    }
+
+    /** @param consigne consigne à afficher, vide pour l'effacer */
+    void afficherConsigne(String consigne) {
+        ecran.afficherConsigne(consigne);
+    }
+
+    /**
+     * Exécute une modification des demandes et l'ajoute à l'historique.
+     *
+     * @param commande modification à exécuter
+     */
+    void executer(Commande commande) {
+        historique.executer(commande);
+        retrouverEtatLivraison();
+    }
+
+    /** Annule la dernière modification des demandes. */
+    void annulerCommande() {
+        historique.annuler();
+        retrouverEtatLivraison();
+    }
+
+    /** Rétablit la dernière modification annulée. */
+    void refaireCommande() {
+        historique.refaire();
+        retrouverEtatLivraison();
+    }
+
+    /** @return vrai s'il reste une modification à annuler */
+    boolean peutAnnuler() {
+        return historique.peutAnnuler();
+    }
+
+    /** @return vrai s'il reste une modification annulée à rétablir */
+    boolean peutRefaire() {
+        return historique.peutRefaire();
+    }
+
+    /**
+     * Revient à l'état qui correspond aux demandes actuelles : si leur tournée
+     * a déjà été calculée, elle est réaffichée depuis le cache
+     * ({@link EtatTourneeCalculee}) ; sinon la tournée est retirée
+     * ({@link EtatLivraisonChargee}).
+     */
+    void retrouverEtatLivraison() {
+        ecran.afficherConsigne("");
+        List<Passage> tournee = tourneesCalculees.get(
+                List.copyOf(livraison.obtenirDemandes()));
+        if (tournee != null) {
+            changerEtat(new EtatTourneeCalculee());
+            ecran.showTour(tournee);
+        } else {
+            changerEtat(new EtatLivraisonChargee());
+            ecran.effacerTournee();
+        }
+    }
+
+    /** Oublie l'historique et le cache : le plan ou les demandes changent. */
+    private void oublierModifications() {
+        historique.vider();
+        tourneesCalculees.clear();
     }
 }

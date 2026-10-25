@@ -141,6 +141,46 @@ stateDiagram-v2
     EtatTourneeCalculee --> EtatLivraisonChargee : importerLivraison [valide]
     EtatPlanCharge --> EtatInitial : importerPlan [invalide]
     EtatLivraisonChargee --> EtatPlanCharge : importerPlan [valide]
+    EtatLivraisonChargee --> EtatAjoutCollecte : ajouterDemande
+    EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
+    EtatAjoutLivraison --> EtatLivraisonChargee : cliquerNoeud / CommandeAjouterDemande
+    EtatTourneeCalculee --> EtatLivraisonChargee : supprimerDemande [pas de tournée en cache]
+    EtatLivraisonChargee --> EtatTourneeCalculee : annuler [tournée en cache]
+```
+
+## Modifier les demandes et annuler (design pattern Command)
+
+Chaque modification des demandes est une `Commande` (`executer`, `annuler`)
+exécutée par `MainController.executer(...)` et gardée dans `ListeDeCommandes`
+(Annuler : Ctrl+Z, Rétablir : Ctrl+Y). Le contrôleur garde en cache les
+tournées déjà calculées, indexées par la liste des demandes : après une
+modification, une annulation ou un rétablissement, il réaffiche la tournée en
+cache si elle existe, sinon il la retire (voir
+l'[ADR 0004](../adr/0004-design-pattern-command-annulation.md)).
+
+```mermaid
+sequenceDiagram
+    actor U as Utilisateur
+    participant V as MainView
+    participant C as MainController
+    participant E as EtatTourneeCalculee
+    participant H as ListeDeCommandes
+    participant L as Livraison
+    U->>V: Supprimer la demande
+    V->>C: supprimerDemande(position)
+    C->>E: supprimerDemande(controleur, position)
+    E->>C: executer(new CommandeSupprimerDemande)
+    C->>H: executer(commande)
+    H->>L: retirerDemande(position)
+    L-->>V: mettreAJour (Observer)
+    C->>C: retrouverEtatLivraison() : pas de tournée en cache
+    C->>V: effacerTournee()
+    U->>V: Ctrl+Z
+    V->>C: annuler
+    C->>H: annuler()
+    H->>L: ajouterDemande(position, demande)
+    C->>C: retrouverEtatLivraison() : tournée en cache
+    C->>V: showTour(tournée en cache)
 ```
 
 ## Observation des demandes (design pattern Observer)
