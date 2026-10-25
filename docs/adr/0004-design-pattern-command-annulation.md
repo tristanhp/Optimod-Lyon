@@ -1,6 +1,6 @@
 # 0004. Design pattern Command pour annuler les modifications
 
-- **Statut** : Proposée
+- **Statut** : Acceptée
 - **Date** : 2026-10-25
 
 ## Contexte

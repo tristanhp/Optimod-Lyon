@@ -1,6 +1,6 @@
 # 0003. Design pattern Observer entre le modèle et la vue
 
-- **Statut** : Proposée
+- **Statut** : Acceptée
 - **Date** : 2026-10-25
 
 ## Contexte

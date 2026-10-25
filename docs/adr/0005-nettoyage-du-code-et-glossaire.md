@@ -1,6 +1,6 @@
 # 0005. Nettoyage du code et vocabulaire du glossaire
 
-- **Statut** : Proposée
+- **Statut** : Acceptée
 - **Date** : 2026-10-25
 
 ## Contexte
