@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Rend les diagrammes PlantUML de docs/diagrams/*.puml en SVG dans
-# docs/diagrams/out/. Échoue si un diagramme contient une erreur de syntaxe.
+# docs/diagrams/out/ (ignoré par git : les images sont publiées sur GitHub
+# Pages). Échoue si un diagramme contient une erreur de syntaxe.
 # Le jar PlantUML est téléchargé depuis Maven Central (nécessite Java).
 set -euo pipefail
 

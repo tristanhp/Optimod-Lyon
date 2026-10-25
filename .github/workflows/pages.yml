@@ -46,7 +46,8 @@ jobs:
           cp -r target/reports/apidocs _site/javadoc
           cp -r target/site/jacoco _site/couverture
           cp -r docs/diagrams/out _site/diagrammes
-          cat > _site/index.html <<'EOF'
+          {
+            cat <<'EOF'
           <!doctype html>
           <html lang="fr">
           <head>
@@ -59,12 +60,17 @@ jobs:
             <ul>
               <li><a href="javadoc/">Javadoc (avec diagrammes de classes)</a></li>
               <li><a href="couverture/">Rapport de couverture des tests</a></li>
-              <li><a href="diagrammes/architecture-mvc.svg">Architecture MVC</a></li>
-              <li><a href="diagrammes/sequence-calcul-tournee.svg">Séquence : calcul d'une tournée</a></li>
             </ul>
-          </body>
-          </html>
+            <h2>Diagrammes</h2>
+            <ul>
           EOF
+            # Un lien par diagramme rendu, pour ne pas oublier les nouveaux.
+            for svg in _site/diagrammes/*.svg; do
+              nom="$(basename "$svg" .svg)"
+              echo "    <li><a href=\"diagrammes/$nom.svg\">$nom</a></li>"
+            done
+            printf '  </ul>\n</body>\n</html>\n'
+          } > _site/index.html
 
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
