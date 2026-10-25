@@ -224,7 +224,7 @@ Le travail est suivi dans Linear (équipe TIG, projet *AGILE Optimod'Lyon*).
    `tig-XX-titre-court`. Pour de l'outillage sans issue : `chore/titre`.
    Tout autre nom est refusé par la CI.
 3. **Coder** en suivant [`AGENTS.md`](AGENTS.md) (MVC, design patterns,
-   glossaire, Javadoc) et **écrire les tests** avant ou avec le code (les
+   glossaire, noms de variables en français, Javadoc) et **écrire les tests** avant ou avec le code (les
    tests d'abord sont obligatoires pour les calculs).
 4. **Vérifier** en local : `mvn clean verify` doit passer.
 5. **Committer** avec des messages courts : `feat: …`, `fix: …`, `refactor: …`,
@@ -232,9 +232,8 @@ Le travail est suivi dans Linear (équipe TIG, projet *AGILE Optimod'Lyon*).
 6. **Ouvrir une pull request** vers `main` : titre au même format ou contenant
    `TIG-XX`, [modèle de PR](.github/pull_request_template.md) rempli. Mettre à
    jour les diagrammes et le README si l'architecture ou l'utilisation change.
-7. **Relecture** : au moins une personne de l'équipe approuve (la revue
-   Copilot automatique n'est qu'un premier avis) et le check **CI OK** est
-   vert. Le merge se fait en *squash* ; la branche est supprimée ensuite.
+7. **Relecture** : au moins une personne de l'équipe approuve et le check
+   **CI OK** est vert. Le merge se fait en *squash* ; la branche est supprimée ensuite.
 
 PR qui dépendent l'une de l'autre (« pile ») : on les merge dans l'ordre ; après
 chaque merge, rebaser la suivante sur `main` (`git rebase --onto main

@@ -91,8 +91,19 @@ correspondance dans le code. Règles :
 
 ## Conventions de code
 
-- Identifiants en français. Seuls les noms imposés par Java ou JavaFX restent
-  en anglais (`main`, `start`, `layoutChildren`, `hasNext`…).
+- **Tout identifiant en français** : variables, champs, paramètres,
+  constantes, méthodes, méthodes de test, classes de test
+  (`boutonCalculer`, `dernierDossier`, `LARGEUR`, `EcranFactice`), pas
+  `calculateButton`, `lastDirectory`, `WIDTH`, `FakeScreen`.
+- Exceptions admises, le vocabulaire de code usuel :
+  - noms imposés par Java ou JavaFX (`main`, `start`, `stage`, `scene`,
+    `layoutChildren`, `hasNext`, `toString`…) ;
+  - variables courtes conventionnelles (`i`, `j`, `k`, `x`, `y`, `dx`, `e`,
+    `args`) et suffixes techniques (`Test`, `Exception`) ;
+  - termes techniques sans équivalent courant (`record`, `cache`, `XML`).
+- Les classes historiques `MainController`, `MainView`, `MainApp`,
+  `MapScreen`, `MapCanvas`, `MapProjection` et `AppLauncher` gardent leur nom
+  pour l'instant ; toute **nouvelle** classe est nommée en français.
 - Données immuables = `record` ; leurs accesseurs portent le nom du champ
   (`noeud.latitude()`). Méthodes des classes : `obtenirX()`, jamais `getX()`.
 - Minimum de getters et de setters : n'exposer que ce qu'un appelant utilise
