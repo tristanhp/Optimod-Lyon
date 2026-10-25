@@ -36,7 +36,7 @@ import fr.insa.optimod.model.Plan;
 public class MainControllerTest {
 
     /** Écran factice qui enregistre ce que le contrôleur lui demande. */
-    private static final class FakeScreen implements MapScreen {
+    private static final class EcranFactice implements MapScreen {
         private Runnable actionImportPlan;
         private Runnable actionImportLivraison;
         private Runnable actionCalculer;
@@ -185,7 +185,7 @@ public class MainControllerTest {
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
 
-    private FakeScreen ecran;
+    private EcranFactice ecran;
     private MainController controleur;
     private final Queue<Runnable> arrierePlan = new ArrayDeque<>();
     private Plan planRecu;
@@ -194,7 +194,7 @@ public class MainControllerTest {
 
     @Before
     public void creer() {
-        ecran = new FakeScreen();
+        ecran = new EcranFactice();
         BiFunction<Plan, ProgrammeLivraisons, Tournee> calcul =
                 (plan, programme) -> {
             planRecu = plan;

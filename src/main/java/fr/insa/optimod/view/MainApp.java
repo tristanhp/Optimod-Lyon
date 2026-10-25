@@ -20,28 +20,28 @@ import javafx.stage.Stage;
 public final class MainApp extends Application {
 
     /** Largeur initiale de la fenêtre. */
-    private static final double WIDTH = 1100;
+    private static final double LARGEUR = 1100;
 
     /** Hauteur initiale de la fenêtre. */
-    private static final double HEIGHT = 760;
+    private static final double HAUTEUR = 760;
 
     /** Exécute le calcul de la tournée hors du thread de l'interface. */
     private ExecutorService calcul;
 
     /** Contrôleur, gardé pour qu'il vive autant que la fenêtre. */
-    private MainController controller;
+    private MainController controleur;
 
     @Override
     public void start(Stage stage) {
-        MainView view = new MainView();
+        MainView vue = new MainView();
         calcul = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "calcul-tournee");
             t.setDaemon(true);
             return t;
         });
-        controller = new MainController(view, Plan::calculerTournee, calcul,
+        controleur = new MainController(vue, Plan::calculerTournee, calcul,
                 Platform::runLater);
-        Scene scene = new Scene(view, WIDTH, HEIGHT);
+        Scene scene = new Scene(vue, LARGEUR, HAUTEUR);
         scene.getStylesheets().add(Objects.requireNonNull(
                 getClass().getResource("style.css")).toExternalForm());
         stage.setTitle("Optimod'Lyon");
