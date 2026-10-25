@@ -1,177 +1,163 @@
 # AGENTS.md
 
-Instructions pour les agents IA (Claude Code, Codex, Cursor, Copilot, Gemini…)
-et pour les humains qui travaillent sur Optimod'Lyon. Ce fichier est la source
-unique : `CLAUDE.md` se contente de l'importer. Le [README](README.md) détaille
-l'installation et l'utilisation ; ici, on ne garde que ce qu'il faut savoir
-pour modifier le code.
+Instructions pour tout agent IA (Claude Code, Codex, Cursor, Copilot,
+Gemini…) qui travaille dans ce dépôt. C'est la source unique : `CLAUDE.md` se
+contente de l'importer. Le [README](README.md) explique le projet aux humains
+(installation, utilisation, glossaire complet, workflow) ; ce fichier dit
+**comment modifier le code** et ce qui est interdit. En cas de doute, suivre
+ce fichier, puis le README, puis les [ADR](docs/adr/README.md).
 
-## Projet
+## Projet en bref
 
-Projet PLD Agile (INSA Lyon) : application JavaFX qui calcule des tournées de
-livraison à vélo (*Pickup & Delivery*) sur un plan de Lyon lu en XML. Équipe de
-5 personnes, issues suivies dans Linear (projet *AGILE Optimod'Lyon*, équipe
-TIG, identifiants `TIG-XX`).
+Application JavaFX qui calcule des tournées de livraison à vélo à Lyon (PLD
+Agile, INSA Lyon). Équipe de 5 étudiants ; issues dans Linear (équipe TIG,
+projet *AGILE Optimod'Lyon*, identifiants `TIG-XX`). Code, commentaires,
+Javadoc, messages de commit et PR **en français**.
 
 - Java **27** (`.sdkmanrc`), Maven 3.9+, JavaFX, JUnit **4**.
-- Pas de dépendance nouvelle sans en parler à l'équipe (le `pom.xml` est relu
-  par tous, voir `.github/CODEOWNERS`).
+- Aucune nouvelle dépendance Maven sans accord de l'équipe.
 
-## Commandes
+## Avant de rendre la main
 
-| But | Commande |
-| --- | --- |
-| Tout vérifier avant une PR (tests, couverture, jar) | `mvn clean verify` |
-| Tests seuls / une classe | `mvn test` / `mvn test -Dtest=PlanTest` |
-| Style | `mvn checkstyle:check` |
-| Bugs | `mvn compile spotbugs:check` |
-| Javadoc | `mvn javadoc:javadoc` |
-| Lancer l'interface | `mvn javafx:run` |
-| Rendre les diagrammes | `./scripts/render-diagrams.sh` |
+Lancer, dans cet ordre, et corriger jusqu'à ce que tout passe :
 
-`mvn clean verify` doit passer avant de proposer un commit ou une PR. Le seuil
-de couverture JaCoCo est `jacoco.line.minimum` dans le `pom.xml`.
+```bash
+mvn clean verify               # tests, couverture minimale, jar
+mvn compile spotbugs:check     # aucun bug Medium ou plus
+mvn checkstyle:check           # pas de nouvel avertissement dans le code touché
+mvn javadoc:javadoc            # aucune erreur
+./scripts/render-diagrams.sh   # si un .puml a changé : il doit se rendre
+```
+
+Ne jamais déclarer une tâche terminée si l'une de ces commandes échoue ;
+dire ce qui échoue.
 
 ## Architecture (MVC strict)
 
-```text
-src/main/java/fr/insa/optimod/
-├── Main.java     point d'entrée du jar (--version : pas d'interface)
-├── model/        données métier et lecture XML : Plan, Noeud, Troncon,
-│                 Livraison, Demande, Entrepot, Etape, Passage,
-│                 Observable, Observateur
-├── algo/         plus courts chemins (AEtoile), GrapheChemins, CalculHoraires,
-│   └── tsp/      TSP avec précédence (TemplateTSP et ses variantes)
-├── controller/   MainController, MapScreen (ce que le contrôleur attend
-│                 de l'écran), états (Etat*) et commandes (Commande*)
-└── view/         JavaFX : MainView, MapCanvas, MapProjection,
-                  LibellesDemandes, MainApp, AppLauncher
-```
+| Package | Contient | Peut dépendre de |
+| --- | --- | --- |
+| `model` | `Plan` (lecture du plan **et** calcul de la tournée), `ProgrammeLivraisons` (+ `Demande`), `Tournee` (+ `Arret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
+| `algo.tsp` | Voyageur de commerce : `TemplateTSP`, `TSP3`, `GrapheDepandance` | JDK |
+| `controller` | `MainController`, `MapScreen`, états `Etat*`, commandes `Commande*`, `ListeDeCommandes` | `model` |
+| `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher` | `controller`, `model`, JavaFX |
 
-Règles de dépendance, à ne pas casser :
+Règles :
 
-- `model` n'importe ni `controller`, ni `view`, ni JavaFX.
-- `view` ne lit aucun fichier et ne modifie pas le modèle : elle transmet les
-  actions de l'utilisateur au contrôleur.
-- `controller` ne connaît la vue qu'à travers l'interface `MapScreen` : c'est
-  ce qui permet de tester le contrôleur sans fenêtre (`MainControllerTest`
-  utilise un faux écran). Toute nouvelle méthode d'écran passe par
-  `MapScreen`.
-- Le calcul long tourne hors du thread JavaFX : le contrôleur reçoit deux
-  `Executor` (arrière-plan, interface) pour rester testable.
-- Lancer l'interface via `AppLauncher`, jamais `MainApp` directement.
+- `model` n'importe jamais `controller`, `view` ni JavaFX.
+- `view` ne lit aucun fichier et ne modifie jamais le modèle : elle transmet
+  les actions au contrôleur et observe le modèle pour se redessiner.
+- `controller` ne connaît la vue que par l'interface `MapScreen`. Toute
+  nouvelle interaction avec l'écran = une méthode de `MapScreen`, implémentée
+  dans `MainView` et dans les faux écrans des tests.
+- Le calcul de la tournée est `Plan.calculerTournee(programme)`. Ses étapes
+  (A*, graphe des plus courts chemins, TSP, heures de passage) sont des
+  méthodes **privées** de `Plan` : ne pas recréer de classes `AEtoile`,
+  `CalculHoraires`, `GrapheChemins` ou équivalentes.
+- Le calcul long tourne hors du thread JavaFX ; le contrôleur reçoit le calcul
+  (`BiFunction`) et deux `Executor` pour rester testable.
+- Lancer l'interface via `AppLauncher`, jamais `MainApp`.
 
-### Design patterns
+## Design patterns : les utiliser, ne pas les contourner
 
-Trois patterns structurent l'application (ADR 0002 à 0004 dans
-[`docs/adr/`](docs/adr/README.md)). Toute nouvelle fonctionnalité passe par
-eux plutôt que de les contourner.
+- **State** (`controller/Etat`, ADR 0002) : `MainController` délègue chaque
+  action à son état courant. Nouvelle action = une méthode par défaut dans
+  `Etat` (qui ignore l'action), redéfinie dans les états où elle est permise ;
+  les boutons actifs viennent de `Etat.actionsPermises`. Jamais de booléen
+  d'état ni de `if (plan != null …)` dans le contrôleur.
+- **Observer** (`model/Observable`, ADR 0003) : toute méthode qui modifie un
+  objet observable appelle `notifierObservateurs()`. La vue s'inscrit sur le
+  modèle affiché et se désinscrit de l'ancien.
+- **Command** (`controller/Commande`, ADR 0004) : toute modification du
+  programme faite par l'utilisateur est une `Commande` réversible exécutée par
+  `MainController.executer(...)`, pour qu'Annuler et Rétablir marchent. Ne
+  jamais modifier le modèle directement depuis un état ou la vue.
 
-- **State** (`controller/Etat` et `Etat*`) : `MainController` délègue chaque
-  action de l'utilisateur à son état courant, qui décide si l'action est
-  permise, quels boutons sont actifs (`MapScreen.activerActions`) et quel est
-  l'état suivant. Une nouvelle action = une méthode par défaut dans `Etat`
-  (ignorée), redéfinie dans les états où elle est permise. Pas de booléen
-  d'état dans le contrôleur.
-- **Observer** (`model/Observable`, `model/Observateur`) : le modèle prévient
-  la vue quand il change ; la vue se redessine seule. Une méthode qui modifie
-  un objet observable appelle `notifierObservateurs()`.
-- **Command** (`controller/Commande`, `ListeDeCommandes`) : toute
-  modification des demandes faite par l'utilisateur est une `Commande`
-  réversible, exécutée par `MainController.executer(...)`, pour qu'Annuler et
-  Rétablir fonctionnent. Ne jamais modifier le modèle directement depuis un
-  état ou la vue.
+## Glossaire : nommer avec les mots du projet
 
-Les décisions d'architecture sont dans [`docs/adr/`](docs/adr/README.md) ; une
-nouvelle décision structurante = un nouvel ADR (copier `docs/adr/modele.md`).
+Le vocabulaire est fixé par le document Linear *AGILE Glossaire du projet*,
+repris dans la section [Glossaire du README](README.md#glossaire) avec la
+correspondance dans le code. Règles :
 
-## Règles de nettoyage du code
-
-Issues du document Linear *Nettoyage Code OPTIMOD* ; à appliquer au code
-nouveau ou modifié.
-
-- Code propre, simple à maintenir et à faire évoluer.
-- **Respecter le MVC** (règles ci-dessus).
-- Minimum de getters et setters : n'exposer que ce dont un appelant a besoin.
-- Minimiser le nombre de classes : pas de classe pour une seule méthode
-  utilitaire, pas de couche d'abstraction « au cas où ». Les design patterns
-  demandés (State, Observer, Command) sont l'exception assumée.
-
-Cible du nettoyage, à faire dans des PR dédiées (pas en passant dans une autre
-PR) :
-
-- `AEtoile`, `CalculateurTournee` et `CalculHoraires` deviennent des méthodes
-  privées de `Plan` (la tournée se calcule à partir d'une liste de noeuds).
-- `GrapheChemins` : le TSP réutilise `GrapheDepandance` ; le reste va dans
-  `Plan`.
-- `Passage` est supprimé ; `Demande` devient une paire
-  (noeud de collecte, noeud de livraison) dans `Livraison`.
-- `algo/tsp` : **uniquement à la fin**, ne garder que la dernière version du
-  TSP et supprimer les intermédiaires (`TSP1`, `TSP2`…).
+- Nommer classes, méthodes, variables, textes d'interface et diagrammes avec
+  ces termes : **plan, nœud, tronçon, adresse, entrepôt, programme de
+  livraisons, demande, point de collecte, point de livraison, durée sur
+  place, tournée, arrêt, heure de passage, contrainte d'ordre**.
+- « Livraison » désigne le dépôt d'un colis, pas l'ensemble des demandes
+  (c'est le *programme de livraisons*, `ProgrammeLivraisons`).
+- Pas de synonymes anglais ou approximatifs dans le code métier : pas de
+  `pickup`, `delivery`, `request`, `tour`, `stop`, `lot`, `requête`.
+- Un concept absent du glossaire : le signaler à l'humain pour qu'il soit
+  ajouté au glossaire, ne pas inventer un terme.
 
 ## Conventions de code
 
-- **Identifiants en français** (classes, méthodes, variables, tests). Les
-  accesseurs s'appellent `obtenirX()`, pas `getX()`. Seuls les noms imposés
-  par Java ou JavaFX restent en anglais (`main`, `start`, `layoutChildren`…).
-  Du code ancien en anglais (`showTour`, `setOnCalculate`…) existe : le
-  franciser quand on y touche.
-- Javadoc en français sur toute classe et toute méthode publique
-  (`mvn javadoc:javadoc` sans erreur).
-- 4 espaces, UTF-8, LF, lignes de 80 caractères si possible
-  (`.editorconfig`, `config/checkstyle.xml`).
-- Préférer les `record` et les champs `final` ; renvoyer des collections non
-  modifiables.
-- Lecture XML : réutiliser la configuration sécurisée existante
-  (`FEATURE_SECURE_PROCESSING`, DOCTYPE interdit). Une erreur de fichier se
-  traduit par une `SAXException` avec un message lisible par l'utilisateur.
+- Identifiants en français. Seuls les noms imposés par Java ou JavaFX restent
+  en anglais (`main`, `start`, `layoutChildren`, `hasNext`…).
+- Données immuables = `record` ; leurs accesseurs portent le nom du champ
+  (`noeud.latitude()`). Méthodes des classes : `obtenirX()`, jamais `getX()`.
+- Minimum de getters et de setters : n'exposer que ce qu'un appelant utilise
+  vraiment. Minimum de classes : pas de classe pour une seule méthode, pas
+  d'abstraction « au cas où » (les patterns ci-dessus sont l'exception).
+- Renvoyer des collections non modifiables ; champs `final` dès que possible.
+- Javadoc en français sur toute classe et méthode publique.
+- 4 espaces, UTF-8, LF, lignes de 80 caractères si possible (`.editorconfig`,
+  `config/checkstyle.xml`). Suivre le style du code autour.
+- Lecture XML : passer par `Plan.creerLecteurXml()` (DOCTYPE interdit). Une
+  erreur de fichier devient une `SAXException` au message lisible par
+  l'utilisateur ; une tournée impossible, une `IllegalStateException`.
+- `docs/code-fourni/` est en lecture seule. `algo/tsp` ne sera nettoyé (garder
+  seulement `TSP3`) qu'à la fin du projet : ne pas le faire sans demande.
 
 ## Tests
 
-Voir [l'ADR 0001](docs/adr/0001-organisation-des-tests-unitaires.md).
+- JUnit 4 ; `Foo` est testé par `FooTest`, dans le même package sous
+  `src/test/java` (ADR 0001). Pas de suite de tests.
+- Méthodes de test aux noms descriptifs en français
+  (`retourApres13hRefuse()`), avec une ligne de Javadoc.
+- Tests d'abord pour tout calcul (exigence du cours).
+- Données : fichiers fournis via `getResourceAsStream("/data/...")` ; petits
+  XML écrits dans le test (voir `PlansPourTests`).
+- Contrôleur : faux `MapScreen` + `Executor` synchrones + calcul factice,
+  jamais de fenêtre JavaFX.
+- Toute correction de bug arrive avec le test qui l'aurait détectée.
 
-- JUnit 4. La classe `Foo` est testée par `FooTest`, dans le **même package**
-  sous `src/test/java`.
-- Pas de suite de tests : Surefire lance toutes les classes `*Test`.
-- Noms de méthodes descriptifs en français (`longueurNegativeRefusee()`).
-- Données de test dans `src/test/resources`, chargées avec
-  `getClass().getResourceAsStream(...)`. Les XML fournis par les enseignants
-  sont dans `src/main/resources/data/`.
-- Tester le contrôleur avec un faux `MapScreen` et des `Executor` synchrones,
-  jamais en ouvrant une fenêtre JavaFX.
-- Toute correction de bug arrive avec le test qui l'aurait détecté.
+## Documentation à tenir à jour
 
-## Diagrammes
+- Diagrammes : modifier la source `docs/diagrams/*.puml` concernée dans la
+  même PR que le code (et les blocs Mermaid de `docs/diagrams/README.md` s'ils
+  sont touchés). Diagrammes non séquentiels : `!pragma layout smetana`.
+- Les SVG ne sont **jamais** committés (`docs/diagrams/out/` est ignoré) : la
+  CI les génère et GitHub Pages les publie.
+- Décision structurante (nouveau pattern, nouvelle dépendance, changement
+  d'architecture) : nouvel ADR à partir de `docs/adr/modele.md`.
+- Changement visible par l'utilisateur ou dans la façon de travailler :
+  mettre à jour le README (et ce fichier si une règle change).
 
-- Seules les sources PlantUML `docs/diagrams/*.puml` sont versionnées. Les SVG
-  ne le sont pas (leur rendu dépend des polices de la machine) : ils sont
-  publiés sur GitHub Pages et joints en artefact à chaque CI. En local,
-  `./scripts/render-diagrams.sh` les génère dans `docs/diagrams/out/` (ignoré
-  par git) ; ne jamais les committer.
-- Les diagrammes qui ne sont pas de séquence contiennent
-  `!pragma layout smetana` (pas de Graphviz).
-- Mettre à jour les diagrammes quand l'architecture change (nouvelle classe,
-  nouveau pattern, nouvelle séquence), ainsi que les blocs Mermaid de
-  `docs/diagrams/README.md` qui en sont la copie lisible sur GitHub.
+## Git et pull requests
 
-## Workflow git et PR
+- Ne jamais pousser sur `main`. Une branche par issue, au nom proposé par
+  Linear : `tig-XX-titre-court` ; outillage sans issue : `chore/titre`.
+  Tout autre nom fait échouer la CI.
+- Commits et titres de PR : `type: description` (`feat`, `fix`, `refactor`,
+  `test`, `docs`, `ci`, `chore`, `build`, `perf`, `style`) ou contenant
+  `TIG-XX`. Remplir le [modèle de PR](.github/pull_request_template.md).
+- **Aucune mention d'IA** dans les commits, PR, commentaires de revue ou
+  fichiers : pas de ligne `Co-Authored-By: Claude …` (ni d'un autre
+  assistant), pas de « Generated with Claude Code », pas d'emoji robot.
+  Le travail est signé par la personne qui le soumet.
+- Une PR = un sujet. Ne pas mélanger fonctionnalité et refactor.
+- Merge en *squash* après approbation humaine et check **CI OK** vert.
+- Ne pas réécrire l'historique d'une branche partagée sans accord ;
+  `git push --force-with-lease` uniquement sur ses propres branches.
 
-- Ne jamais pousser sur `main`. Une branche par issue Linear, nommée comme le
-  propose Linear : `tig-XX-titre-court`. Outillage sans issue : `chore/titre`.
-  Tout autre nom fait échouer le workflow *Règles de PR*.
-- Titre de PR : `type: description` (`feat`, `fix`, `docs`, `refactor`,
-  `test`, `ci`, `chore`…) ou contenant `TIG-XX`.
-- Remplir le [modèle de PR](.github/pull_request_template.md) : résumé, issue
-  Linear, checklist.
-- Commits courts au format `type: description`.
-- Le check requis est **CI OK** ; une personne de l'équipe relit avant le
-  merge.
+## Interdits
 
-## À ne pas faire
-
-- Modifier `docs/code-fourni/` (code TSP fourni, en lecture seule).
-- Committer des SVG de diagrammes (`docs/diagrams/out/`).
-- Committer des réglages locaux (`JAVA_HOME`, chemins absolus, `target/`).
-- Désactiver un test, baisser le seuil de couverture ou ajouter une exclusion
-  SpotBugs/Checkstyle pour faire passer la CI.
-- Mélanger dans une même PR une fonctionnalité et un gros refactor.
+- Modifier `docs/code-fourni/`.
+- Committer des SVG de diagrammes, `target/`, des réglages locaux
+  (`JAVA_HOME`, chemins absolus).
+- Désactiver ou supprimer un test, baisser `jacoco.line.minimum`, ajouter une
+  exclusion SpotBugs ou Checkstyle pour faire passer la CI. Une exclusion
+  SpotBugs n'est acceptable que ciblée (une classe, un type de bug) et
+  justifiée en commentaire dans `config/spotbugs-exclude.xml`.
+- Contourner State, Observer ou Command (voir plus haut).
+- Introduire un terme métier hors glossaire.

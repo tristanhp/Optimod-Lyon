@@ -12,3 +12,5 @@
 - [ ] Les nouvelles classes et méthodes publiques sont documentées (Javadoc)
 - [ ] Les nouveaux comportements sont couverts par des tests
 - [ ] Les diagrammes de `docs/diagrams/` sont à jour si l'architecture change
+- [ ] Le vocabulaire suit le glossaire du projet (voir le README)
+- [ ] Aucune mention d'IA dans les commits et la PR (voir `AGENTS.md`)
