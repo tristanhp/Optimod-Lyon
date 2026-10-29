@@ -19,7 +19,9 @@ Issue Linear : TIG-92.
    `controller`) : `CommandeAjouterDemande` (ajout en fin de liste) et
    `CommandeSupprimerDemande` (garde la demande retirée et son rang pour la
    remettre). Les commandes modifient `ProgrammeLivraisons`, qui prévient la vue
-   (Observer, ADR 0003).
+   (Observer, ADR 0003). `CommandeChangerOrdre` est la seule à ne pas toucher
+   aux demandes : elle range dans le cache la tournée avec le nouvel ordre
+   (calculée avant la commande), et annuler remet la tournée précédente.
 2. `ListeDeCommandes` garde l'historique : `executer`, `annuler`, `refaire`,
    `vider`. Exécuter une nouvelle commande oublie les commandes annulées.
    L'historique est vidé quand un plan ou des demandes sont importés.

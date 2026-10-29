@@ -9,7 +9,7 @@ EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
-EtatTourneeCalculee : (sous-classe)
+EtatTourneeCalculee : + Monter, Descendre (sous-classe)
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : idCollecte : long
@@ -26,6 +26,7 @@ EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valide
 state "Choix de l'état selon le cache" as cache <<choice>>
 EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
+EtatTourneeCalculee --> cache : changerOrdre / CommandeChangerOrdre
 cache --> EtatTourneeCalculee : [tournée des demandes en cache]
 cache --> EtatProgrammeCharge : [sinon]
 

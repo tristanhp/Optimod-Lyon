@@ -110,6 +110,10 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
+        ecran.definirActionMonterArret(
+                rang -> etat.changerOrdre(this, rang, -1));
+        ecran.definirActionDescendreArret(
+                rang -> etat.changerOrdre(this, rang, 1));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
@@ -324,6 +328,38 @@ public final class MainController {
             // Recalcul local impossible : on ne range rien dans le cache, la
             // suppression retirera simplement la tournée affichée.
         }
+    }
+
+    /**
+     * Change l'ordre d'un arrêt de la tournée affichée (« Monter » ou
+     * « Descendre ») par une commande annulable. Le nouvel ordre est d'abord
+     * calculé localement ({@link Plan#calculerTourneeOrdreChange}) : s'il est
+     * refusé (contrainte d'ordre, retour après 13 h, arrêt qui ne peut pas
+     * bouger), l'écran affiche la raison et rien n'est modifié, pas même
+     * l'historique. Sinon la commande range la nouvelle tournée dans le cache,
+     * à la place de l'ancienne, et {@link #retrouverEtatProgramme} l'affiche.
+     *
+     * @param rang rang de l'arrêt sélectionné dans la tournée
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    void changerOrdreTournee(int rang, int decalage) {
+        List<Demande> demandes = List.copyOf(programme.obtenirDemandes());
+        Tournee avant = tourneesCalculees.get(demandes);
+        if (avant == null) {
+            return;
+        }
+        Tournee apres;
+        try {
+            apres = plan.calculerTourneeOrdreChange(avant, demandes, rang,
+                    decalage);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ecran.afficherRefusOrdre(e.getMessage());
+            return;
+        }
+        executer(new CommandeChangerOrdre(
+                tournee -> tourneesCalculees.put(demandes, tournee), avant,
+                apres));
     }
 
     /** Oublie l'historique et le cache : le plan ou les demandes changent. */
