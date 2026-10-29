@@ -2,6 +2,7 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -284,6 +285,44 @@ public final class MainController {
         } else {
             changerEtat(new EtatProgrammeCharge());
             ecran.effacerTournee();
+        }
+    }
+
+    /**
+     * Prépare l'affichage de la tournée qui suit la suppression d'une demande,
+     * sans relancer le voyageur de commerce. La tournée affichée est celle des
+     * demandes actuelles (elle est dans le cache) : on en retire les deux
+     * arrêts de la demande ({@link Plan#calculerTourneeSansDemande}), l'ordre
+     * des autres arrêts est gardé, et on range le résultat dans le cache sous
+     * la liste des demandes restantes. Une fois la suppression exécutée,
+     * {@link #retrouverEtatProgramme} la trouvera donc dans le cache.
+     *
+     * <p>Ne fait rien (la tournée sera simplement retirée de l'écran, comme
+     * avant) si la position est invalide, si la tournée des demandes restantes
+     * est déjà connue (calculée par le voyageur de commerce : elle est
+     * meilleure, on la garde), ou si le recalcul local est impossible (arrêts
+     * de la demande ambigus dans la tournée).
+     *
+     * @param position rang dans le programme de la demande à supprimer
+     */
+    void memoriserTourneeSansDemande(int position) {
+        List<Demande> avant = List.copyOf(programme.obtenirDemandes());
+        Tournee actuelle = tourneesCalculees.get(avant);
+        if (actuelle == null || position < 0 || position >= avant.size()) {
+            return;
+        }
+        List<Demande> apres = new ArrayList<>(avant);
+        apres.remove(position);
+        if (tourneesCalculees.containsKey(apres)) {
+            return;
+        }
+        try {
+            tourneesCalculees.put(List.copyOf(apres),
+                    plan.calculerTourneeSansDemande(actuelle,
+                            avant.get(position)));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // Recalcul local impossible : on ne range rien dans le cache, la
+            // suppression retirera simplement la tournée affichée.
         }
     }
 

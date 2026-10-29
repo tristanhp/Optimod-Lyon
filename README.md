@@ -109,7 +109,9 @@ de même taille.
      collecte, puis sur le point de livraison (durées sur place : 5 min) ;
      recliquer sur le bouton annule l'ajout ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
-     cliquer sur le bouton sous la liste ;
+     cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
+     mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls
+     les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s) ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -191,6 +193,13 @@ Les trois design patterns :
 Le calcul de la tournée vit dans `Plan.calculerTournee` : A* entre chaque
 couple d'adresses, ordre de passage par séparation et évaluation (`TSP3`),
 puis heures de passage ([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md)).
+
+Le voyageur de commerce ne sert qu'au bouton *Calculer*. Quand on modifie une
+tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres
+arrêts est gardé et seuls les trajets touchés (A*) et les heures de passage
+sont recalculés, par `Plan.recalculerTournee` (ordre imposé) ; la suppression
+d'une demande passe par `Plan.calculerTourneeSansDemande`. « Recalcul local »
+est un terme technique, pas du vocabulaire métier.
 
 ## Structure du dépôt
 
