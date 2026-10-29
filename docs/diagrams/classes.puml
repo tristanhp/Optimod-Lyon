@@ -13,6 +13,9 @@ package "model" {
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
     +calculerTournee(programme : ProgrammeLivraisons) : Tournee
+    +recalculerTournee(heureDepart, adresses, durees) : Tournee
+    +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
+    +calculerTourneeOrdreChange(tournee, demandes, rang, decalage) : Tournee
     -calculerPlusCourtsChemins(adresses) : Chemin[][]
     -calculerOrdreDePassage(chemins) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
@@ -81,6 +84,8 @@ package "controller" {
     +obtenirProgramme() : ProgrammeLivraisons
     ~changerEtat(nouvelEtat : Etat)
     ~executer(commande : Commande)
+    ~memoriserTourneeSansDemande(position : int)
+    ~changerOrdreTournee(rang : int, decalage : int)
     -tourneesCalculees : Map<List<Demande>, Tournee>
   }
   interface MapScreen
@@ -99,6 +104,7 @@ package "controller" {
   class ListeDeCommandes
   class CommandeAjouterDemande
   class CommandeSupprimerDemande
+  class CommandeChangerOrdre
 }
 
 package "view" {
@@ -112,7 +118,7 @@ Plan *--> "*" Troncon
 Troncon --> "2" Noeud
 Chemin o--> "*" Troncon
 Plan ..> ProgrammeLivraisons : calculerTournee
-Plan ..> Tournee : crée
+Plan ..> Tournee : crée et recalcule
 Plan ..> TSP3 : ordre de passage
 TSP3 --|> TemplateTSP
 TemplateTSP ..> GrapheDepandance
@@ -139,6 +145,7 @@ EtatAjoutLivraison ..|> Etat
 ListeDeCommandes o--> "*" Commande
 CommandeAjouterDemande ..|> Commande
 CommandeSupprimerDemande ..|> Commande
+CommandeChangerOrdre ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur

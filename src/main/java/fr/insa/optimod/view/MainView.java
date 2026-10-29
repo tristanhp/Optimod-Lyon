@@ -62,6 +62,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     private final Button boutonAjouter = new Button("Ajouter une demande");
     private final Button boutonSupprimer = new Button("Supprimer la demande");
+    private final Button boutonMonter = new Button("Monter");
+    private final Button boutonDescendre = new Button("Descendre");
     private final Button boutonAnnuler = new Button("Annuler");
     private final Button boutonRefaire = new Button("Rétablir");
 
@@ -70,6 +72,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
+
+    /** Vrai si l'état du contrôleur permet de changer l'ordre des arrêts. */
+    private boolean changementOrdrePermis;
 
     /** Indicateur d'attente affiché pendant le calcul. */
     private final ProgressIndicator indicateurAttente = new ProgressIndicator();
@@ -130,6 +135,18 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                     carte.mettreEnEvidence(nouveau.intValue());
                     actualiserBoutonSupprimer();
                 });
+        listeTournee.getSelectionModel().selectedIndexProperty().addListener(
+                (observable, ancien, nouveau) -> actualiserBoutonsOrdre());
+        boutonMonter.setMaxWidth(Double.MAX_VALUE);
+        boutonDescendre.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(boutonMonter, Priority.ALWAYS);
+        HBox.setHgrow(boutonDescendre, Priority.ALWAYS);
+        VBox.setVgrow(listeTournee, Priority.ALWAYS);
+        VBox panneauTournee = new VBox(4, listeTournee,
+                new HBox(4, boutonMonter, boutonDescendre));
+        panneauTournee.visibleProperty().bind(listeTournee.visibleProperty());
+        panneauTournee.managedProperty().bind(listeTournee.managedProperty());
+        actualiserBoutonsOrdre();
         VBox.setVgrow(listeDemandes, Priority.ALWAYS);
         boutonSupprimer.setMaxWidth(Double.MAX_VALUE);
         VBox panneauDemandes = new VBox(4, listeDemandes, boutonSupprimer);
@@ -149,7 +166,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         setLeft(panneauDemandes);
         setTop(barreOutils);
         setCenter(carte);
-        setRight(listeTournee);
+        setRight(panneauTournee);
     }
 
     @Override
@@ -173,6 +190,22 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonRefaire.setDisable(!actions.contains(Action.REFAIRE));
         suppressionPermise = actions.contains(Action.SUPPRIMER_DEMANDE);
         actualiserBoutonSupprimer();
+        changementOrdrePermis = actions.contains(Action.CHANGER_ORDRE);
+        actualiserBoutonsOrdre();
+    }
+
+    /**
+     * Monter et Descendre : action permise et arrêt sélectionné. Le départ et
+     * le retour de l'entrepôt (premier et dernier de la liste) ne se déplacent
+     * pas.
+     */
+    private void actualiserBoutonsOrdre() {
+        int rang = listeTournee.getSelectionModel().getSelectedIndex();
+        boolean arretSelectionne = rang >= 1
+                && rang < listeTournee.getItems().size() - 1;
+        boutonMonter.setDisable(!changementOrdrePermis || !arretSelectionne);
+        boutonDescendre.setDisable(!changementOrdrePermis
+                || !arretSelectionne);
     }
 
     /** Supprimer demande une action permise et une demande sélectionnée. */
@@ -190,6 +223,18 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     public void definirActionSupprimerDemande(IntConsumer action) {
         boutonSupprimer.setOnAction(event -> action.accept(
                 listeDemandes.getSelectionModel().getSelectedIndex()));
+    }
+
+    @Override
+    public void definirActionMonterArret(IntConsumer action) {
+        boutonMonter.setOnAction(event -> action.accept(
+                listeTournee.getSelectionModel().getSelectedIndex()));
+    }
+
+    @Override
+    public void definirActionDescendreArret(IntConsumer action) {
+        boutonDescendre.setOnAction(event -> action.accept(
+                listeTournee.getSelectionModel().getSelectedIndex()));
     }
 
     @Override
@@ -267,6 +312,16 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Calcul de la tournée impossible");
+        alert.setContentText(detail);
+        alert.initOwner(getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    @Override
+    public void afficherRefusOrdre(String detail) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Changement d'ordre impossible");
         alert.setContentText(detail);
         alert.initOwner(getScene().getWindow());
         alert.showAndWait();
