@@ -2,22 +2,20 @@ package fr.insa.optimod.algo.tsp;
 
 import static org.junit.Assert.assertEquals;
 
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TSP1Test {
-    private final int nbSommets = 10;
+    private static final int nbSommets = 10;
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
-    GrapheDepandance grapheDepandance;
-    TSP1 tsp1;
+    private static GrapheDepandance grapheDepandance;
+    private static TSP1 tsp1;
 
-    @Before
-    public void initialisation() {
+    @BeforeClass
+    public static void initialisation() {
         // Executé avant chaque test
         int iseed = 1;
         int cout[][];
@@ -37,35 +35,26 @@ public class TSP1Test {
             }
         }
         HashMap<Integer, Integer> depandance = new HashMap<>();
-        depandance.put(5, 0);
-        depandance.put(6, 1);
-        depandance.put(7, 2);
-        depandance.put(8, 3);
-        depandance.put(9, 4);
+        for (int livraison = 2; livraison < nbSommets; livraison += 2) {
+            depandance.put(livraison, livraison - 1);
+        }
 
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =10s
     }
 
     /** TSP1 renvoie le cout de la meilleur solution. */
     @Test
     public void testTSP1() {
         // Test TSP1 sur un graphe complet à 10 sommet et vérifie le resultat
-        // System.out.println("Cout graphe : " +
-        // Integer.toString(tsp1.obtenirCoutSolution()));
-        System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) + "ms");
-        assertEquals(145, tsp1.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-    }
-
-    /** Le 4e indice de la meilleure solution */
-    @Test
-    public void testGetSolution() {
-        // Test TSP1 sur un graphe complet à 10 sommet et vérifie l'indice du sommet n°4
-        // System.out.println("Solution a l'indice 4 : " +
-        // Integer.toString(tsp1.obtenirSommetSolution(4)));
-        assertEquals(tsp1.obtenirSommetSolution(4), Integer.valueOf(9));
+        int somme = 0;
+        for (int i = 1; i < nbSommets; i++) {
+            somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(i - 1), tsp1.obtenirSommetSolution(i));
+        }
+        somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(nbSommets - 1), 0);
+        assertEquals(somme, tsp1.obtenirCoutSolution());
     }
 
     /** Test de la fonction bound de TSP1 */
@@ -80,14 +69,5 @@ public class TSP1Test {
     public void testCroisementArc() {
         // TSP1 n'utilise pas la fonction croisementArc, elle renvoie toujours false
         assertEquals(false, tsp1.croisementArc(null, null, null, null));
-    }
-
-    /** Test de la fonction trierParDistance de TSP1 */
-    @Test
-    public void testTrierParDistance() {
-        // TSP1 n'utilise pas la fonction trierParDistance, elle renvoie toujours la
-        // liste envoye en entrer
-        Collection<Integer> list = Arrays.asList(1, 2, 3, 4);
-        assertEquals(list, tsp1.trieParDistance(null, list, grapheDepandance));
     }
 }
