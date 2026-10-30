@@ -11,7 +11,8 @@ public class TSP1 extends TemplateTSP {
     }
 
     @Override
-    protected Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt, Collection<Integer> nonVus, Graphe g) {
+    protected Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt, Collection<Integer> nonVus,
+            GrapheDepandance g) {
         return new IteratorSeq(nonVus, sommetCrt, g);
     }
 
@@ -19,10 +20,5 @@ public class TSP1 extends TemplateTSP {
     protected Boolean croisementArc(Integer sommetCrt, Integer sommetVisite, Collection<Integer> nonVus,
             GrapheDepandance g) {
         return false;
-    }
-
-    @Override
-    protected Collection<Integer> trieParDistance(Integer sommetCrt, Collection<Integer> nonVus, GrapheDepandance g) {
-        return nonVus;
     }
 }

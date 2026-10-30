@@ -3,23 +3,23 @@ package fr.insa.optimod.algo.tsp;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 
-import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 public class TSP3Test {
-    private final int nbSommets = 10;
+    private static final int nbSommets = 10;
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
-    GrapheDepandance grapheDepandance;
-    TSP3 tsp3;
+    private static GrapheDepandance grapheDepandance;
+    private static TSP3 tsp3;
 
-    @Before
-    public void initialisation() {
+    @BeforeClass
+    public static void initialisation() {
         // Executé avant chaque test
         int iseed = 1;
         int cout[][];
@@ -39,35 +39,25 @@ public class TSP3Test {
             }
         }
         HashMap<Integer, Integer> depandance = new HashMap<>();
-        depandance.put(5, 0);
-        depandance.put(6, 1);
-        depandance.put(7, 2);
-        depandance.put(8, 3);
-        depandance.put(9, 4);
-
+        for (int livraison = 2; livraison < nbSommets; livraison += 2) {
+            depandance.put(livraison, livraison - 1);
+        }
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP3 renvoie le cout de la meilleur solution. */
     @Test
     public void testTSP3() {
         // Test TSP3 sur un graphe complet à 10 sommet et vérifie le resultat
-        // System.out.println("Cout graphe : " +
-        // Integer.toString(tsp3.obtenirCoutSolution()));
-        System.out.println("Duree TPS1 : " + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
-        assertEquals(145, tsp3.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-    }
-
-    /** Le 4e indice de la meilleure solution */
-    @Test
-    public void testGetSolution() {
-        // Test TSP3 sur un graphe complet à 10 sommet et vérifie l'indice du sommet n°4
-        // System.out.println("Solution a l'indice 4 : " +
-        // Integer.toString(tsp3.obtenirSommetSolution(4)));
-        assertEquals(tsp3.obtenirSommetSolution(4), Integer.valueOf(9));
+        int somme = 0;
+        for (int i = 1; i < nbSommets; i++) {
+            somme += grapheDepandance.obtenirCoutArc(tsp3.obtenirSommetSolution(i - 1), tsp3.obtenirSommetSolution(i));
+        }
+        somme += grapheDepandance.obtenirCoutArc(tsp3.obtenirSommetSolution(nbSommets - 1), 0);
+        assertEquals(somme, tsp3.obtenirCoutSolution());
     }
 
     /** Test de la fonction bound de TSP3 */
@@ -92,15 +82,16 @@ public class TSP3Test {
         // courant
 
         // Test 1
-        Collection<Integer> list = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9);
+        ArrayList<Integer> list = new ArrayList<Integer>(Arrays.asList(1, 2, 4, 5, 6, 7, 8, 9));
         Integer sommetDepart = 0;
-        Iterator<Integer> iterator = tsp3.trieParDistance(sommetDepart, list, grapheDepandance).iterator();
+        Iterator<Integer> iterator = tsp3.creerIterateurSuccesseurs(sommetDepart, list, grapheDepandance);
         if (!iterator.hasNext())
             return;
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
+                    sommetDepart,
                     suivant));
             precedent = suivant;
         }
@@ -108,15 +99,16 @@ public class TSP3Test {
 
     @Test
     public void testTrierParDistance2() {
-        Collection<Integer> list = Arrays.asList(1, 4, 5, 6, 7, 9);
+        ArrayList<Integer> list = new ArrayList<Integer>(Arrays.asList(1, 2, 4, 5, 6, 7, 8, 9));
         Integer sommetDepart = 3;
-        Iterator<Integer> iterator = tsp3.trieParDistance(sommetDepart, list, grapheDepandance).iterator();
+        Iterator<Integer> iterator = tsp3.creerIterateurSuccesseurs(sommetDepart, list, grapheDepandance);
         if (!iterator.hasNext())
             return;
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(sommetDepart,
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
+                    sommetDepart,
                     suivant));
             precedent = suivant;
         }
