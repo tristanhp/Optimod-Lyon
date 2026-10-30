@@ -21,9 +21,10 @@ public class TSP3 extends TSP2 {
             GrapheDepandance g) {
         // On trie la liste restante en fonction de la distance des sommets au sommet
         // courant
-        ((ArrayList<Integer>) nonVus).sort((a, b) -> {
+        ArrayList<Integer> listeTrie = new ArrayList<>(nonVus);
+        listeTrie.sort((a, b) -> {
             return g.obtenirCoutArc(sommetCrt, b) - g.obtenirCoutArc(sommetCrt, a);
         });
-        return new IteratorSeq(nonVus, sommetCrt, g);
+        return new IteratorSeq(listeTrie, sommetCrt, g);
     }
 }
