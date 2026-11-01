@@ -17,11 +17,13 @@ import java.nio.file.Files;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee.TypeArret;
 
 /**
  * Tests de {@link Plan} : lecture du fichier de plan, plus courts chemins et
@@ -193,6 +195,14 @@ public class PlanTest {
                         plan.obtenirNoeud(livraison), 60, 120)));
     }
 
+    /** Tournée du livreur 1 (programme d'un seul livreur). */
+    private static Tournee premiereTournee(Plan plan,
+            ProgrammeLivraisons programme) {
+        Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
+        assertEquals(programme.obtenirNombreLivreurs(), tournees.size());
+        return tournees.get(1);
+    }
+
     private static void assertArret(Tournee.Arret arret, long noeud,
             String arrivee, String depart) {
         assertEquals(noeud, arret.noeud().identifiant());
@@ -207,7 +217,7 @@ public class PlanTest {
     @Test
     public void heuresDePassageCalculeesALaMain() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
-        Tournee tournee = plan.calculerTournee(
+        Tournee tournee = premiereTournee(plan,
                 programme(plan, LocalTime.of(8, 0), 3, 2));
         assertEquals(4, tournee.arrets().size());
         assertArret(tournee.arrets().get(0), 1, "08:00", "08:00");
@@ -227,7 +237,7 @@ public class PlanTest {
     @Test
     public void collecteAvantLivraison() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
-        Tournee tournee = plan.calculerTournee(
+        Tournee tournee = premiereTournee(plan,
                 programme(plan, LocalTime.of(8, 0), 2, 3));
         List<Long> ordre = new ArrayList<>();
         for (Tournee.Arret arret : tournee.arrets()) {
@@ -240,7 +250,7 @@ public class PlanTest {
     @Test
     public void programmeSansDemande() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
-        Tournee tournee = plan.calculerTournee(new ProgrammeLivraisons(
+        Tournee tournee = premiereTournee(plan, new ProgrammeLivraisons(
                 plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of()));
         assertEquals(1, tournee.arrets().size());
         assertTrue(tournee.chemins().isEmpty());
@@ -252,23 +262,28 @@ public class PlanTest {
     public void adresseInaccessibleRefusee() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         IllegalStateException erreur = assertThrows(
-                IllegalStateException.class, () -> plan.calculerTournee(
+                IllegalStateException.class, () -> premiereTournee(plan,
                         programme(plan, LocalTime.of(8, 0), 4, 2)));
         assertTrue(erreur.getMessage().contains("inaccessible"));
     }
 
-    /** Le retour à l'entrepôt doit avoir lieu avant 13 h (TIG-46). */
+    /**
+     * Le retour à l'entrepôt doit avoir lieu avant 13 h (TIG-46). Une tournée
+     * qui revient trop tard est renvoyée mais signalée impossible (TIG-95),
+     * pour que le cas 6 puisse la montrer.
+     */
     @Test
-    public void retourApres13hRefuse() throws Exception {
+    public void retourApres13hSignale() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         // La tournée dure 5 min 12 s.
-        assertEquals(LocalTime.of(12, 59, 12), plan.calculerTournee(
-                programme(plan, LocalTime.of(12, 54), 3, 2))
-                .obtenirHeureRetour());
-        IllegalStateException erreur = assertThrows(
-                IllegalStateException.class, () -> plan.calculerTournee(
-                        programme(plan, LocalTime.of(12, 58), 3, 2)));
-        assertTrue(erreur.getMessage().contains("13:00"));
+        Tournee aLHeure = premiereTournee(plan,
+                programme(plan, LocalTime.of(12, 54), 3, 2));
+        assertEquals(LocalTime.of(12, 59, 12), aLHeure.obtenirHeureRetour());
+        assertTrue(aLHeure.estPossible());
+        Tournee enRetard = premiereTournee(plan,
+                programme(plan, LocalTime.of(12, 58), 3, 2));
+        assertEquals(LocalTime.of(13, 3, 12), enRetard.obtenirHeureRetour());
+        assertFalse(enRetard.estPossible());
     }
 
     /**
@@ -286,7 +301,7 @@ public class PlanTest {
                     "/data/" + jeu[1] + ".xml")) {
                 programme = new ProgrammeLivraisons(xml, plan);
             }
-            Tournee tournee = plan.calculerTournee(programme);
+            Tournee tournee = premiereTournee(plan, programme);
             List<Tournee.Arret> arrets = tournee.arrets();
             assertEquals(2 * programme.obtenirDemandes().size() + 2,
                     arrets.size());
@@ -304,6 +319,129 @@ public class PlanTest {
                         < rang(arrets, demande.livraison()));
             }
         }
+    }
+
+    // --- Plusieurs livreurs (TIG-95) ---
+
+    /** Chaque arrêt connaît son type et sa demande. */
+    @Test
+    public void arretsPortentTypeEtDemande() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = programme(plan, LocalTime.of(8, 0),
+                3, 2);
+        Demande demande = programme.obtenirDemandes().get(0);
+        List<Tournee.Arret> arrets = premiereTournee(plan, programme).arrets();
+        List<TypeArret> types = new ArrayList<>();
+        for (Tournee.Arret arret : arrets) {
+            types.add(arret.type());
+        }
+        assertEquals(List.of(TypeArret.ENTREPOT, TypeArret.COLLECTE,
+                TypeArret.LIVRAISON, TypeArret.ENTREPOT), types);
+        assertNull(arrets.get(0).demande());
+        assertSame(demande, arrets.get(1).demande());
+        assertSame(demande, arrets.get(2).demande());
+        assertNull(arrets.get(3).demande());
+    }
+
+    /**
+     * Deux livreurs : deux tournées indépendantes, chacune avec ses seules
+     * demandes, partant toutes deux de l'entrepôt à l'heure de départ.
+     */
+    @Test
+    public void deuxLivreursDeuxTourneesIndependantes() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande premiere = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 120, 1);
+        Demande seconde = new Demande(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3), 60, 120, 2);
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0),
+                List.of(premiere, seconde));
+        assertEquals(2, programme.obtenirNombreLivreurs());
+
+        Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
+        assertEquals(List.of(1, 2), new ArrayList<>(tournees.keySet()));
+        for (int livreur = 1; livreur <= 2; livreur++) {
+            List<Tournee.Arret> arrets = tournees.get(livreur).arrets();
+            assertEquals(4, arrets.size());
+            assertEquals(LocalTime.of(8, 0), arrets.get(0).depart());
+            Demande attendue = livreur == 1 ? premiere : seconde;
+            assertSame(attendue, arrets.get(1).demande());
+            assertSame(attendue, arrets.get(2).demande());
+            assertTrue(tournees.get(livreur).estPossible());
+        }
+        // La tournée du livreur 1 est celle qu'il aurait seul.
+        Tournee seul = premiereTournee(plan, programme(plan,
+                LocalTime.of(8, 0), 3, 2));
+        assertEquals(seul.obtenirHeureRetour(),
+                tournees.get(1).obtenirHeureRetour());
+    }
+
+    /** Un livreur sans demande a une tournée vide. */
+    @Test
+    public void livreurSansDemandeATourneeVide() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = programme(plan, LocalTime.of(8, 0),
+                3, 2);
+        programme.definirNombreLivreurs(2);
+        Tournee vide = plan.calculerTournees(programme).get(2);
+        assertEquals(1, vide.arrets().size());
+        assertEquals(TypeArret.ENTREPOT, vide.arrets().get(0).type());
+        assertTrue(vide.chemins().isEmpty());
+    }
+
+    /**
+     * Fichier fourni partagé entre deux livreurs : chaque demande est servie
+     * une fois, par son livreur, collecte avant livraison.
+     */
+    @Test
+    public void fichierFourniPartageEntreDeuxLivreurs() throws Exception {
+        Plan plan = lirePlanFourni("moyenPlan");
+        ProgrammeLivraisons lu;
+        try (InputStream xml = getClass().getResourceAsStream(
+                "/data/demandeMoyen5.xml")) {
+            lu = new ProgrammeLivraisons(xml, plan);
+        }
+        List<Demande> reparties = new ArrayList<>();
+        for (int rang = 0; rang < lu.obtenirDemandes().size(); rang++) {
+            reparties.add(lu.obtenirDemandes().get(rang)
+                    .avecLivreur(rang % 2 + 1));
+        }
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                lu.obtenirEntrepot(), lu.obtenirHeureDepart(), reparties);
+
+        Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
+        int arretsDeDemandes = 0;
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            List<Tournee.Arret> arrets = entree.getValue().arrets();
+            assertSame(programme.obtenirEntrepot(), arrets.get(0).noeud());
+            for (Tournee.Arret arret : arrets) {
+                if (arret.demande() != null) {
+                    assertEquals((int) entree.getKey(),
+                            arret.demande().livreur());
+                    arretsDeDemandes++;
+                }
+            }
+            for (Demande demande : reparties) {
+                if (demande.livreur() == entree.getKey()) {
+                    assertTrue(rangDe(arrets, demande, TypeArret.COLLECTE)
+                            < rangDe(arrets, demande, TypeArret.LIVRAISON));
+                }
+            }
+        }
+        assertEquals(2 * reparties.size(), arretsDeDemandes);
+    }
+
+    /** Rang de l'arrêt d'une demande, d'un type donné. */
+    private static int rangDe(List<Tournee.Arret> arrets, Demande demande,
+            TypeArret type) {
+        for (int rang = 0; rang < arrets.size(); rang++) {
+            if (arrets.get(rang).demande() == demande
+                    && arrets.get(rang).type() == type) {
+                return rang;
+            }
+        }
+        throw new AssertionError("Arrêt absent : " + type);
     }
 
     private Plan lirePlanFourni(String nom) throws Exception {
