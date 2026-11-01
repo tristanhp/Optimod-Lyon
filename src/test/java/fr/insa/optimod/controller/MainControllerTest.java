@@ -403,6 +403,7 @@ public class MainControllerTest {
         assertTrue(tournees().isEmpty());
     }
 
+    /** Le calcul range les tournées dans le programme, que la vue observe. */
     @Test
     public void calculRangeLesTourneesDansLeProgramme() throws Exception {
         chargerPlanEtLivraison();
@@ -532,6 +533,7 @@ public class MainControllerTest {
         assertEquals(2, demandes().size());
     }
 
+    /** Une modification retire les tournées ; annuler les remet. */
     @Test
     public void modifierRetireLesTourneesEtAnnulerLesRemet()
             throws Exception {
