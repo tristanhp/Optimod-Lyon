@@ -1,5 +1,6 @@
 package fr.insa.optimod.controller;
 
+import java.util.Map;
 import java.util.Set;
 
 import fr.insa.optimod.model.Tournee;
@@ -51,15 +52,16 @@ interface Etat {
     }
 
     /**
-     * Fin du calcul de la tournée, sur le thread de l'interface. Ignorée par
+     * Fin du calcul des tournées, sur le thread de l'interface. Ignorée par
      * défaut.
      *
      * @param controleur contrôleur à piloter
-     * @param tournee tournée calculée, ou {@code null} en cas d'erreur
+     * @param tournees tournées par numéro de livreur, ou {@code null} en cas
+     *        d'erreur
      * @param erreur explication de l'erreur, ou {@code null}
      */
-    default void finirCalcul(MainController controleur, Tournee tournee,
-            String erreur) {
+    default void finirCalcul(MainController controleur,
+            Map<Integer, Tournee> tournees, String erreur) {
     }
 
     /**

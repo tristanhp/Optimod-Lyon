@@ -3,6 +3,7 @@ package fr.insa.optimod.view;
 import java.io.File;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntConsumer;
@@ -213,11 +214,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void effacerTournee() {
-        effacerListeTournee();
-    }
-
-    @Override
     public void afficherAttente(boolean enAttente) {
         indicateurAttente.setVisible(enAttente);
     }
@@ -248,18 +244,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         effacerDemandes();
         carte.afficherPlan(plan);
         message.setText("");
-    }
-
-    @Override
-    public void afficherTournee(Tournee tournee) {
-        listeTournee.getItems().clear();
-        for (Tournee.Arret arret : tournee.arrets()) {
-            listeTournee.getItems().add(HEURE.format(arret.arrivee()) + " → "
-                    + HEURE.format(arret.depart()) + "   nœud "
-                    + arret.noeud().identifiant());
-        }
-        listeTournee.setVisible(true);
-        listeTournee.setManaged(true);
     }
 
     @Override
@@ -307,10 +291,14 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         observer(programme);
     }
 
-    /** Les demandes observées ont changé : redessine la liste et la carte. */
+    /**
+     * Le programme observé a changé (demandes ou tournées) : redessine la
+     * liste des demandes, la carte et la liste des tournées.
+     */
     @Override
     public void mettreAJour(Observable source) {
         dessinerDemandes();
+        dessinerTournees();
     }
 
     /**
@@ -327,6 +315,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             programme.ajouterObservateur(this);
         }
         dessinerDemandes();
+        dessinerTournees();
     }
 
     private void dessinerDemandes() {
@@ -345,6 +334,33 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         }
         message.setText("Programme chargé : "
                 + programmeObserve.obtenirDemandes().size() + " demande(s)");
+    }
+
+    /**
+     * Liste les arrêts des tournées rangées dans le programme, avec leurs
+     * heures de passage ; un titre par livreur s'il y en a plusieurs. La liste
+     * est cachée tant qu'aucune tournée n'est calculée.
+     */
+    private void dessinerTournees() {
+        Map<Integer, Tournee> tournees = programmeObserve == null ? Map.of()
+                : programmeObserve.obtenirTournees();
+        if (tournees.isEmpty()) {
+            effacerListeTournee();
+            return;
+        }
+        listeTournee.getItems().clear();
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            if (tournees.size() > 1) {
+                listeTournee.getItems().add("Livreur " + entree.getKey());
+            }
+            for (Tournee.Arret arret : entree.getValue().arrets()) {
+                listeTournee.getItems().add(HEURE.format(arret.arrivee())
+                        + " → " + HEURE.format(arret.depart()) + "   nœud "
+                        + arret.noeud().identifiant());
+            }
+        }
+        listeTournee.setVisible(true);
+        listeTournee.setManaged(true);
     }
 
     private void effacerDemandes() {

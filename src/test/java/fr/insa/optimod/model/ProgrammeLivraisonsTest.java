@@ -212,7 +212,7 @@ public class ProgrammeLivraisonsTest {
         new Demande(A, B, 60, 60, 0);
     }
 
-    /** Changer de livreur donne une copie, la demande d'origine ne change pas. */
+    /** Changer de livreur donne une copie ; l'original ne change pas. */
     @Test
     public void avecLivreurDonneUneCopie() {
         Demande demande = new Demande(A, B, 60, 120);
@@ -237,12 +237,11 @@ public class ProgrammeLivraisonsTest {
         }
     }
 
-    /** Le nombre de livreurs couvre au moins les livreurs des demandes. */
-    @Test
-    public void nombreDeLivreursDeduitDesDemandes() {
-        ProgrammeLivraisons programme = new ProgrammeLivraisons(C,
-                LocalTime.of(8, 0), List.of(new Demande(A, B, 0, 0, 3)));
-        assertEquals(3, programme.obtenirNombreLivreurs());
+    /** Un programme a un seul livreur au départ : livreur 2 refusé. */
+    @Test(expected = IllegalArgumentException.class)
+    public void unSeulLivreurALaCreation() {
+        new ProgrammeLivraisons(C, LocalTime.of(8, 0),
+                List.of(new Demande(A, B, 0, 0, 2)));
     }
 
     /** Il faut au moins un livreur. */

@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -14,6 +13,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilder;
@@ -30,14 +31,15 @@ import fr.insa.optimod.algo.tsp.GrapheDepandance;
 import fr.insa.optimod.algo.tsp.TSP;
 import fr.insa.optimod.algo.tsp.TSP3;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee.TypeArret;
 
 /**
  * Plan de la ville lu dans un fichier de plan : des nœuds et des tronçons.
  *
- * <p>Le plan calcule aussi la tournée d'un programme de livraisons
- * ({@link #calculerTournee}) : plus courts chemins entre les adresses (A*),
- * meilleur ordre de passage avec la contrainte d'ordre (voyageur de commerce,
- * {@link TSP3}), puis heures de passage.
+ * <p>Le plan calcule aussi les tournées d'un programme de livraisons, une par
+ * livreur ({@link #calculerTournees}) : plus courts chemins entre les
+ * adresses (A*), meilleur ordre de passage avec la contrainte d'ordre
+ * (voyageur de commerce, {@link TSP3}), puis heures de passage.
  */
 public final class Plan {
 
@@ -47,7 +49,10 @@ public final class Plan {
     /** Heure limite de retour à l'entrepôt. */
     public static final LocalTime HEURE_LIMITE_RETOUR = LocalTime.of(13, 0);
 
-    /** Limite de temps du calcul de l'ordre de passage, en millisecondes. */
+    /**
+     * Limite de temps du calcul des ordres de passage, en millisecondes,
+     * partagée entre les livreurs qui ont des demandes.
+     */
     private static final int LIMITE_TEMPS_TSP_MS = 10_000;
 
     /** Rayon moyen de la Terre, en mètres. */
@@ -63,6 +68,15 @@ public final class Plan {
 
     /** Nœud à explorer par A*, avec sa distance depuis la source et g + h. */
     private record Etiquette(Noeud noeud, double distance, double estimation) {
+    }
+
+    /**
+     * Sommet du voyageur de commerce : une adresse de la tournée, sa durée
+     * sur place (en secondes), son type et sa demande ({@code null} pour
+     * l'entrepôt).
+     */
+    private record Sommet(Noeud adresse, int duree, TypeArret type,
+            Demande demande) {
     }
 
     private final Map<Long, Noeud> noeuds = new LinkedHashMap<>();
@@ -175,49 +189,82 @@ public final class Plan {
         return Collections.unmodifiableList(troncons);
     }
 
-    // --- Calcul de la tournée ---
+    // --- Calcul des tournées ---
 
     /**
-     * Calcule la meilleure tournée d'un programme de livraisons : départ de
-     * l'entrepôt à l'heure de départ, chaque colis récupéré avant d'être
-     * livré, retour à l'entrepôt le plus tôt possible, à
-     * {@value #VITESSE_KMH} km/h.
+     * Calcule la meilleure tournée de chaque livreur : voyageur de commerce
+     * sur les seules demandes du livreur ; un livreur sans demande a une
+     * tournée vide. Chaque tournée part de l'entrepôt à l'heure de départ,
+     * récupère chaque colis avant de le livrer et revient à l'entrepôt le
+     * plus tôt possible, à {@value #VITESSE_KMH} km/h. La limite de temps du
+     * voyageur de commerce est partagée à parts égales entre les livreurs qui
+     * ont des demandes.
      *
-     * @param programme entrepôt, heure de départ et demandes
-     * @return la tournée, avec ses heures de passage
-     * @throws IllegalStateException si aucune tournée possible n'existe : une
-     *         adresse est inaccessible, aucun ordre n'a été trouvé dans la
-     *         limite de temps, ou le retour à l'entrepôt dépasse
-     *         {@link #HEURE_LIMITE_RETOUR}
+     * <p>Une tournée qui revient à l'entrepôt après
+     * {@link #HEURE_LIMITE_RETOUR} est renvoyée quand même : elle est
+     * signalée par {@link Tournee#estPossible()}.
+     *
+     * @param programme entrepôt, heure de départ, livreurs et demandes
+     * @return une tournée par numéro de livreur, triées (non modifiable)
+     * @throws IllegalStateException si une adresse est inaccessible ou si
+     *         aucun ordre de passage n'a été trouvé dans la limite de temps
      */
-    public Tournee calculerTournee(ProgrammeLivraisons programme) {
-        List<Noeud> adresses = new ArrayList<>();
-        List<Integer> durees = new ArrayList<>();
-        adresses.add(programme.obtenirEntrepot());
-        durees.add(0);
-        for (Demande demande : programme.obtenirDemandes()) {
-            adresses.add(demande.collecte());
-            durees.add(demande.dureeCollecte());
-            adresses.add(demande.livraison());
-            durees.add(demande.dureeLivraison());
+    public Map<Integer, Tournee> calculerTournees(
+            ProgrammeLivraisons programme) {
+        int nombreLivreurs = programme.obtenirNombreLivreurs();
+        List<List<Demande>> demandesParLivreur = new ArrayList<>();
+        for (int livreur = 1; livreur <= nombreLivreurs; livreur++) {
+            demandesParLivreur.add(new ArrayList<>());
         }
-        Chemin[][] chemins = calculerPlusCourtsChemins(adresses);
-        List<Integer> ordre = calculerOrdreDePassage(chemins);
-        return calculerHeuresDePassage(programme.obtenirHeureDepart(),
-                adresses, durees, chemins, ordre);
+        for (Demande demande : programme.obtenirDemandes()) {
+            demandesParLivreur.get(demande.livreur() - 1).add(demande);
+        }
+        long livreursOccupes = demandesParLivreur.stream()
+                .filter(demandes -> !demandes.isEmpty()).count();
+        int limiteTemps = (int) (LIMITE_TEMPS_TSP_MS
+                / Math.max(1, livreursOccupes));
+        SortedMap<Integer, Tournee> tournees = new TreeMap<>();
+        for (int livreur = 1; livreur <= nombreLivreurs; livreur++) {
+            tournees.put(livreur, calculerTournee(programme.obtenirEntrepot(),
+                    programme.obtenirHeureDepart(),
+                    demandesParLivreur.get(livreur - 1), limiteTemps));
+        }
+        return Collections.unmodifiableSortedMap(tournees);
+    }
+
+    /**
+     * Meilleure tournée d'un livreur : plus courts chemins entre ses
+     * adresses, ordre de passage, puis heures de passage. Sommets : 0 est
+     * l'entrepôt, puis pour la demande k, 2k+1 est sa collecte et 2k+2 sa
+     * livraison.
+     */
+    private Tournee calculerTournee(Noeud entrepot, LocalTime heureDepart,
+            List<Demande> demandes, int limiteTemps) {
+        List<Sommet> sommets = new ArrayList<>();
+        sommets.add(new Sommet(entrepot, 0, TypeArret.ENTREPOT, null));
+        for (Demande demande : demandes) {
+            sommets.add(new Sommet(demande.collecte(), demande.dureeCollecte(),
+                    TypeArret.COLLECTE, demande));
+            sommets.add(new Sommet(demande.livraison(),
+                    demande.dureeLivraison(), TypeArret.LIVRAISON, demande));
+        }
+        Chemin[][] chemins = calculerPlusCourtsChemins(sommets);
+        List<Integer> ordre = calculerOrdreDePassage(chemins, limiteTemps);
+        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre);
     }
 
     /**
      * Graphe des plus courts chemins : le plus court chemin entre chaque
      * couple d'adresses.
      */
-    private Chemin[][] calculerPlusCourtsChemins(List<Noeud> adresses) {
-        int nombre = adresses.size();
+    private Chemin[][] calculerPlusCourtsChemins(List<Sommet> sommets) {
+        int nombre = sommets.size();
         Chemin[][] chemins = new Chemin[nombre][nombre];
         for (int i = 0; i < nombre; i++) {
             for (int j = 0; j < nombre; j++) {
                 chemins[i][j] = i == j ? new Chemin(0, List.of())
-                        : plusCourtChemin(adresses.get(i), adresses.get(j));
+                        : plusCourtChemin(sommets.get(i).adresse(),
+                                sommets.get(j).adresse());
             }
         }
         return chemins;
@@ -225,13 +272,13 @@ public final class Plan {
 
     /**
      * Meilleur ordre de passage (voyageur de commerce avec contrainte
-     * d'ordre). Sommets : 0 est l'entrepôt, puis pour la demande k, 2k+1 est
-     * sa collecte et 2k+2 sa livraison.
+     * d'ordre), cherché pendant au plus {@code limiteTemps} millisecondes.
      *
      * @return les sommets dans l'ordre de passage, en commençant par 0, sans
      *         le retour à l'entrepôt
      */
-    private static List<Integer> calculerOrdreDePassage(Chemin[][] chemins) {
+    private static List<Integer> calculerOrdreDePassage(Chemin[][] chemins,
+            int limiteTemps) {
         int nombre = chemins.length;
         if (nombre == 1) {
             return List.of(0);
@@ -252,7 +299,7 @@ public final class Plan {
             collecteAvantLivraison.put(livraison, livraison - 1);
         }
         TSP tsp = new TSP3();
-        tsp.chercherSolution(LIMITE_TEMPS_TSP_MS,
+        tsp.chercherSolution(limiteTemps,
                 new GrapheDepandance(nombre, couts, collecteAvantLivraison));
         List<Integer> ordre = new ArrayList<>();
         for (int rang = 0; rang < nombre; rang++) {
@@ -273,8 +320,7 @@ public final class Plan {
      * l'arrivée plus la durée sur place.
      */
     private static Tournee calculerHeuresDePassage(LocalTime heureDepart,
-            List<Noeud> adresses, List<Integer> durees, Chemin[][] chemins,
-            List<Integer> ordre) {
+            List<Sommet> sommets, Chemin[][] chemins, List<Integer> ordre) {
         List<Integer> parcours = new ArrayList<>(ordre);
         if (ordre.size() > 1) {
             parcours.add(0); // retour à l'entrepôt
@@ -282,36 +328,27 @@ public final class Plan {
         List<Tournee.Arret> arrets = new ArrayList<>();
         List<Chemin> trajets = new ArrayList<>();
         LocalTime depart = heureDepart;
-        long secondesDepuisDepart = 0;
         for (int rang = 0; rang < parcours.size(); rang++) {
-            int sommet = parcours.get(rang);
+            Sommet sommet = sommets.get(parcours.get(rang));
             long trajet = 0;
             if (rang > 0) {
-                Chemin chemin = chemins[parcours.get(rang - 1)][sommet];
+                Chemin chemin = chemins[parcours.get(rang - 1)]
+                        [parcours.get(rang)];
                 if (!chemin.estAccessible()) {
                     throw new IllegalStateException("Adresse "
-                            + adresses.get(sommet).identifiant()
+                            + sommet.adresse().identifiant()
                             + " inaccessible depuis l'adresse "
-                            + adresses.get(parcours.get(rang - 1)).identifiant()
+                            + sommets.get(parcours.get(rang - 1)).adresse()
+                                    .identifiant()
                             + ".");
                 }
                 trajets.add(chemin);
                 trajet = secondesDeTrajet(chemin.longueur());
             }
             LocalTime arrivee = depart.plusSeconds(trajet);
-            int duree = rang == parcours.size() - 1 && rang > 0
-                    ? 0 : durees.get(sommet);
-            secondesDepuisDepart += trajet + duree;
-            depart = arrivee.plusSeconds(duree);
-            arrets.add(new Tournee.Arret(adresses.get(sommet), arrivee,
-                    depart));
-        }
-        LocalTime retour = arrets.get(arrets.size() - 1).arrivee();
-        if (secondesDepuisDepart > heureDepart.until(HEURE_LIMITE_RETOUR,
-                ChronoUnit.SECONDS)) {
-            throw new IllegalStateException("Tournée impossible : retour à "
-                    + "l'entrepôt à " + retour + ", après "
-                    + HEURE_LIMITE_RETOUR + ".");
+            depart = arrivee.plusSeconds(sommet.duree());
+            arrets.add(new Tournee.Arret(sommet.adresse(), arrivee, depart,
+                    sommet.type(), sommet.demande()));
         }
         return new Tournee(arrets, trajets);
     }

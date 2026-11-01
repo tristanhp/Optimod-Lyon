@@ -14,6 +14,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -30,6 +31,7 @@ import fr.insa.optimod.controller.MapScreen.Action;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Tournee.TypeArret;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 
@@ -52,7 +54,6 @@ public class MainControllerTest {
         private ProgrammeLivraisons programmeAffiche;
         private Set<Action> actions;
         private boolean attente;
-        private Tournee tournee;
         private String erreurCalcul;
 
         @Override
@@ -106,12 +107,6 @@ public class MainControllerTest {
         }
 
         @Override
-        public void effacerTournee() {
-            tournee = null;
-            evenements.add("effacer tournee");
-        }
-
-        @Override
         public Optional<File> choisirFichierPlan() {
             return Optional.ofNullable(fichierChoisi);
         }
@@ -152,12 +147,6 @@ public class MainControllerTest {
         }
 
         @Override
-        public void afficherTournee(Tournee passages) {
-            tournee = passages;
-            evenements.add("tournee");
-        }
-
-        @Override
         public void afficherErreurCalcul(String detail) {
             erreurCalcul = detail;
             evenements.add("erreur");
@@ -172,9 +161,22 @@ public class MainControllerTest {
             + "<noeud id=\"1\" latitude=\"45.75\" longitude=\"4.85\"/>"
             + "</reseau>";
 
-    private static final Tournee TOURNEE = new Tournee(List.of(
-            new Tournee.Arret(new Noeud(1, 4.85, 45.75), LocalTime.of(8, 0),
-                    LocalTime.of(8, 0))), List.of());
+    private static final Noeud ENTREPOT = new Noeud(1, 4.85, 45.75);
+
+    /** Tournée qui part de l'entrepôt et y revient à cette heure. */
+    private static Tournee tourneeRevenantA(LocalTime retour) {
+        return new Tournee(List.of(
+                new Tournee.Arret(ENTREPOT, LocalTime.of(8, 0),
+                        LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
+                new Tournee.Arret(ENTREPOT, retour, retour,
+                        TypeArret.ENTREPOT, null)), List.of());
+    }
+
+    private static final Tournee TOURNEE = tourneeRevenantA(
+            LocalTime.of(8, 0));
+
+    /** Tournées rendues par le calcul factice : un livreur. */
+    private static final Map<Integer, Tournee> TOURNEES = Map.of(1, TOURNEE);
 
     /** Deux nœuds du petit plan fourni, pour ajouter une demande. */
     private static final long NOEUD_A = 25175791L;
@@ -191,18 +193,19 @@ public class MainControllerTest {
     private Plan planRecu;
     private ProgrammeLivraisons lotRecu;
     private RuntimeException erreurDeCalcul;
+    private Map<Integer, Tournee> tourneesCalculees = TOURNEES;
 
     @Before
     public void creer() {
         ecran = new EcranFactice();
-        BiFunction<Plan, ProgrammeLivraisons, Tournee> calcul =
+        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul =
                 (plan, programme) -> {
             planRecu = plan;
             lotRecu = programme;
             if (erreurDeCalcul != null) {
                 throw erreurDeCalcul;
             }
-            return TOURNEE;
+            return tourneesCalculees;
         };
         controleur = new MainController(ecran, calcul, arrierePlan::add,
                 Runnable::run);
@@ -244,6 +247,11 @@ public class MainControllerTest {
 
     private List<Demande> demandes() {
         return controleur.obtenirProgramme().obtenirDemandes();
+    }
+
+    /** Tournées rangées dans le programme chargé. */
+    private Map<Integer, Tournee> tournees() {
+        return controleur.obtenirProgramme().obtenirTournees();
     }
 
     private void executerArrierePlan() {
@@ -392,17 +400,17 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertTrue(ecran.actions.isEmpty());
         assertTrue(ecran.attente);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
     }
 
     @Test
-    public void calculAfficheLaTournee() throws Exception {
+    public void calculRangeLesTourneesDansLeProgramme() throws Exception {
         chargerPlanEtLivraison();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        assertEquals(List.of("attente:true", "attente:false", "tournee"),
+        assertEquals(List.of("attente:true", "attente:false"),
                 ecran.evenements);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
         assertSame(controleur.obtenirPlan(), planRecu);
         assertSame(controleur.obtenirProgramme(), lotRecu);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
@@ -428,7 +436,7 @@ public class MainControllerTest {
         assertSame(plan, controleur.obtenirPlan());
         assertSame(programme, controleur.obtenirProgramme());
         executerArrierePlan();
-        assertSame(TOURNEE, ecran.tournee);
+        assertSame(TOURNEE, tournees().get(1));
     }
 
     @Test
@@ -440,7 +448,7 @@ public class MainControllerTest {
         assertEquals(List.of("attente:true", "attente:false", "erreur"),
                 ecran.evenements);
         assertEquals("Tournée impossible", ecran.erreurCalcul);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertEquals(MODIFIABLE, ecran.actions);
     }
@@ -471,8 +479,7 @@ public class MainControllerTest {
         chargerPlanEtLivraison();
         ecran.actionCalculer.run();
         assertNull(ecran.erreurCalcul);
-        assertNotNull(ecran.tournee);
-        assertEquals(4, ecran.tournee.arrets().size());
+        assertEquals(4, tournees().get(1).arrets().size());
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
@@ -526,22 +533,20 @@ public class MainControllerTest {
     }
 
     @Test
-    public void modifierRetireLaTourneeEtAnnulerLaRetrouveDuCache()
+    public void modifierRetireLesTourneesEtAnnulerLesRemet()
             throws Exception {
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        ecran.evenements.clear();
 
         ecran.actionSupprimer.accept(1);
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
 
         ecran.actionAnnuler.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
-        assertEquals(List.of("effacer tournee", "tournee"), ecran.evenements);
     }
 
     @Test
@@ -554,7 +559,58 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         ecran.actionRefaire.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    /**
+     * Les tournées calculées après une annulation sont celles de l'état
+     * d'avant la commande : annuler à nouveau après « Rétablir » les remet.
+     */
+    @Test
+    public void annulerRetrouveLaTourneeCalculeeApresAnnulation()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionAnnuler.run();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        ecran.actionRefaire.run();
+        assertTrue(tournees().isEmpty());
+        ecran.actionAnnuler.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    // --- Plusieurs livreurs (TIG-95) ---
+
+    /**
+     * Une tournée qui revient après 13 h est rangée et affichée, et le
+     * livreur concerné est signalé.
+     */
+    @Test
+    public void tourneeApres13hRangeeEtSignalee() throws Exception {
+        tourneesCalculees = Map.of(1, tourneeRevenantA(LocalTime.of(13, 42)));
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(tourneesCalculees, tournees());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals("Livreur 1 : retour à 13:42, après 13:00.",
+                ecran.erreurCalcul);
+    }
+
+    /** Deux livreurs : les deux tournées calculées sont rangées. */
+    @Test
+    public void deuxLivreursDeuxTourneesRangees() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        tourneesCalculees = Map.of(1, TOURNEE,
+                2, tourneeRevenantA(LocalTime.of(9, 0)));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(List.of(1, 2), List.copyOf(tournees().keySet()));
+        assertEquals(tourneesCalculees, tournees());
+        assertNull(ecran.erreurCalcul);
     }
 
     @Test

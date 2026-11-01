@@ -1,6 +1,7 @@
 package fr.insa.optimod.controller;
 
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 
 import fr.insa.optimod.controller.MapScreen.Action;
@@ -22,16 +23,18 @@ final class EtatCalculEnCours implements Etat {
     }
 
     /**
-     * Affiche la tournée ({@link EtatTourneeCalculee}) ou l'erreur (retour à
-     * {@link EtatProgrammeCharge}).
+     * Range les tournées dans le programme ({@link EtatTourneeCalculee}) et
+     * signale les livreurs qui reviennent trop tard, ou affiche l'erreur
+     * (retour à {@link EtatProgrammeCharge}).
      */
     @Override
-    public void finirCalcul(MainController controleur, Tournee tournee,
-            String erreur) {
+    public void finirCalcul(MainController controleur,
+            Map<Integer, Tournee> tournees, String erreur) {
         controleur.arreterAttente();
-        if (tournee != null) {
+        if (tournees != null) {
+            controleur.rangerTournees(tournees);
             controleur.changerEtat(new EtatTourneeCalculee());
-            controleur.afficherTournee(tournee);
+            controleur.signalerTourneesImpossibles(tournees);
         } else {
             controleur.changerEtat(new EtatProgrammeCharge());
             controleur.afficherErreurCalcul(erreur);

@@ -7,7 +7,6 @@ import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 
 /**
@@ -141,22 +140,12 @@ public interface MapScreen {
      */
     void afficherConsigne(String consigne);
 
-    /** Retire la tournée affichée (elle ne correspond plus aux demandes). */
-    void effacerTournee();
-
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.
      *
      * @param waiting {@code true} tant que le calcul est en cours
      */
     void afficherAttente(boolean waiting);
-
-    /**
-     * Affiche la tournée calculée.
-     *
-     * @param tournee arrêts de la tournée avec leurs heures de passage
-     */
-    void afficherTournee(Tournee tournee);
 
     /**
      * Signale que le calcul a échoué.

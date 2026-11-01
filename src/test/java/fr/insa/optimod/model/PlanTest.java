@@ -355,9 +355,10 @@ public class PlanTest {
         Demande seconde = new Demande(plan.obtenirNoeud(2),
                 plan.obtenirNoeud(3), 60, 120, 2);
         ProgrammeLivraisons programme = new ProgrammeLivraisons(
-                plan.obtenirNoeud(1), LocalTime.of(8, 0),
-                List.of(premiere, seconde));
-        assertEquals(2, programme.obtenirNombreLivreurs());
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of());
+        programme.definirNombreLivreurs(2);
+        programme.ajouterDemande(0, premiere);
+        programme.ajouterDemande(1, seconde);
 
         Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
         assertEquals(List.of(1, 2), new ArrayList<>(tournees.keySet()));
@@ -408,7 +409,12 @@ public class PlanTest {
                     .avecLivreur(rang % 2 + 1));
         }
         ProgrammeLivraisons programme = new ProgrammeLivraisons(
-                lu.obtenirEntrepot(), lu.obtenirHeureDepart(), reparties);
+                lu.obtenirEntrepot(), lu.obtenirHeureDepart(), List.of());
+        programme.definirNombreLivreurs(2);
+        for (Demande demande : reparties) {
+            programme.ajouterDemande(
+                    programme.obtenirDemandes().size(), demande);
+        }
 
         Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
         int arretsDeDemandes = 0;

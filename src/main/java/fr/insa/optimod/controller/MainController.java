@@ -2,7 +2,7 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -11,7 +11,6 @@ import java.util.function.BiFunction;
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 
@@ -26,10 +25,11 @@ import fr.insa.optimod.model.Plan;
  * suivant. Le contrôleur fournit aux états les opérations élémentaires (lire
  * un fichier, lancer le calcul, mettre à jour l'écran).
  *
- * <p>Les modifications des demandes passent par des commandes annulables
- * ({@link Commande}, design pattern Command). Les tournées déjà calculées sont
- * gardées en cache par liste de demandes : annuler ou rétablir une
- * modification réaffiche la tournée correspondante sans la recalculer.
+ * <p>Les tournées calculées sont rangées dans le programme de livraisons, une
+ * par livreur ; la vue les observe. Les modifications des demandes passent
+ * par des commandes annulables ({@link Commande}, design pattern Command),
+ * qui gardent les tournées d'avant et d'après : annuler ou rétablir une
+ * modification remet les tournées correspondantes sans les recalculer.
  */
 public final class MainController {
 
@@ -46,8 +46,9 @@ public final class MainController {
     /** Écran piloté. */
     private final MapScreen ecran;
 
-    /** Calcul de la tournée ({@link Plan#calculerTournee} hors tests). */
-    private final BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee;
+    /** Calcul des tournées ({@link Plan#calculerTournees} hors tests). */
+    private final BiFunction<Plan, ProgrammeLivraisons,
+            Map<Integer, Tournee>> calculTournees;
 
     /** Exécute le calcul hors du thread de l'interface. */
     private final Executor arrierePlan;
@@ -68,19 +69,12 @@ public final class MainController {
     private final ListeDeCommandes historique = new ListeDeCommandes();
 
     /**
-     * Tournées déjà calculées pour le plan et les demandes chargés, indexées
-     * par la liste des demandes (dans l'ordre).
-     */
-    private final Map<List<Demande>, Tournee> tourneesCalculees =
-            new HashMap<>();
-
-    /**
      * Crée un contrôleur qui calcule la tournée sur le thread appelant.
      *
      * @param ecran écran à piloter
      */
     public MainController(MapScreen ecran) {
-        this(ecran, Plan::calculerTournee, Runnable::run, Runnable::run);
+        this(ecran, Plan::calculerTournees, Runnable::run, Runnable::run);
     }
 
     /**
@@ -88,17 +82,18 @@ public final class MainController {
      * l'état initial (seul l'import d'un plan est possible).
      *
      * @param ecran écran à piloter
-     * @param calculTournee calcul de la tournée d'un programme sur un plan
-     *        ({@code Plan::calculerTournee} ; remplaçable dans les tests)
+     * @param calculTournees calcul des tournées d'un programme sur un plan
+     *        ({@code Plan::calculerTournees} ; remplaçable dans les tests)
      * @param arrierePlan exécute le calcul hors du thread de l'interface
      * @param interfaceUtilisateur exécute les mises à jour de la vue sur le
      *        thread de l'interface
      */
     public MainController(MapScreen ecran,
-            BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee,
+            BiFunction<Plan, ProgrammeLivraisons,
+                    Map<Integer, Tournee>> calculTournees,
             Executor arrierePlan, Executor interfaceUtilisateur) {
         this.ecran = ecran;
-        this.calculTournee = calculTournee;
+        this.calculTournees = calculTournees;
         this.arrierePlan = arrierePlan;
         this.interfaceUtilisateur = interfaceUtilisateur;
         ecran.definirActionImportPlan(() -> etat.importerPlan(this));
@@ -196,17 +191,13 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         ProgrammeLivraisons programmeCalcule = programme;
-        List<Demande> demandesCalculees = List.copyOf(
-                programme.obtenirDemandes());
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
-                Tournee tournee = calculTournee.apply(planCalcule,
-                        programmeCalcule);
-                interfaceUtilisateur.execute(() -> {
-                    tourneesCalculees.put(demandesCalculees, tournee);
-                    etat.finirCalcul(this, tournee, null);
-                });
+                Map<Integer, Tournee> tournees = calculTournees.apply(
+                        planCalcule, programmeCalcule);
+                interfaceUtilisateur.execute(
+                        () -> etat.finirCalcul(this, tournees, null));
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
@@ -221,9 +212,36 @@ public final class MainController {
         ecran.afficherAttente(false);
     }
 
-    /** @param tournee tournée calculée à afficher */
-    void afficherTournee(Tournee tournee) {
-        ecran.afficherTournee(tournee);
+    /**
+     * Range les tournées calculées dans le programme (la vue les observe) et
+     * les fait retenir par l'historique, pour annuler et rétablir.
+     *
+     * @param tournees tournées par numéro de livreur
+     */
+    void rangerTournees(Map<Integer, Tournee> tournees) {
+        programme.definirTournees(tournees);
+        historique.memoriserTournees(programme.obtenirTournees());
+    }
+
+    /**
+     * Signale les livreurs dont la tournée revient à l'entrepôt après
+     * {@link Plan#HEURE_LIMITE_RETOUR} ; ne fait rien si toutes sont
+     * possibles.
+     *
+     * @param tournees tournées par numéro de livreur
+     */
+    void signalerTourneesImpossibles(Map<Integer, Tournee> tournees) {
+        List<String> retards = new ArrayList<>();
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            if (!entree.getValue().estPossible()) {
+                retards.add("Livreur " + entree.getKey() + " : retour à "
+                        + entree.getValue().obtenirHeureRetour() + ", après "
+                        + Plan.HEURE_LIMITE_RETOUR + ".");
+            }
+        }
+        if (!retards.isEmpty()) {
+            ecran.afficherErreurCalcul(String.join("\n", retards));
+        }
     }
 
     /** @param detail explication de l'échec du calcul */
@@ -269,27 +287,21 @@ public final class MainController {
     }
 
     /**
-     * Revient à l'état qui correspond au programme actuel : si leur tournée
-     * a déjà été calculée, elle est réaffichée depuis le cache
-     * ({@link EtatTourneeCalculee}) ; sinon la tournée est retirée
-     * ({@link EtatProgrammeCharge}).
+     * Revient à l'état qui correspond au programme actuel :
+     * {@link EtatTourneeCalculee} si ses tournées sont calculées, sinon
+     * {@link EtatProgrammeCharge}.
      */
     void retrouverEtatProgramme() {
         ecran.afficherConsigne("");
-        Tournee tournee = tourneesCalculees.get(
-                List.copyOf(programme.obtenirDemandes()));
-        if (tournee != null) {
-            changerEtat(new EtatTourneeCalculee());
-            ecran.afficherTournee(tournee);
-        } else {
+        if (programme.obtenirTournees().isEmpty()) {
             changerEtat(new EtatProgrammeCharge());
-            ecran.effacerTournee();
+        } else {
+            changerEtat(new EtatTourneeCalculee());
         }
     }
 
-    /** Oublie l'historique et le cache : le plan ou les demandes changent. */
+    /** Oublie l'historique : le plan ou les demandes changent. */
     private void oublierModifications() {
         historique.vider();
-        tourneesCalculees.clear();
     }
 }
