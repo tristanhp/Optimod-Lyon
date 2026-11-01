@@ -17,16 +17,16 @@ EtatAjoutLivraison : idCollecte : long
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
-EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
 EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
 EtatTourneeCalculee --> EtatCalculEnCours : calculer
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
-state "Choix de l'état selon le cache" as cache <<choice>>
+state "Choix de l'état selon les tournées du programme" as cache <<choice>>
 EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
-cache --> EtatTourneeCalculee : [tournée des demandes en cache]
+cache --> EtatTourneeCalculee : [tournées rangées dans le programme]
 cache --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande

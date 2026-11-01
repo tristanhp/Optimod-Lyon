@@ -1,6 +1,7 @@
 # 0004. Design pattern Command pour annuler les modifications
 
-- **Statut** : Acceptée
+- **Statut** : Acceptée ; point 3 (cache des tournées) remplacé par
+  [0006](0006-plusieurs-livreurs.md)
 - **Date** : 2026-10-25
 
 ## Contexte

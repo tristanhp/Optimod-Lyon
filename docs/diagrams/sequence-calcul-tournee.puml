@@ -1,5 +1,5 @@
 @startuml sequence-calcul-tournee
-title Calculer la tournée
+title Calculer les tournées
 autonumber
 actor Utilisateur as U
 boundary "vue : MainView" as V
@@ -7,6 +7,7 @@ control "controleur : MainController" as C
 participant "etat : EtatProgrammeCharge" as E
 entity "plan : Plan" as P
 participant "tsp : TSP3" as T
+entity "programme : ProgrammeLivraisons" as L
 U -> V : Cliquer sur « Calculer »
 V -> C : action enregistrée
 C -> E : calculer(controleur)
@@ -15,24 +16,30 @@ note right of C : tous les boutons désactivés
 E -> C : lancerCalcul()
 C -> V : afficherAttente(true)
 group Thread d'arrière-plan
-  C -> P : calculerTournee(programme)
-  P -> P : calculerPlusCourtsChemins(adresses)
-  note right of P : A* entre chaque couple d'adresses\n(entrepôt, collectes, livraisons)
-  P -> T : chercherSolution(10 s, GrapheDepandance)
-  note right of T : séparation et évaluation,\ncollecte avant livraison
-  T --> P : ordre de passage
-  P -> P : calculerHeuresDePassage(...)
-  note right of P : 15 km/h, durées sur place,\nretour avant 13:00 sinon erreur
-  P --> C : Tournee (ou IllegalStateException)
+  C -> P : calculerTournees(programme)
+  loop pour chaque livreur
+    P -> P : calculerPlusCourtsChemins(sommets)
+    note right of P : A* entre chaque couple d'adresses du livreur\n(entrepôt, collectes, livraisons)
+    P -> T : chercherSolution(10 s / livreurs occupés, GrapheDepandance)
+    note right of T : séparation et évaluation,\ncollecte avant livraison
+    T --> P : ordre de passage
+    P -> P : calculerHeuresDePassage(...)
+    note right of P : 15 km/h, durées sur place ;\nchaque arrêt garde son type et sa demande
+  end
+  P --> C : une Tournee par livreur (ou IllegalStateException)
 end
 group Thread de l'interface
-  C -> C : mémoriser la tournée dans le cache
-  C -> C : etat.finirCalcul(tournee, erreur)
-  alt Tournée calculée
+  C -> C : etat.finirCalcul(tournees, erreur)
+  alt Tournées calculées
+    C -> L : definirTournees(tournees)
+    L -> V : mettreAJour(programme)
+    V --> U : arrêts et heures de passage, par livreur
+    C -> C : historique.memoriserTournees(tournees)
     C -> C : changerEtat(new EtatTourneeCalculee())
-    C -> V : afficherTournee(tournee)
-    V --> U : arrêts et heures de passage
-  else Aucune tournée possible
+    opt Un livreur revient après 13:00
+      C -> V : afficherErreurCalcul(« Livreur k : retour à … »)
+    end
+  else Adresse inaccessible ou aucun ordre trouvé
     C -> C : changerEtat(new EtatProgrammeCharge())
     C -> V : afficherErreurCalcul(message)
     V --> U : alerte « Calcul de la tournée impossible »

@@ -36,7 +36,7 @@ dire ce qui échoue.
 
 | Package | Contient | Peut dépendre de |
 | --- | --- | --- |
-| `model` | `Plan` (lecture du plan **et** calcul de la tournée), `ProgrammeLivraisons` (+ `Demande`), `Tournee` (+ `Arret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
+| `model` | `Plan` (lecture du plan **et** calcul des tournées), `ProgrammeLivraisons` (+ `Demande`, tournées des livreurs), `Tournee` (+ `Arret`, `TypeArret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
 | `algo.tsp` | Voyageur de commerce : `TemplateTSP`, `TSP3`, `GrapheDepandance` | JDK |
 | `controller` | `MainController`, `MapScreen`, états `Etat*`, commandes `Commande*`, `ListeDeCommandes` | `model` |
 | `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher` | `controller`, `model`, JavaFX |
@@ -49,10 +49,14 @@ Règles :
 - `controller` ne connaît la vue que par l'interface `MapScreen`. Toute
   nouvelle interaction avec l'écran = une méthode de `MapScreen`, implémentée
   dans `MainView` et dans les faux écrans des tests.
-- Le calcul de la tournée est `Plan.calculerTournee(programme)`. Ses étapes
-  (A*, graphe des plus courts chemins, TSP, heures de passage) sont des
-  méthodes **privées** de `Plan` : ne pas recréer de classes `AEtoile`,
-  `CalculHoraires`, `GrapheChemins` ou équivalentes.
+- Le calcul des tournées est `Plan.calculerTournees(programme)`, une tournée
+  par livreur (ADR 0006). Ses étapes (A*, graphe des plus courts chemins,
+  TSP, heures de passage) sont des méthodes **privées** de `Plan` : ne pas
+  recréer de classes `AEtoile`, `CalculHoraires`, `GrapheChemins` ou
+  équivalentes.
+- Les tournées sont une donnée du modèle, rangées dans `ProgrammeLivraisons`
+  et observées par la vue ; une commande qui modifie les demandes garde les
+  tournées d'avant et d'après (ADR 0006).
 - Le calcul long tourne hors du thread JavaFX ; le contrôleur reçoit le calcul
   (`BiFunction`) et deux `Executor` pour rester testable.
 - Lancer l'interface via `AppLauncher`, jamais `MainApp`.
@@ -115,7 +119,9 @@ correspondance dans le code. Règles :
   `config/checkstyle.xml`). Suivre le style du code autour.
 - Lecture XML : passer par `Plan.creerLecteurXml()` (DOCTYPE interdit). Une
   erreur de fichier devient une `SAXException` au message lisible par
-  l'utilisateur ; une tournée impossible, une `IllegalStateException`.
+  l'utilisateur ; une adresse inaccessible ou un calcul sans solution, une
+  `IllegalStateException` ; un retour après 13 h, une tournée renvoyée avec
+  `Tournee.estPossible()` faux.
 - `docs/code-fourni/` est en lecture seule. `algo/tsp` ne sera nettoyé (garder
   seulement `TSP3`) qu'à la fin du projet : ne pas le faire sans demande.
 
@@ -124,7 +130,7 @@ correspondance dans le code. Règles :
 - JUnit 4 ; `Foo` est testé par `FooTest`, dans le même package sous
   `src/test/java` (ADR 0001). Pas de suite de tests.
 - Méthodes de test aux noms descriptifs en français
-  (`retourApres13hRefuse()`), avec une ligne de Javadoc.
+  (`retourApres13hSignale()`), avec une ligne de Javadoc.
 - Tests d'abord pour tout calcul (exigence du cours).
 - Données : fichiers fournis via `getResourceAsStream("/data/...")` ; petits
   XML écrits dans le test (voir `PlansPourTests`).
