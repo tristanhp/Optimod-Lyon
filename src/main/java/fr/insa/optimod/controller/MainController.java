@@ -2,6 +2,7 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +15,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.SauvegardeTournee;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -60,6 +62,9 @@ public final class MainController {
 
     /** Plan actuellement chargé, ou {@code null}. */
     private Plan plan;
+
+    /** Référence du fichier du plan courant. */
+    private Path fichierPlan;
 
     /** Programme de livraisons actuellement chargé, ou {@code null}. */
     private ProgrammeLivraisons programme;
@@ -111,6 +116,8 @@ public final class MainController {
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
+        ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
+        ecran.definirActionRestaurer(() -> etat.restaurer(this));
         changerEtat(new EtatInitial());
     }
 
@@ -155,6 +162,7 @@ public final class MainController {
         oublierModifications();
         try {
             plan = new Plan(fichier.getPath());
+            fichierPlan = fichier.toPath();
             ecran.afficherPlan(plan);
             return Lecture.REUSSIE;
         } catch (IOException | SAXException | IllegalArgumentException e) {
@@ -285,6 +293,55 @@ public final class MainController {
             changerEtat(new EtatProgrammeCharge());
             ecran.effacerTournee();
         }
+    }
+
+    /** Sauvegarde la tournée courante dans le fichier choisi. */
+    void sauvegarderTournee() {
+        ecran.choisirFichierSauvegarde().ifPresent(fichier -> {
+            try {
+                SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
+                        programme, tourneesCalculees.get(
+                                List.copyOf(programme.obtenirDemandes())));
+            } catch (IOException erreur) {
+                ecran.afficherErreurXml(erreur.getMessage());
+            }
+        });
+    }
+
+    /** Restaure intégralement avant de remplacer l'état courant. */
+    void restaurerSauvegarde() {
+        ecran.choisirFichierRestauration().ifPresent(fichier -> {
+            Etat ancienEtat = etat;
+            changerEtat(new EtatRestauration());
+            ecran.afficherAttente(true);
+            arrierePlan.execute(() -> {
+                try {
+                    SauvegardeTournee sauvegarde =
+                            SauvegardeTournee.restaurer(fichier.toPath());
+                    interfaceUtilisateur.execute(() -> {
+                        plan = sauvegarde.plan();
+                        fichierPlan = sauvegarde.fichierPlan();
+                        programme = sauvegarde.programme();
+                        oublierModifications();
+                        tourneesCalculees.put(List.copyOf(
+                                programme.obtenirDemandes()),
+                                sauvegarde.tournee());
+                        ecran.afficherPlan(plan);
+                        ecran.afficherProgramme(programme);
+                        ecran.afficherConsigne("");
+                        ecran.afficherTournee(sauvegarde.tournee());
+                        ecran.afficherAttente(false);
+                        changerEtat(new EtatTourneeCalculee());
+                    });
+                } catch (SAXException erreur) {
+                    interfaceUtilisateur.execute(() -> {
+                        ecran.afficherAttente(false);
+                        changerEtat(ancienEtat);
+                        ecran.afficherErreurXml(erreur.getMessage());
+                    });
+                }
+            });
+        });
     }
 
     /** Oublie l'historique et le cache : le plan ou les demandes changent. */

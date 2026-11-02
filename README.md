@@ -33,7 +33,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
 | Déplacer un point, changer l'ordre des arrêts, plusieurs livreurs | à faire |
-| Sauvegarder et restaurer les tournées | à faire |
+| Sauvegarder et restaurer la tournée d'un livreur (XML) | fait |
 
 ## Installer le projet
 
@@ -41,8 +41,9 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 
 - **JDK 27** (fixé dans [`.sdkmanrc`](.sdkmanrc) ; ce n'est pas une version
   LTS) et **Maven 3.9+**.
-- **Sous Windows : WSL** (Ubuntu conseillé). Le projet se clone, se compile et
-  se lance dans WSL ; VS Code s'y connecte avec l'extension *WSL*.
+- **Sous Windows :** le workflow de l'équipe utilise WSL (Ubuntu conseillé),
+  avec l'extension *WSL* de VS Code. Une installation native avec PowerShell
+  est aussi décrite ci-dessous, notamment pour Windows 10 sans WSLg.
 - **VS Code** avec les extensions recommandées, proposées à l'ouverture du
   dossier (liste dans [`.vscode/extensions.json`](.vscode/extensions.json)) :
   Java, Maven, tests, débogueur, EditorConfig, Coverage Gutters.
@@ -60,6 +61,26 @@ Si VS Code ne trouve pas le bon JDK, pointer `JAVA_HOME` vers
 
 ### Vérifier l'installation
 
+Sur un nouveau PC Windows, Java 11 ne suffit pas. Pour travailler directement
+dans PowerShell (notamment sans WSLg sous Windows 10) :
+
+1. Installer le **JDK 27**, puis **Apache Maven 3.9+** depuis leurs sites
+   officiels : [Java](https://www.oracle.com/java/technologies/downloads/),
+   [Maven](https://maven.apache.org/download.cgi).
+2. Dans les variables d'environnement utilisateur, définir `JAVA_HOME` vers
+   le dossier du JDK 27 (sans `bin`) et ajouter `%JAVA_HOME%\bin` et le dossier
+   `bin` de Maven au `Path`. Placer Java 27 avant les anciens Java.
+   Ces chemins dépendent du PC et ne doivent pas être committés.
+3. Fermer puis rouvrir VS Code. Installer les extensions recommandées via
+   l'onglet Extensions, filtre `@recommended`.
+4. Ouvrir le dossier contenant `pom.xml`, puis exécuter `Java: Configure
+   Java Runtime` dans la palette de commandes pour vérifier le JDK du projet.
+5. Dans un **nouveau terminal PowerShell**, vérifier `java -version`,
+   `javac -version` (27) et `mvn -version` (Maven 3.9+ utilisant Java 27).
+   Lancer ensuite `mvn clean verify`, puis `mvn javafx:run`.
+
+JavaFX est téléchargé par Maven ; aucun SDK JavaFX séparé n'est nécessaire.
+
 ```bash
 git clone https://github.com/tristanhp/Optimod-Lyon.git
 cd Optimod-Lyon
@@ -74,8 +95,11 @@ mvn clean verify    # compile, lance tous les tests, vérifie la couverture
 mvn javafx:run
 ```
 
-Maven télécharge JavaFX au premier lancement ; sous Windows, la fenêtre
-s'affiche grâce à WSLg (Windows 11). Autres façons de lancer :
+Maven télécharge JavaFX au premier lancement. Le lancement utilise le
+classpath pour rendre accessibles les bibliothèques natives du système,
+même si le projet embarque plusieurs variantes de JavaFX. Sous Windows,
+la fenêtre s'affiche directement avec Java natif ; sous WSL, elle nécessite
+WSLg ou un serveur d'affichage. Autres façons de lancer :
 
 - VS Code : *Exécuter et déboguer*, configuration **Interface JavaFX** ;
 - archive exécutable : `mvn clean package` puis
@@ -87,6 +111,15 @@ Ne pas lancer `MainApp` directement : JavaFX exige de passer par
 `AppLauncher`.
 
 ### Utiliser
+
+**Sauvegarde et restauration (modèle actuel : un livreur)** : après un calcul,
+cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
+dès l'ouverture et hors opération en cours, recharge le plan référencé et le
+programme, puis recalcule les trajets et les heures sans changer l'ordre des
+arrêts et sans relancer le TSP. La restauration réussie vide Annuler/Rétablir.
+Un fichier invalide laisse le travail courant intact. Garder le fichier du
+plan à son emplacement ; il n'est pas inclus dans la sauvegarde.
+Le [format XML](docs/sauvegarde-tournee.md) décrit les limites de cette version.
 
 Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 (`petitPlan.xml`, `moyenPlan.xml`, `grandPlan.xml`) et des fichiers de

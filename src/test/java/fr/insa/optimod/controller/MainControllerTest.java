@@ -40,6 +40,8 @@ public class MainControllerTest {
         private Runnable actionImportPlan;
         private Runnable actionImportLivraison;
         private Runnable actionCalculer;
+        private Runnable actionSauvegarder;
+        private Runnable actionRestaurer;
         private Runnable actionAjouter;
         private IntConsumer actionSupprimer;
         private Runnable actionAnnuler;
@@ -54,6 +56,26 @@ public class MainControllerTest {
         private boolean attente;
         private Tournee tournee;
         private String erreurCalcul;
+
+        @Override
+        public void definirActionSauvegarder(Runnable action) {
+            actionSauvegarder = action;
+        }
+
+        @Override
+        public void definirActionRestaurer(Runnable action) {
+            actionRestaurer = action;
+        }
+
+        @Override
+        public Optional<File> choisirFichierSauvegarde() {
+            return Optional.ofNullable(fichierChoisi);
+        }
+
+        @Override
+        public Optional<File> choisirFichierRestauration() {
+            return Optional.ofNullable(fichierChoisi);
+        }
 
         @Override
         public void definirActionImportPlan(Runnable action) {
@@ -183,7 +205,7 @@ public class MainControllerTest {
     /** Actions permises avec des demandes chargées, sans historique. */
     private static final Set<Action> MODIFIABLE = EnumSet.of(
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
-            Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
+            Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE, Action.RESTAURER);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -264,7 +286,8 @@ public class MainControllerTest {
     @Test
     public void auDepartSeulLImportDuPlanEstPossible() {
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
-        assertEquals(EnumSet.of(Action.IMPORTER_PLAN), ecran.actions);
+        assertEquals(EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER),
+                ecran.actions);
         assertNull(controleur.obtenirPlan());
         assertTrue(ecran.evenements.isEmpty());
     }
@@ -288,7 +311,7 @@ public class MainControllerTest {
         assertSame(ecran.planAffiche, controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_PROGRAMME), ecran.actions);
+                Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
     @Test
@@ -318,7 +341,7 @@ public class MainControllerTest {
         assertNull(controleur.obtenirProgramme());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
-                Action.IMPORTER_PROGRAMME), ecran.actions);
+                Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
     @Test
@@ -406,7 +429,9 @@ public class MainControllerTest {
         assertSame(controleur.obtenirPlan(), planRecu);
         assertSame(controleur.obtenirProgramme(), lotRecu);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertEquals(MODIFIABLE, ecran.actions);
+        Set<Action> permises = EnumSet.copyOf(MODIFIABLE);
+        permises.add(Action.SAUVEGARDER);
+        assertEquals(permises, ecran.actions);
     }
 
     @Test
@@ -496,7 +521,7 @@ public class MainControllerTest {
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
                 Action.IMPORTER_PROGRAMME, Action.CALCULER,
                 Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
-                Action.ANNULER), ecran.actions);
+                Action.ANNULER, Action.RESTAURER), ecran.actions);
 
         ecran.actionAnnuler.run();
         assertEquals(avant, demandes());
@@ -637,6 +662,67 @@ public class MainControllerTest {
         importerProgramme(ressource("/data/demandePetit1.xml"));
         assertSame(plan, controleur.obtenirPlan());
         assertEquals(2, demandes().size());
+    }
+
+    /** Sauvegarder et restaurer garde la tournée et vide les commandes. */
+    @Test
+    public void sauvegardeRestaurationVideHistorique() throws Exception {
+        controleur = new MainController(ecran);
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionCalculer.run();
+        Tournee avant = ecran.tournee;
+        File fichier = dossier.newFile("sauvegarde.xml");
+        ecran.fichierChoisi = fichier;
+        ecran.actionSauvegarder.run();
+        assertTrue(fichier.length() > 0);
+        ecran.actionSupprimer.accept(0);
+        ecran.actionRestaurer.run();
+        assertEquals(avant, ecran.tournee);
+        assertEquals(1, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(controleur.peutRefaire());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Un échec restaure l'état et conserve les commandes. */
+    @Test
+    public void restaurationInvalideConserveEtatEtHistorique() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        Etat avant = controleur.obtenirEtat();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        ecran.fichierChoisi = ecrire("<invalide/>");
+        ecran.actionRestaurer.run();
+        assertTrue(ecran.actions.isEmpty());
+        ecran.actionImportPlan.run();
+        ecran.actionRestaurer.run();
+        executerArrierePlan();
+        assertSame(avant, controleur.obtenirEtat());
+        assertSame(programme, controleur.obtenirProgramme());
+        assertTrue(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(ecran.evenements.contains("invalide"));
+    }
+
+    /** Le sélecteur annulé ne provoque aucune lecture ni changement. */
+    @Test
+    public void restaurationAnnuleeConserveEtat() {
+        Etat avant = controleur.obtenirEtat();
+        ecran.fichierChoisi = null;
+        ecran.actionRestaurer.run();
+        assertSame(avant, controleur.obtenirEtat());
+        assertTrue(arrierePlan.isEmpty());
+    }
+
+    /** Sauvegarder avant le calcul est ignoré par l'état. */
+    @Test
+    public void sauvegardeSansTourneeIgnoree() throws Exception {
+        chargerDeuxDemandes();
+        File fichier = dossier.newFile();
+        ecran.fichierChoisi = fichier;
+        ecran.actionSauvegarder.run();
+        assertEquals(0, fichier.length());
     }
 
     @Test

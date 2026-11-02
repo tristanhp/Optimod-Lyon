@@ -313,6 +313,32 @@ public class PlanTest {
         }
     }
 
+    /** Le recalcul conserve un ordre imposé et ses durées, sans TSP. */
+    @Test
+    public void recalculConserveOrdreImpose() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        List<Noeud> adresses = List.of(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(2), plan.obtenirNoeud(3),
+                plan.obtenirNoeud(1));
+        Tournee tournee = plan.recalculerTournee(LocalTime.of(8, 0),
+                adresses, List.of(0, 120, 240, 0));
+        assertEquals(adresses,
+                tournee.arrets().stream().map(Tournee.Arret::noeud).toList());
+        assertEquals(LocalTime.of(8, 1), tournee.arrets().get(1).arrivee());
+        assertEquals(LocalTime.of(8, 3), tournee.arrets().get(1).depart());
+        assertEquals(3, tournee.chemins().size());
+    }
+
+    /** Le recalcul conserve la règle actuelle de retour avant 13 h. */
+    @Test
+    public void recalculApres13hRefuse() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        assertThrows(IllegalStateException.class,
+                () -> plan.recalculerTournee(LocalTime.of(12, 59),
+                        List.of(plan.obtenirNoeud(1), plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(1)), List.of(0, 300, 0)));
+    }
+
     /** Rang du premier arrêt (hors départ) sur un nœud. */
     private static int rang(List<Tournee.Arret> arrets, Noeud noeud) {
         for (int rang = 1; rang < arrets.size(); rang++) {

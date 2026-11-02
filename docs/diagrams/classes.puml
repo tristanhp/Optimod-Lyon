@@ -13,10 +13,19 @@ package "model" {
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
     +calculerTournee(programme : ProgrammeLivraisons) : Tournee
+    +recalculerTournee(heureDepart, adresses, durees) : Tournee
     -calculerPlusCourtsChemins(adresses) : Chemin[][]
     -calculerOrdreDePassage(chemins) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
     ~plusCourtChemin(source : Noeud, cible : Noeud) : Chemin
+  }
+  class SauvegardeTournee <<record>> {
+    plan : Plan
+    fichierPlan : Path
+    programme : ProgrammeLivraisons
+    tournee : Tournee
+    +{static} sauvegarder(fichier, fichierPlan, programme, tournee)
+    +{static} restaurer(fichier) : SauvegardeTournee
   }
   class Noeud <<record>> {
     identifiant : long
@@ -90,6 +99,7 @@ package "controller" {
   class EtatProgrammeCharge
   class EtatTourneeCalculee
   class EtatCalculEnCours
+  class EtatRestauration
   class EtatAjoutCollecte
   class EtatAjoutLivraison
   interface Commande {
@@ -134,6 +144,9 @@ EtatPlanCharge ..|> Etat
 EtatProgrammeCharge ..|> Etat
 EtatTourneeCalculee --|> EtatProgrammeCharge
 EtatCalculEnCours ..|> Etat
+EtatRestauration ..|> Etat
+MainController ..> SauvegardeTournee
+SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
 ListeDeCommandes o--> "*" Commande

@@ -208,6 +208,39 @@ public final class Plan {
     }
 
     /**
+     * Recalcule les trajets et les heures pour un ordre imposé, sans TSP.
+     *
+     * @param heureDepart heure de départ
+     * @param adresses arrêts ordonnés, entrepôt au début et à la fin
+     * @param durees durées sur place en secondes
+     * @return tournée dans l'ordre fourni
+     * @throws IllegalArgumentException si l'ordre est invalide
+     * @throws IllegalStateException si la tournée est impossible
+     */
+    public Tournee recalculerTournee(LocalTime heureDepart,
+            List<Noeud> adresses, List<Integer> durees) {
+        int taille = adresses.size();
+        if (taille == 0 || taille != durees.size()
+                || !adresses.get(0).equals(adresses.get(taille - 1))
+                || durees.stream().anyMatch(duree -> duree < 0)
+                || durees.get(0) != 0 || durees.get(taille - 1) != 0) {
+            throw new IllegalArgumentException("Ordre des arrêts invalide.");
+        }
+        int nombre = Math.max(1, taille - 1);
+        List<Noeud> sommets = adresses.subList(0, nombre);
+        Chemin[][] chemins = new Chemin[nombre][nombre];
+        List<Integer> ordre = new ArrayList<>();
+        for (int rang = 0; rang < nombre; rang++) {
+            ordre.add(rang);
+            int suivant = (rang + 1) % nombre;
+            chemins[rang][suivant] = plusCourtChemin(sommets.get(rang),
+                    sommets.get(suivant));
+        }
+        return calculerHeuresDePassage(heureDepart, sommets,
+                durees.subList(0, nombre), chemins, ordre);
+    }
+
+    /**
      * Graphe des plus courts chemins : le plus court chemin entre chaque
      * couple d'adresses.
      */

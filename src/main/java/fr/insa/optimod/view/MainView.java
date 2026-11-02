@@ -26,7 +26,7 @@ import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
@@ -59,6 +59,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Label message = new Label();
 
     private final Button boutonCalculer = new Button("Calculer");
+    private final Button boutonSauvegarder = new Button("Sauvegarder");
+    private final Button boutonRestaurer = new Button("Restaurer");
 
     private final Button boutonAjouter = new Button("Ajouter une demande");
     private final Button boutonSupprimer = new Button("Supprimer la demande");
@@ -100,9 +102,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         setBottom(message);
         boutonAnnuler.setTooltip(new Tooltip("Ctrl+Z"));
         boutonRefaire.setTooltip(new Tooltip("Ctrl+Y"));
-        HBox barreOutils = new HBox(8, boutonImporterPlan, boutonImporterDemandes,
+        FlowPane barreOutils = new FlowPane(8, 8,
+                boutonImporterPlan, boutonImporterDemandes,
                 boutonCalculer, indicateurAttente, boutonAjouter,
-                boutonAnnuler, boutonRefaire, consigne);
+                boutonAnnuler, boutonRefaire, boutonSauvegarder,
+                boutonRestaurer, consigne);
         barreOutils.getStyleClass().add("tool-bar-box");
         listeTournee.setPrefWidth(LARGEUR_TOURNEE);
         listeTournee.setVisible(false);
@@ -164,6 +168,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void activerActions(Set<Action> actions) {
+        boutonSauvegarder.setDisable(!actions.contains(Action.SAUVEGARDER));
+        boutonRestaurer.setDisable(!actions.contains(Action.RESTAURER));
         boutonImporterPlan.setDisable(!actions.contains(Action.IMPORTER_PLAN));
         boutonImporterDemandes.setDisable(
                 !actions.contains(Action.IMPORTER_PROGRAMME));
@@ -227,7 +233,31 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         return choisirFichierXml("Importer un plan XML");
     }
 
+    @Override
+    public void definirActionSauvegarder(Runnable action) {
+        boutonSauvegarder.setOnAction(e -> action.run());
+    }
+
+    @Override
+    public void definirActionRestaurer(Runnable action) {
+        boutonRestaurer.setOnAction(e -> action.run());
+    }
+
+    @Override
+    public Optional<File> choisirFichierSauvegarde() {
+        return choisirFichierXml("Sauvegarder la tournée", true);
+    }
+
+    @Override
+    public Optional<File> choisirFichierRestauration() {
+        return choisirFichierXml("Restaurer une tournée");
+    }
+
     private Optional<File> choisirFichierXml(String titre) {
+        return choisirFichierXml(titre, false);
+    }
+
+    private Optional<File> choisirFichierXml(String titre, boolean sauvegarde) {
         FileChooser selecteur = new FileChooser();
         selecteur.setTitle(titre);
         selecteur.getExtensionFilters().add(
@@ -235,7 +265,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         if (dernierDossier != null && dernierDossier.isDirectory()) {
             selecteur.setInitialDirectory(dernierDossier);
         }
-        File fichier = selecteur.showOpenDialog(getScene().getWindow());
+        File fichier = sauvegarde
+                ? selecteur.showSaveDialog(getScene().getWindow())
+                : selecteur.showOpenDialog(getScene().getWindow());
         if (fichier != null) {
             dernierDossier = fichier.getParentFile();
         }

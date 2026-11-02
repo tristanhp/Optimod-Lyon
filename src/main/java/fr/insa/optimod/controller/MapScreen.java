@@ -31,7 +31,11 @@ public interface MapScreen {
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
-        REFAIRE
+        REFAIRE,
+        /** Sauvegarder la tournée calculée. */
+        SAUVEGARDER,
+        /** Restaurer une sauvegarde XML. */
+        RESTAURER
     }
 
     /** Définit l'action d'import des demandes. @param action action au clic */
@@ -164,4 +168,16 @@ public interface MapScreen {
      * @param detail explication de l'erreur
      */
     void afficherErreurCalcul(String detail);
+
+    /** @param action action de sauvegarde */
+    void definirActionSauvegarder(Runnable action);
+
+    /** @param action action de restauration */
+    void definirActionRestaurer(Runnable action);
+
+    /** @return destination XML, ou vide après annulation */
+    Optional<File> choisirFichierSauvegarde();
+
+    /** @return sauvegarde XML, ou vide après annulation */
+    Optional<File> choisirFichierRestauration();
 }

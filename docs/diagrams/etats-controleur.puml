@@ -3,13 +3,16 @@
 title États du contrôleur (design pattern State)
 hide empty description
 [*] --> EtatInitial
-EtatInitial : boutons : Plan
-EtatPlanCharge : boutons : Plan, Demandes
+EtatInitial : boutons : Plan, Restaurer
+EtatPlanCharge : boutons : Plan, Demandes, Restaurer
 EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
+EtatProgrammeCharge : Restaurer
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : (sous-classe)
+EtatTourneeCalculee : Sauvegarder
+EtatRestauration : boutons : aucun
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : idCollecte : long
@@ -39,6 +42,10 @@ EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]
 tous --> EtatInitial : importerPlan [plan invalide]
+tous --> EtatRestauration : restaurer [fichier choisi]
+EtatRestauration --> EtatTourneeCalculee : succès / vider historique
+EtatRestauration --> tous : erreur / retrouver état précédent
+EtatTourneeCalculee --> EtatTourneeCalculee : sauvegarder
 
 note bottom of tous
 Règles par défaut de l'interface Etat (EtatCalculEnCours et
