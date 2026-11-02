@@ -90,8 +90,8 @@ public class TSPTest {
         System.out.println("Duree TPS2 : " + Long.toString(tsp2.obtenirDureeCalcul()) + "ms");
         System.out.println("Duree TPS3 : " + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
         System.out.println("Duree TPS4 : " + Long.toString(tsp4.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS5 : " + Long.toString(tsp4.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS6 : " + Long.toString(tsp4.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS5 : " + Long.toString(tsp5.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS6 : " + Long.toString(tsp6.obtenirDureeCalcul()) + "ms");
         System.out.println("Solution TPS1 : " + Long.toString(tsp1.obtenirCoutSolution()));
         System.out.println("Solution TPS2 : " + Long.toString(tsp2.obtenirCoutSolution()));
         System.out.println("Solution TPS3 : " + Long.toString(tsp3.obtenirCoutSolution()));
@@ -114,9 +114,9 @@ public class TSPTest {
         System.out.print("Solution (TSP4) : ");
         for (int i = 0; i < nbSommets; ++i) {
             System.out.print(tsp4.obtenirSommetSolution(i) + " -> ");
-            // assertEquals(tsp1.obtenirSommetSolution(i), tsp2.obtenirSommetSolution(i));
-            // assertEquals(tsp2.obtenirSommetSolution(i), tsp3.obtenirSommetSolution(i));
-            // assertEquals(tsp3.obtenirSommetSolution(i), tsp4.obtenirSommetSolution(i));
+            assertEquals(tsp1.obtenirSommetSolution(i), tsp2.obtenirSommetSolution(i));
+            assertEquals(tsp2.obtenirSommetSolution(i), tsp3.obtenirSommetSolution(i));
+            assertEquals(tsp3.obtenirSommetSolution(i), tsp5.obtenirSommetSolution(i));
         }
         System.out.println("0");
 

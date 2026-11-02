@@ -13,6 +13,7 @@ public abstract class TemplateTSP implements TSP {
     private int tpsLimite;
     private long tpsDebut;
     private long tpsFin;
+    private boolean tpsLimiteAtteint = false;
 
     public ResultatCalculTSP chercherSolution(int tpsLimite, GrapheDepandance g, int coutLimite) {
         if (tpsLimite <= 0)
@@ -37,7 +38,7 @@ public abstract class TemplateTSP implements TSP {
         tpsFin = System.currentTimeMillis();
 
         // Si le temps limite est atteint, la solution peut etre non-optimal
-        if (tpsFin - tpsDebut >= tpsLimite) {
+        if (tpsLimiteAtteint) {
             if (coutMeilleureSolution == Integer.MAX_VALUE) {
                 return ResultatCalculTSP.CALCUL_TROP_LONG_SANS_RESULTAT;
             }
@@ -46,7 +47,7 @@ public abstract class TemplateTSP implements TSP {
         if (coutMeilleureSolution == Integer.MAX_VALUE) {
             return ResultatCalculTSP.PAS_DE_SOLUTION;
         }
-        if (coutMeilleureSolution > coutLimite) {
+        if (coutLimite != -1 && coutMeilleureSolution > coutLimite) {
             return ResultatCalculTSP.COUT_TROP_ELEVE;
         }
         // La solution est optimal
@@ -121,8 +122,10 @@ public abstract class TemplateTSP implements TSP {
      */
     private void branchAndBound(int sommetCrt, Collection<Integer> nonVus, Collection<Integer> accessible,
             Collection<Integer> vus, int coutVus) {
-        if (System.currentTimeMillis() - tpsDebut > tpsLimite)
+        if (System.currentTimeMillis() - tpsDebut > tpsLimite) {
+            tpsLimiteAtteint = true;
             return;
+        }
         if (nonVus.size() == 0) { // tous les sommets ont ete visites
             if (g.estArc(sommetCrt, 0)) { // on peut retourner au sommet de depart (0)
                 if (coutVus + g.obtenirCoutArc(sommetCrt, 0) < coutMeilleureSolution) { // on a trouve une solution
@@ -132,34 +135,37 @@ public abstract class TemplateTSP implements TSP {
                     coutMeilleureSolution = coutVus + g.obtenirCoutArc(sommetCrt, 0);
                 }
             }
-        } else if (coutVus + calculerBorneInferieure(sommetCrt, nonVus) < coutMeilleureSolution) {
-            // Si le cout limite est depasse, il est inutile de continuer les calculs
-            if (coutLimite != -1 && coutVus + calculerBorneInferieure(sommetCrt, nonVus) > coutLimite) {
-                return;
-            }
-
-            Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt, accessible, g);
-            while (it.hasNext()) {
-                Integer prochainSommet = it.next();
-
-                // On verifie qu'il n'y a pas d'arc qui se croise (hors depandance)
-                if (croisementArc(sommetCrt, prochainSommet, vus, g)) {
-                    continue;
+        } else {
+            int borneInferieur = calculerBorneInferieure(sommetCrt, nonVus);
+            if (coutVus + borneInferieur < coutMeilleureSolution) {
+                // Si le cout limite est depasse, il est inutile de continuer les calculs
+                if (coutLimite != -1 && coutVus + borneInferieur > coutLimite) {
+                    return;
                 }
 
-                vus.add(prochainSommet);
-                nonVus.remove(prochainSommet);
-                accessible.remove(prochainSommet);
-                if (g.obtenirSousDepandance(prochainSommet) != -1) {
-                    accessible.add(g.obtenirSousDepandance(prochainSommet));
-                }
-                branchAndBound(prochainSommet, nonVus, accessible, vus,
-                        coutVus + g.obtenirCoutArc(sommetCrt, prochainSommet));
-                vus.remove(prochainSommet);
-                nonVus.add(prochainSommet);
-                accessible.add(prochainSommet);
-                if (g.obtenirSousDepandance(prochainSommet) != -1) {
-                    accessible.remove(g.obtenirSousDepandance(prochainSommet));
+                Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt, accessible, g);
+                while (it.hasNext()) {
+                    Integer prochainSommet = it.next();
+
+                    // On verifie qu'il n'y a pas d'arc qui se croise (hors depandance)
+                    if (croisementArc(sommetCrt, prochainSommet, vus, g)) {
+                        continue;
+                    }
+
+                    vus.add(prochainSommet);
+                    nonVus.remove(prochainSommet);
+                    accessible.remove(prochainSommet);
+                    if (g.obtenirSousDepandance(prochainSommet) != -1) {
+                        accessible.add(g.obtenirSousDepandance(prochainSommet));
+                    }
+                    branchAndBound(prochainSommet, nonVus, accessible, vus,
+                            coutVus + g.obtenirCoutArc(sommetCrt, prochainSommet));
+                    vus.remove(prochainSommet);
+                    nonVus.add(prochainSommet);
+                    accessible.add(prochainSommet);
+                    if (g.obtenirSousDepandance(prochainSommet) != -1) {
+                        accessible.remove(g.obtenirSousDepandance(prochainSommet));
+                    }
                 }
             }
         }
