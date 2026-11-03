@@ -23,7 +23,7 @@ public interface MapScreen {
      * Saisie des durées en minutes et du livreur choisi.
      * @param dureeCollecte minutes de collecte saisies
      * @param dureeLivraison minutes de livraison saisies
-     * @param livreur numéro du livreur 
+     * @param livreur numéro du livreur
      */
     record SaisieDemande(String dureeCollecte, String dureeLivraison,
             int livreur) {
