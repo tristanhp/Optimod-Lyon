@@ -9,7 +9,9 @@ import fr.insa.optimod.model.Tournee;
 /**
  * Calcul de la tournée en cours : toutes les actions sont bloquées jusqu'au
  * résultat, pour que le plan et les demandes ne changent pas pendant le
- * calcul.
+ * calcul. Cet état sert aussi pendant le recalcul local qui suit la
+ * suppression d'une demande
+ * ({@link MainController#supprimerDemandeEnGardantLOrdre}).
  */
 final class EtatCalculEnCours implements Etat {
 

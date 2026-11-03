@@ -41,6 +41,11 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
  * ({@link #calculerTournee}) : plus courts chemins entre les adresses (A*),
  * meilleur ordre de passage avec la contrainte d'ordre (voyageur de commerce,
  * {@link TSP3}), puis heures de passage.
+ *
+ * <p>Le voyageur de commerce ne sert qu'au calcul complet. Quand l'utilisateur
+ * modifie une tournée, l'ordre des autres arrêts est gardé, seuls les trajets
+ * des jonctions créées sont recalculés et les heures sont refaites
+ * ({@link #calculerTourneeSansDemande}) : c'est le recalcul local.
  */
 public final class Plan {
 
@@ -332,6 +337,136 @@ public final class Plan {
     private static long secondesDeTrajet(double metres) {
         double metresParSeconde = VITESSE_KMH * 1000 / 3600;
         return Math.round(metres / metresParSeconde);
+    }
+
+    // --- Recalcul local d'une tournée (sans relancer le voyageur de commerce)
+
+    /**
+     * Retire une demande d'une tournée déjà calculée en <b>gardant l'ordre de
+     * passage de tous les autres arrêts</b> : les deux arrêts de la demande
+     * (collecte et livraison) disparaissent, puis les heures de passage sont
+     * recalculées. Le voyageur de commerce n'est pas relancé, et A* ne tourne
+     * que sur les jonctions créées par la suppression (une par arrêt retiré, au
+     * plus deux) ; les autres trajets sont repris de la tournée actuelle. La
+     * réponse est donc immédiate, même sur le grand plan.
+     *
+     * <p>Une tournée ne garde pas la demande de chaque arrêt : les deux arrêts
+     * sont retrouvés par leur nœud et leur durée sur place (la durée est
+     * l'écart entre l'heure d'arrivée et l'heure de départ). Si ce couple se
+     * retrouve sur plusieurs arrêts (deux demandes avec le même point de
+     * collecte et la même durée), on ne sait pas lequel retirer sans risquer
+     * de casser la contrainte d'ordre d'une autre demande : la méthode
+     * refuse.
+     *
+     * <p>Mêmes règles que {@link #calculerTournee} : {@value #VITESSE_KMH}
+     * km/h, départ à l'heure de départ de la tournée actuelle, retour à
+     * l'entrepôt avant {@link #HEURE_LIMITE_RETOUR}.
+     *
+     * @param tournee tournée actuelle, avec la demande à retirer
+     * @param demande demande à retirer
+     * @return la nouvelle tournée, sans les deux arrêts de la demande
+     * @throws IllegalArgumentException si un arrêt de la demande est
+     *         introuvable dans la tournée, ou ne peut pas être identifié sans
+     *         ambiguïté
+     * @throws IllegalStateException si une jonction est inaccessible ou si le
+     *         retour à l'entrepôt dépasse {@link #HEURE_LIMITE_RETOUR} ;
+     *         retirer des arrêts ne devrait jamais allonger une tournée
+     *         possible
+     */
+    public Tournee calculerTourneeSansDemande(Tournee tournee,
+            Demande demande) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        int rangCollecte = trouverRangArret(arrets, demande.collecte(),
+                demande.dureeCollecte());
+        int rangLivraison = trouverRangArret(arrets, demande.livraison(),
+                demande.dureeLivraison());
+        // Rangs, dans la tournée actuelle, des arrêts qui restent : tous sauf
+        // les deux de la demande (le départ et le retour restent toujours).
+        List<Integer> rangsGardes = new ArrayList<>();
+        for (int rang = 0; rang < arrets.size(); rang++) {
+            if (rang != rangCollecte && rang != rangLivraison) {
+                rangsGardes.add(rang);
+            }
+        }
+        return recalculerEnGardant(tournee, rangsGardes);
+    }
+
+    /**
+     * Tournée qui ne garde que certains arrêts de la tournée actuelle, dans le
+     * même ordre. Un trajet entre deux arrêts gardés qui se suivaient déjà est
+     * repris tel quel ; seuls les trajets entre deux arrêts gardés qui ne se
+     * suivaient pas (les jonctions créées) sont calculés par A*.
+     *
+     * @param tournee tournée actuelle
+     * @param rangsGardes rangs des arrêts gardés, dans l'ordre : le premier est
+     *        le départ de l'entrepôt, le dernier le retour à l'entrepôt
+     */
+    private Tournee recalculerEnGardant(Tournee tournee,
+            List<Integer> rangsGardes) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        // Le retour à l'entrepôt (dernier rang gardé) n'est pas un sommet :
+        // l'étape des heures de passage l'ajoute elle-même, comme dans
+        // calculerTournee. Il reste l'entrepôt (sommet 0) puis les arrêts
+        // gardés (sommets 1, 2, ...) dans leur ordre.
+        int nombre = rangsGardes.size() - 1;
+        List<Noeud> sommets = new ArrayList<>();
+        List<Integer> durees = new ArrayList<>();
+        List<Integer> ordre = new ArrayList<>();
+        for (int sommet = 0; sommet < nombre; sommet++) {
+            Tournee.Arret arret = arrets.get(rangsGardes.get(sommet));
+            sommets.add(arret.noeud());
+            durees.add(dureeSurPlace(arret));
+            ordre.add(sommet);
+        }
+        Chemin[][] chemins = new Chemin[nombre][nombre];
+        // Avec le seul entrepôt, la tournée se réduit au départ : aucun trajet.
+        for (int sommet = 0; sommet < nombre && nombre > 1; sommet++) {
+            int rang = rangsGardes.get(sommet);
+            int rangSuivant = rangsGardes.get(sommet + 1);
+            // Les deux arrêts se suivaient déjà : on reprend leur trajet. Sinon
+            // c'est une jonction créée par la suppression : A*.
+            Chemin chemin = rangSuivant == rang + 1
+                    ? tournee.chemins().get(rang)
+                    : plusCourtChemin(arrets.get(rang).noeud(),
+                            arrets.get(rangSuivant).noeud());
+            chemins[sommet][(sommet + 1) % nombre] = chemin;
+        }
+        // Le premier arrêt est l'entrepôt : il est « atteint » à l'heure de
+        // départ de la tournée.
+        return calculerHeuresDePassage(arrets.get(0).arrivee(), sommets,
+                durees, chemins, ordre);
+    }
+
+    /**
+     * Rang de l'unique arrêt qui a ce nœud et cette durée sur place. Le départ
+     * (rang 0) et le retour (dernier rang) sont l'entrepôt : on ne les cherche
+     * pas.
+     */
+    private static int trouverRangArret(List<Tournee.Arret> arrets,
+            Noeud noeud, int duree) {
+        int trouve = -1;
+        for (int rang = 1; rang < arrets.size() - 1; rang++) {
+            Tournee.Arret arret = arrets.get(rang);
+            if (arret.noeud().equals(noeud) && dureeSurPlace(arret) == duree) {
+                if (trouve != -1) {
+                    throw new IllegalArgumentException("Arrêt ambigu : le nœud "
+                            + noeud.identifiant() + " est visité plusieurs "
+                            + "fois avec la même durée sur place.");
+                }
+                trouve = rang;
+            }
+        }
+        if (trouve == -1) {
+            throw new IllegalArgumentException("Arrêt introuvable dans la "
+                    + "tournée : nœud " + noeud.identifiant() + ", durée sur "
+                    + "place " + duree + " s.");
+        }
+        return trouve;
+    }
+
+    /** Durée sur place d'un arrêt, en secondes : départ moins arrivée. */
+    private static int dureeSurPlace(Tournee.Arret arret) {
+        return (int) arret.arrivee().until(arret.depart(), ChronoUnit.SECONDS);
     }
 
     /**

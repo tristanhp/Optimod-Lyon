@@ -15,8 +15,12 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.Test;
 import org.xml.sax.SAXException;
@@ -321,5 +325,266 @@ public class PlanTest {
             }
         }
         throw new AssertionError("Nœud absent de la tournée : " + noeud);
+    }
+
+    // --- Recalcul local d'une tournée, sans relancer le TSP (TIG-101) ---
+
+    /** Adresses d'une tournée, dans l'ordre de passage (départ et retour). */
+    private static List<Noeud> adressesDe(Tournee tournee) {
+        List<Noeud> adresses = new ArrayList<>();
+        for (Tournee.Arret arret : tournee.arrets()) {
+            adresses.add(arret.noeud());
+        }
+        return adresses;
+    }
+
+    /** Durée sur place de chaque arrêt : départ moins arrivée, en secondes. */
+    private static List<Integer> dureesDe(Tournee tournee) {
+        List<Integer> durees = new ArrayList<>();
+        for (Tournee.Arret arret : tournee.arrets()) {
+            durees.add((int) arret.arrivee().until(arret.depart(),
+                    ChronoUnit.SECONDS));
+        }
+        return durees;
+    }
+
+    /** Lit un fichier de demandes fourni, pour un plan déjà lu. */
+    private ProgrammeLivraisons lireProgrammeFourni(Plan plan, String nom)
+            throws Exception {
+        try (InputStream xml = getClass().getResourceAsStream(
+                "/data/" + nom + ".xml")) {
+            return new ProgrammeLivraisons(xml, plan);
+        }
+    }
+
+    /**
+     * Tournée attendue pour un ordre de passage donné, calculée ici sans
+     * passer par le code testé : A* entre arrêts consécutifs
+     * ({@code plusCourtChemin}), trajets à 15 km/h arrondis à la seconde, durée
+     * sur place ajoutée à chaque arrêt. Sert aussi à fabriquer une tournée
+     * « actuelle » dans un ordre choisi, sans passer par le voyageur de
+     * commerce. La limite de 13 h n'est pas vérifiée.
+     */
+    private static Tournee tourneeDansLOrdre(Plan plan, LocalTime heureDepart,
+            List<Noeud> adresses, List<Integer> durees) {
+        List<Tournee.Arret> arrets = new ArrayList<>();
+        List<Chemin> chemins = new ArrayList<>();
+        LocalTime heure = heureDepart;
+        for (int rang = 0; rang < adresses.size(); rang++) {
+            if (rang > 0) {
+                Chemin chemin = plan.plusCourtChemin(adresses.get(rang - 1),
+                        adresses.get(rang));
+                chemins.add(chemin);
+                heure = heure.plusSeconds(Math.round(chemin.longueur()
+                        / (Plan.VITESSE_KMH * 1000 / 3600)));
+            }
+            LocalTime arrivee = heure;
+            heure = arrivee.plusSeconds(durees.get(rang));
+            arrets.add(new Tournee.Arret(adresses.get(rang), arrivee, heure));
+        }
+        return new Tournee(arrets, chemins);
+    }
+
+    /**
+     * Tournée du petit réseau dans l'ordre 1, 3 (collecte de la demande
+     * retirée), 2, 1 (livraison de la demande retirée), 3, 1, départ à l'heure
+     * donnée. Les durées sur place sont 0, 30, 60, 45, 120 et 0 s.
+     */
+    private static Tournee tourneeAvecUneDemandeASupprimer(Plan plan,
+            LocalTime heureDepart) {
+        List<Noeud> adresses = List.of(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                plan.obtenirNoeud(1), plan.obtenirNoeud(3),
+                plan.obtenirNoeud(1));
+        return tourneeDansLOrdre(plan, heureDepart, adresses,
+                List.of(0, 30, 60, 45, 120, 0));
+    }
+
+    /** Demande retirée par {@link #tourneeAvecUneDemandeASupprimer}. */
+    private static Demande demandeASupprimer(Plan plan) {
+        return new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(1), 30, 45);
+    }
+
+    /**
+     * L'ordre des autres arrêts est suivi même s'il est plus long que le
+     * meilleur : après la suppression, la tournée est 1, 2, 3, 1, qui passe par
+     * le détour 2 vers 1 vers 3 (400 m = 96 s) et revient par 449,6 m (108 s),
+     * alors que 1, 3, 2, 1 revient à 08:05:12. Heures calculées à la main à
+     * 15 km/h : 249,6 m = 59,9 s arrondi à 60 s.
+     */
+    @Test
+    public void ordreGardeRespecteMemeSiPlusLong() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee actuelle = tourneeAvecUneDemandeASupprimer(plan,
+                LocalTime.of(8, 0));
+        Tournee tournee = plan.calculerTourneeSansDemande(actuelle,
+                demandeASupprimer(plan));
+        assertEquals(4, tournee.arrets().size());
+        assertArret(tournee.arrets().get(0), 1, "08:00", "08:00");
+        assertArret(tournee.arrets().get(1), 2, "08:01", "08:02");
+        assertArret(tournee.arrets().get(2), 3, "08:03:36", "08:05:36");
+        assertArret(tournee.arrets().get(3), 1, "08:07:24", "08:07:24");
+        assertEquals(3, tournee.chemins().size());
+        verifierContigu(tournee.chemins().get(1), plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3));
+    }
+
+    /**
+     * Seuls les trajets des jonctions créées sont calculés par A* : ici 1 vers
+     * 2 et 2 vers 3 sont nouveaux, et le trajet 3 vers 1 (dernier) est repris
+     * tel quel de la tournée actuelle (même objet).
+     */
+    @Test
+    public void suppressionReprendLesTrajetsInchanges() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee actuelle = tourneeAvecUneDemandeASupprimer(plan,
+                LocalTime.of(8, 0));
+        Tournee tournee = plan.calculerTourneeSansDemande(actuelle,
+                demandeASupprimer(plan));
+        assertSame(actuelle.chemins().get(4), tournee.chemins().get(2));
+        assertEquals(plan.plusCourtChemin(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(2)), tournee.chemins().get(0));
+        assertEquals(plan.plusCourtChemin(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3)), tournee.chemins().get(1));
+    }
+
+    /**
+     * Le retour à l'entrepôt doit aussi avoir lieu avant 13 h après la
+     * suppression. La tournée qui reste dure 7 min 24 s : retour à 13:00:00
+     * accepté, une seconde plus tard refusé.
+     */
+    @Test
+    public void suppressionRetourApres13hRefuse() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande demande = demandeASupprimer(plan);
+        Tournee limite = tourneeAvecUneDemandeASupprimer(plan,
+                LocalTime.of(12, 52, 36));
+        assertEquals(LocalTime.of(13, 0), plan.calculerTourneeSansDemande(
+                limite, demande).obtenirHeureRetour());
+        Tournee trop = tourneeAvecUneDemandeASupprimer(plan,
+                LocalTime.of(12, 52, 37));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTourneeSansDemande(trop, demande));
+        assertTrue(erreur.getMessage().contains("13:00"));
+    }
+
+    /**
+     * Une jonction vers une adresse inaccessible rend la suppression
+     * impossible. La tournée actuelle est écrite à la main (le nœud 4 n'est pas
+     * atteignable) : 1, 3 (collecte), 4, 2 (livraison), 1. Une fois la demande
+     * retirée, il faudrait aller de 1 à 4.
+     */
+    @Test
+    public void suppressionVersUneAdresseInaccessibleRefusee()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        List<Noeud> noeuds = List.of(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), plan.obtenirNoeud(4),
+                plan.obtenirNoeud(2), plan.obtenirNoeud(1));
+        List<Tournee.Arret> arrets = new ArrayList<>();
+        for (Noeud noeud : noeuds) {
+            long duree = noeud.identifiant() == 3 ? 60
+                    : noeud.identifiant() == 2 ? 15 : 0;
+            arrets.add(new Tournee.Arret(noeud, LocalTime.of(8, 0),
+                    LocalTime.of(8, 0).plusSeconds(duree)));
+        }
+        Tournee actuelle = new Tournee(arrets,
+                Collections.nCopies(4, Chemin.INACCESSIBLE));
+        Demande demande = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 15);
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTourneeSansDemande(actuelle, demande));
+        assertTrue(erreur.getMessage().contains("inaccessible"));
+    }
+
+    /**
+     * Supprimer une demande retire ses deux arrêts et garde l'ordre de tous les
+     * autres ; la tournée est celle d'un calcul indépendant sur ce nouvel
+     * ordre, et le retour à l'entrepôt n'est jamais plus tard qu'avant. Au plus
+     * deux trajets sont nouveaux (une jonction par arrêt retiré) : tous les
+     * autres sont repris de la tournée actuelle (même objet).
+     */
+    @Test
+    public void suppressionGardeLOrdreDesAutresArrets() throws Exception {
+        Plan plan = lirePlanFourni("moyenPlan");
+        ProgrammeLivraisons programme = lireProgrammeFourni(plan,
+                "demandeMoyen5");
+        Tournee tournee = plan.calculerTournee(programme);
+        Set<Chemin> anciens = Collections.newSetFromMap(
+                new IdentityHashMap<>());
+        anciens.addAll(tournee.chemins());
+        for (Demande demande : programme.obtenirDemandes()) {
+            List<Noeud> adresses = adressesDe(tournee);
+            List<Integer> durees = dureesDe(tournee);
+            // Les deux arrêts de la demande, retrouvés par leur nœud : dans
+            // les fichiers fournis, aucun nœud n'est partagé entre demandes.
+            for (Noeud noeud : List.of(demande.livraison(),
+                    demande.collecte())) {
+                int rang = adresses.indexOf(noeud);
+                adresses.remove(rang);
+                durees.remove(rang);
+            }
+            Tournee sans = plan.calculerTourneeSansDemande(tournee, demande);
+            assertEquals(adresses, adressesDe(sans));
+            assertEquals(tournee.arrets().size() - 2, sans.arrets().size());
+            assertEquals(tourneeDansLOrdre(plan, programme.obtenirHeureDepart(),
+                    adresses, durees), sans);
+            assertFalse(sans.obtenirHeureRetour().isAfter(
+                    tournee.obtenirHeureRetour()));
+            long nouveaux = sans.chemins().stream()
+                    .filter(chemin -> !anciens.contains(chemin)).count();
+            assertTrue("trajets calculés : " + nouveaux, nouveaux <= 2);
+        }
+    }
+
+    /** Supprimer la seule demande laisse la tournée sans arrêt. */
+    @Test
+    public void suppressionDeLaDerniereDemandeLaisseLeDepart()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = programme(plan, LocalTime.of(8, 0), 3,
+                2);
+        Tournee sans = plan.calculerTourneeSansDemande(
+                plan.calculerTournee(programme),
+                programme.obtenirDemandes().get(0));
+        assertEquals(plan.calculerTournee(new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of())), sans);
+    }
+
+    /** Une demande dont les arrêts ne sont pas dans la tournée est refusée. */
+    @Test
+    public void suppressionDUneDemandeAbsenteRefusee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = plan.calculerTournee(
+                programme(plan, LocalTime.of(8, 0), 3, 2));
+        Demande autre = new Demande(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3), 60, 120);
+        IllegalArgumentException erreur = assertThrows(
+                IllegalArgumentException.class,
+                () -> plan.calculerTourneeSansDemande(tournee, autre));
+        assertTrue(erreur.getMessage().contains("introuvable"));
+    }
+
+    /**
+     * Si le même nœud avec la même durée sert deux fois (deux demandes ont le
+     * même point de collecte), on ne sait pas quel arrêt retirer : refusé, pour
+     * ne jamais casser la contrainte d'ordre d'une autre demande.
+     */
+    @Test
+    public void suppressionRefuseUnArretAmbigu() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande premiere = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 120);
+        Demande seconde = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(1), 60, 120);
+        Tournee tournee = plan.calculerTournee(new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0),
+                List.of(premiere, seconde)));
+        IllegalArgumentException erreur = assertThrows(
+                IllegalArgumentException.class,
+                () -> plan.calculerTourneeSansDemande(tournee, premiere));
+        assertTrue(erreur.getMessage().contains("plusieurs fois"));
     }
 }

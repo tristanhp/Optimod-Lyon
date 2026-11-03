@@ -185,12 +185,21 @@ public class MainControllerTest {
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
 
+    /** Actions permises juste après une suppression : on peut annuler. */
+    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION =
+            EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME,
+                    Action.CALCULER, Action.AJOUTER_DEMANDE,
+                    Action.SUPPRIMER_DEMANDE, Action.ANNULER);
+
     private EcranFactice ecran;
     private MainController controleur;
     private final Queue<Runnable> arrierePlan = new ArrayDeque<>();
     private Plan planRecu;
     private ProgrammeLivraisons lotRecu;
     private RuntimeException erreurDeCalcul;
+
+    /** Nombre de calculs complets (voyageur de commerce) lancés. */
+    private int nombreDeCalculs;
 
     @Before
     public void creer() {
@@ -250,6 +259,57 @@ public class MainControllerTest {
         while (!arrierePlan.isEmpty()) {
             arrierePlan.remove().run();
         }
+    }
+
+    /**
+     * Remplace le contrôleur par un contrôleur qui fait le vrai calcul de
+     * {@link Plan#calculerTournee}, sur le thread appelant, en comptant les
+     * calculs complets lancés (donc les passages par le voyageur de commerce).
+     */
+    private void utiliserLeVraiCalcul() {
+        controleur = new MainController(ecran, (plan, programme) -> {
+            nombreDeCalculs++;
+            return plan.calculerTournee(programme);
+        }, Runnable::run, Runnable::run);
+    }
+
+    /**
+     * Comme {@link #utiliserLeVraiCalcul}, mais les calculs sont mis dans la
+     * file {@code arrierePlan} : ils ne tournent que quand le test appelle
+     * {@link #executerArrierePlan}, comme sur le thread de calcul.
+     */
+    private void utiliserLeVraiCalculEnArrierePlan() {
+        controleur = new MainController(ecran, (plan, programme) -> {
+            nombreDeCalculs++;
+            return plan.calculerTournee(programme);
+        }, arrierePlan::add, Runnable::run);
+    }
+
+    /**
+     * Fichier de demandes dont deux demandes ont le même point de collecte et
+     * la même durée sur place : leurs arrêts ne se distinguent pas dans la
+     * tournée.
+     */
+    private File demandesAmbigues() throws Exception {
+        return ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<demandeDeLivraisons>"
+                + "<entrepot adresse=\"2835339774\" heureDepart=\"8:0:0\"/>"
+                + "<livraison adresseEnlevement=\"1679901320\" "
+                + "adresseLivraison=\"208769457\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"600\"/>"
+                + "<livraison adresseEnlevement=\"1679901320\" "
+                + "adresseLivraison=\"25336179\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"480\"/>"
+                + "</demandeDeLivraisons>");
+    }
+
+    /** Nœuds d'une tournée, dans l'ordre de passage. */
+    private static List<Noeud> noeudsDe(Tournee tournee) {
+        List<Noeud> noeuds = new ArrayList<>();
+        for (Tournee.Arret arret : tournee.arrets()) {
+            noeuds.add(arret.noeud());
+        }
+        return noeuds;
     }
 
     // --- État initial ---
@@ -525,6 +585,12 @@ public class MainControllerTest {
         assertEquals(2, demandes().size());
     }
 
+    /**
+     * La tournée factice ne contient pas les arrêts de la demande supprimée :
+     * le recalcul local est impossible, la tournée affichée est retirée,
+     * l'utilisateur en est informé par une consigne et Annuler la retrouve dans
+     * le cache.
+     */
     @Test
     public void modifierRetireLaTourneeEtAnnulerLaRetrouveDuCache()
             throws Exception {
@@ -534,14 +600,19 @@ public class MainControllerTest {
         ecran.evenements.clear();
 
         ecran.actionSupprimer.accept(1);
+        executerArrierePlan();
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertNull(ecran.tournee);
+        assertEquals(MainController.CONSIGNE_ORDRE_NON_GARDE, ecran.consigne);
+        assertNull(ecran.erreurCalcul);
 
         ecran.actionAnnuler.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertSame(TOURNEE, ecran.tournee);
+        assertEquals("", ecran.consigne);
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
-        assertEquals(List.of("effacer tournee", "tournee"), ecran.evenements);
+        assertEquals(List.of("attente:true", "attente:false",
+                "effacer tournee", "tournee"), ecran.evenements);
     }
 
     @Test
@@ -645,5 +716,210 @@ public class MainControllerTest {
         ecran.actionClicNoeud.accept(NOEUD_A);
         assertEquals(2, demandes().size());
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+    }
+
+    // --- Suppression d'une demande avec une tournée affichée (TIG-101) ---
+
+    /**
+     * Supprimer une demande quand la tournée est affichée met la tournée à
+     * jour tout de suite, sans relancer le voyageur de commerce, et garde
+     * l'ordre des autres arrêts.
+     */
+    @Test
+    public void supprimerAvecTourneeAfficheeNeRelancePasLeTsp()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee complete = ecran.tournee;
+        assertEquals(1, nombreDeCalculs);
+        assertEquals(6, complete.arrets().size());
+        Demande supprimee = demandes().get(0);
+        ecran.evenements.clear();
+
+        ecran.actionSupprimer.accept(0);
+
+        assertEquals("pas de nouveau calcul complet", 1, nombreDeCalculs);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(List.of("attente:true", "attente:false", "tournee"),
+                ecran.evenements);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        List<Noeud> attendus = noeudsDe(complete);
+        attendus.remove(supprimee.collecte());
+        attendus.remove(supprimee.livraison());
+        assertEquals(attendus, noeudsDe(ecran.tournee));
+        assertEquals(MODIFIABLE_APRES_SUPPRESSION, ecran.actions);
+    }
+
+    /**
+     * Annuler réaffiche la tournée complète et Rétablir la tournée recalculée,
+     * toutes deux depuis le cache : aucun calcul n'est relancé.
+     */
+    @Test
+    public void annulerEtRetablirApresSuppressionLocaleSansCalcul()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee complete = ecran.tournee;
+        ecran.actionSupprimer.accept(0);
+        Tournee reduite = ecran.tournee;
+
+        ecran.actionAnnuler.run();
+        assertSame(complete, ecran.tournee);
+        assertEquals(2, demandes().size());
+        ecran.actionRefaire.run();
+        assertSame(reduite, ecran.tournee);
+        assertEquals(1, demandes().size());
+        assertEquals(1, nombreDeCalculs);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Une position hors de la liste est ignorée, la tournée reste affichée. */
+    @Test
+    public void supprimerUnePositionInvalideAvecTourneeAfficheeEstIgnore()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee complete = ecran.tournee;
+        ecran.actionSupprimer.accept(-1);
+        ecran.actionSupprimer.accept(2);
+        assertEquals(2, demandes().size());
+        assertSame(complete, ecran.tournee);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * Si la tournée des demandes restantes a déjà été calculée par le voyageur
+     * de commerce, elle est réaffichée telle quelle : le recalcul local ne
+     * l'écrase pas.
+     */
+    @Test
+    public void tourneeDuTspDejaConnueNEstPasEcrasee() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionCalculer.run(); // calcul complet des demandes restantes
+        Tournee duTsp = ecran.tournee;
+        assertEquals(2, nombreDeCalculs);
+
+        ecran.actionAnnuler.run();
+        ecran.actionSupprimer.accept(0);
+
+        assertSame(duTsp, ecran.tournee);
+        assertEquals(2, nombreDeCalculs);
+    }
+
+    /**
+     * Le recalcul local tourne dans la file de calcul, pas sur le thread
+     * appelant : tant qu'elle n'est pas exécutée, l'attente est affichée, les
+     * actions sont bloquées et ni les demandes ni la tournée ne changent.
+     */
+    @Test
+    public void suppressionRecalculeHorsDuThreadDeLInterface()
+            throws Exception {
+        utiliserLeVraiCalculEnArrierePlan();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        Tournee complete = ecran.tournee;
+        ecran.evenements.clear();
+
+        ecran.actionSupprimer.accept(0);
+
+        assertEquals(1, arrierePlan.size());
+        assertTrue(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
+        assertTrue(ecran.actions.isEmpty());
+        assertEquals(2, demandes().size());
+        assertSame(complete, ecran.tournee);
+
+        executerArrierePlan();
+
+        assertFalse(ecran.attente);
+        assertEquals(1, demandes().size());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(complete.arrets().size() - 2,
+                ecran.tournee.arrets().size());
+        assertEquals(1, nombreDeCalculs);
+        assertEquals(MODIFIABLE_APRES_SUPPRESSION, ecran.actions);
+    }
+
+    /**
+     * Supprimer toutes les demandes une à une garde l'ordre à chaque fois (la
+     * tournée se réduit jusqu'au seul départ) sans nouveau calcul complet, et
+     * Annuler revient pas à pas aux tournées gardées en cache.
+     */
+    @Test
+    public void suppressionsSuccessivesGardentLOrdre() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee complete = ecran.tournee;
+        ecran.actionSupprimer.accept(0);
+        Tournee uneDemande = ecran.tournee;
+        assertEquals(4, uneDemande.arrets().size());
+        ecran.actionSupprimer.accept(0);
+        assertEquals(1, ecran.tournee.arrets().size());
+        assertTrue(demandes().isEmpty());
+        assertEquals(1, nombreDeCalculs);
+
+        ecran.actionAnnuler.run();
+        assertSame(uneDemande, ecran.tournee);
+        ecran.actionAnnuler.run();
+        assertSame(complete, ecran.tournee);
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * Quand deux demandes ont le même point de collecte et la même durée, on ne
+     * sait pas quel arrêt retirer : c'est le cas attendu du recalcul local
+     * impossible. La demande est supprimée, la tournée est retirée avec une
+     * consigne claire (pas de fenêtre d'erreur), et Annuler la retrouve.
+     */
+    @Test
+    public void suppressionAmbigueRetireLaTourneeAvecUneConsigne()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(demandesAmbigues());
+        ecran.actionCalculer.run();
+        Tournee complete = ecran.tournee;
+        assertNotNull(complete);
+
+        ecran.actionSupprimer.accept(0);
+
+        assertEquals(1, demandes().size());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertNull(ecran.tournee);
+        assertFalse(ecran.attente);
+        assertNull(ecran.erreurCalcul);
+        assertEquals(MainController.CONSIGNE_ORDRE_NON_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertSame(complete, ecran.tournee);
+        assertEquals("", ecran.consigne);
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * La consigne « ordre gardé » ne doit pas rester affichée une fois la
+     * tournée recalculée par le voyageur de commerce.
+     */
+    @Test
+    public void calculerEffaceLaConsigneDuRecalculLocal() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        ecran.actionSupprimer.accept(0);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionCalculer.run();
+
+        assertEquals("", ecran.consigne);
+        assertEquals(2, nombreDeCalculs);
     }
 }
