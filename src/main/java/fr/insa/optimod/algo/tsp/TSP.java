@@ -19,12 +19,8 @@ public interface TSP {
      * <code>tpsLimite</code> millisecondes
      * Attention : la solution calculee commence necessairement par le sommet 0
      *
-     * @param tpsLimite  (int) Le temps limite de la recherche de solution en ms
-     * @param g          (Graphe) Le graphe dans lequelle la solution est cherche
-     * @param coutLimite (int) Le cout limite de la solution a ne pas depasse. Si la
-     *                   solution depasse ce cout,
-     *                   <code> ResultatCalculTSP.COUT_TROP_ELEVE </code> est
-     *                   renvoye. -1 pour ne pas en definir
+     * @param tpsLimite (int) Le temps limite de la recherche de solution en ms
+     * @param g         (Graphe) Le graphe dans lequelle la solution est cherche
      */
     public ResultatCalculTSP chercherSolution(int tpsLimite, GrapheDepandance g);
 

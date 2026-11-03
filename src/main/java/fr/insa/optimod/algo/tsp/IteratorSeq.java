@@ -4,6 +4,11 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+/**
+ * Un iterator pour iterer sur une Collection d'Integer dans le cas d'un
+ * Graphe.java
+ * IteratorSeq
+ */
 public class IteratorSeq implements Iterator<Integer> {
 
     private Integer[] candidats;
@@ -15,9 +20,9 @@ public class IteratorSeq implements Iterator<Integer> {
      * successeurs de sommetCourant dans le graphe graphe,
      * dans l'odre d'apparition dans <code>sommetsNonVisites</code>
      *
-     * @param sommetsNonVisites
-     * @param sommetCourant
-     * @param graphe
+     * @param sommetsNonVisites la liste des sommets non visites du graphe
+     * @param sommetCourant     le sommet courant
+     * @param graphe            le graphe
      */
     public IteratorSeq(Collection<Integer> sommetsNonVisites, int sommetCourant, Graphe graphe) {
         this.candidats = new Integer[sommetsNonVisites.size()];
