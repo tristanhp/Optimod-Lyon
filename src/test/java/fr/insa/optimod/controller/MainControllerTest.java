@@ -1086,7 +1086,7 @@ public class MainControllerTest {
      * tournée), pour pouvoir le déplacer de plusieurs rangs de suite.
      */
     @Test
-    public void l_arretDeplaceResteSelectionne() throws Exception {
+    public void arretDeplaceResteSelectionne() throws Exception {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         ecran.evenements.clear();
         int rang = descendreUnArretPermis(avant);
