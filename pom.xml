@@ -262,6 +262,10 @@
                 <version>${javafx-maven-plugin.version}</version>
                 <configuration>
                     <mainClass>${gui.main.class}</mainClass>
+                    <!-- Les variantes natives de plusieurs systèmes portent
+                         le même nom de module : conserver tous leurs fichiers
+                         sur le classpath pour charger ceux du système hôte. -->
+                    <runtimePathOption>CLASSPATH</runtimePathOption>
                 </configuration>
             </plugin>
 

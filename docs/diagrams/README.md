@@ -16,6 +16,7 @@ machine).
 | Charger le plan | [sequence-chargement-plan.puml](sequence-chargement-plan.puml) | Séquence |
 | Charger le programme | [sequence-chargement-programme.puml](sequence-chargement-programme.puml) | Séquence |
 | Calculer la tournée | [sequence-calcul-tournee.puml](sequence-calcul-tournee.puml) | Séquence |
+| Ajouter après calcul | [sequence-ajout-demande.puml](sequence-ajout-demande.puml) | Saisie, insertion sans TSP, commande et erreurs |
 
 Règles : les diagrammes qui ne sont pas de séquence contiennent
 `!pragma layout smetana` (rendu identique partout, sans Graphviz) ; on met à
@@ -37,14 +38,20 @@ stateDiagram-v2
     EtatInitial --> EtatPlanCharge : importerPlan [valide]
     EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [valide]
     EtatProgrammeCharge --> EtatCalculEnCours : calculer
-    EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+    EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
     EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
     EtatTourneeCalculee --> EtatCalculEnCours : calculer
     EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
-    EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
+    EtatAjoutCollecte --> EtatAjoutLivraison : clic valide / aperçu collecte
+    EtatAjoutLivraison --> EtatAjoutLivraison : second clic / aperçu livraison
+    EtatAjoutCollecte --> EtatProgrammeCharge : annuler / effacer aperçu
+    EtatAjoutLivraison --> EtatProgrammeCharge : annuler / effacer aperçu
     EtatAjoutLivraison --> EtatProgrammeCharge : cliquerNoeud / CommandeAjouterDemande
-    EtatTourneeCalculee --> EtatProgrammeCharge : supprimerDemande [pas de tournée en cache]
-    EtatProgrammeCharge --> EtatTourneeCalculee : annuler [tournée en cache]
+    EtatAjoutLivraison --> EtatCalculEnCours : saisie valide et tournées calculées / insertion
+    EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande
+    EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / alerte, état conservé
+    EtatTourneeCalculee --> EtatProgrammeCharge : supprimerDemande (tournées retirées)
+    EtatProgrammeCharge --> EtatTourneeCalculee : annuler [tournées d'avant calculées]
 ```
 
 ## Observation du programme (Observer)
@@ -68,9 +75,10 @@ sequenceDiagram
 
 ## Annuler une modification (Command)
 
-Chaque modification est une `Commande` gardée dans `ListeDeCommandes` ; les
-tournées calculées restent en cache, indexées par la liste des demandes
-([ADR 0004](../adr/0004-design-pattern-command-annulation.md)).
+Chaque modification est une `Commande` gardée dans `ListeDeCommandes` ; elle
+garde les tournées d'avant et d'après, rangées dans le programme
+([ADR 0004](../adr/0004-design-pattern-command-annulation.md),
+[ADR 0006](../adr/0006-plusieurs-livreurs.md)).
 
 ```mermaid
 sequenceDiagram
@@ -81,10 +89,11 @@ sequenceDiagram
     participant V as MainView
     U->>C: Supprimer la demande
     C->>H: executer(CommandeSupprimerDemande)
-    H->>L: retirerDemande(position)
-    C->>V: effacerTournee() (pas de tournée en cache)
+    H->>L: effacerTournees() puis retirerDemande(position)
+    L->>V: mettreAJour(programme)
     U->>C: Ctrl+Z
     C->>H: annuler()
     H->>L: ajouterDemande(position, demande)
-    C->>V: afficherTournee(tournée en cache)
+    H->>L: definirTournees(tournées d'avant)
+    L->>V: mettreAJour(programme)
 ```

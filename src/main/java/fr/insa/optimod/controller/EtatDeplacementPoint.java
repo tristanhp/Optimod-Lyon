@@ -17,11 +17,18 @@ final class EtatDeplacementPoint implements Etat {
     static final String CONSIGNE = "Cliquez sur la nouvelle adresse du point "
             + "(« Déplacer » pour annuler).";
 
-    /** Rang, dans la tournée affichée, de l'arrêt à déplacer. */
+    /** Livreur de l'arrêt à déplacer. */
+    private final int livreur;
+
+    /** Rang, dans la tournée de ce livreur, de l'arrêt à déplacer. */
     private final int rang;
 
-    /** @param rang rang de l'arrêt à déplacer dans la tournée affichée */
-    EtatDeplacementPoint(int rang) {
+    /**
+     * @param livreur numéro du livreur de l'arrêt à déplacer
+     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     */
+    EtatDeplacementPoint(int livreur, int rang) {
+        this.livreur = livreur;
         this.rang = rang;
     }
 
@@ -34,13 +41,14 @@ final class EtatDeplacementPoint implements Etat {
     }
 
     @Override
-    public void deplacerPoint(MainController controleur, int rangSelectionne) {
+    public void deplacerPoint(MainController controleur, int livreurSelectionne,
+            int rangSelectionne) {
         controleur.retrouverEtatProgramme();
     }
 
     @Override
     public void cliquerNoeud(MainController controleur, long idNoeud) {
-        controleur.deplacerPoint(rang, idNoeud);
+        controleur.deplacerPoint(livreur, rang, idNoeud);
     }
 
     @Override

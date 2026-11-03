@@ -36,7 +36,7 @@ dire ce qui échoue.
 
 | Package | Contient | Peut dépendre de |
 | --- | --- | --- |
-| `model` | `Plan` (lecture du plan **et** calcul de la tournée), `ProgrammeLivraisons` (+ `Demande`), `Tournee` (+ `Arret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
+| `model` | `Plan` (lecture du plan **et** calcul des tournées), `ProgrammeLivraisons` (+ `Demande`, tournées des livreurs), `Tournee` (+ `Arret`, `TypeArret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
 | `algo.tsp` | Voyageur de commerce : `TemplateTSP`, `TSP3`, `GrapheDepandance` | JDK |
 | `controller` | `MainController`, `MapScreen`, états `Etat*`, commandes `Commande*`, `ListeDeCommandes` | `model` |
 | `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher` | `controller`, `model`, JavaFX |
@@ -49,10 +49,14 @@ Règles :
 - `controller` ne connaît la vue que par l'interface `MapScreen`. Toute
   nouvelle interaction avec l'écran = une méthode de `MapScreen`, implémentée
   dans `MainView` et dans les faux écrans des tests.
-- Le calcul de la tournée est `Plan.calculerTournee(programme)`. Ses étapes
-  (A*, graphe des plus courts chemins, TSP, heures de passage) sont des
-  méthodes **privées** de `Plan` : ne pas recréer de classes `AEtoile`,
-  `CalculHoraires`, `GrapheChemins` ou équivalentes.
+- Le calcul des tournées est `Plan.calculerTournees(programme)`, une tournée
+  par livreur (ADR 0006). Ses étapes (A*, graphe des plus courts chemins,
+  TSP, heures de passage) sont des méthodes **privées** de `Plan` : ne pas
+  recréer de classes `AEtoile`, `CalculHoraires`, `GrapheChemins` ou
+  équivalentes.
+- Les tournées sont une donnée du modèle, rangées dans `ProgrammeLivraisons`
+  et observées par la vue ; une commande qui modifie les demandes garde les
+  tournées d'avant et d'après (ADR 0006).
 - Le calcul long tourne hors du thread JavaFX ; le contrôleur reçoit le calcul
   (`BiFunction`) et deux `Executor` pour rester testable.
 - Lancer l'interface via `AppLauncher`, jamais `MainApp`.
@@ -83,29 +87,43 @@ et le responsable de chaque sous-issue se lisent dans Linear, pas ici.
 
 Pour brancher une nouvelle modification :
 
-1. **Calcul dans `Plan`** : une méthode publique qui vérifie les règles, puis
-   s'appuie sur le recalcul local existant (voir `calculerTourneeSansDemande`).
-   Pas de classe de calcul à part (voir *Architecture*).
-2. **Règles avant le recalcul** (contrainte d'ordre, faisabilité) : lever
-   `IllegalArgumentException` (demande refusée) ou `IllegalStateException`
-   (tournée impossible) avec un message lisible par l'utilisateur.
-3. **Une commande** : soit elle modifie les demandes (`CommandeAjouterDemande`,
-   `CommandeSupprimerDemande`), soit elle range une tournée dans le cache du
-   contrôleur. Le calcul se fait **avant** la commande ; annuler et rétablir
-   ne recalculent rien.
+1. **Calcul dans `Plan`** : une méthode publique, sur la tournée **d'un
+   livreur**, qui vérifie les règles, puis s'appuie sur le recalcul local
+   existant (voir `calculerTourneeSansDemande`, `calculerTourneeOrdreChange`).
+   Chaque `Arret` connaît sa demande et son type : on retrouve un arrêt par
+   `arret.demande()`, jamais par son nœud. Pas de classe de calcul à part (voir
+   *Architecture*).
+2. **Règles avant le recalcul** (contrainte d'ordre, arrêt qui ne peut pas
+   bouger) : lever `IllegalArgumentException` (demande refusée) ou
+   `IllegalStateException` (adresse inaccessible) avec un message lisible par
+   l'utilisateur. Un retour après 13 h n'est **pas** une exception : la méthode
+   renvoie la tournée, `Tournee.estPossible()` est faux ; c'est au contrôleur de
+   refuser, si la règle du ticket le demande.
+3. **Une commande** (`Commande`) : elle garde les tournées d'avant et d'après
+   (`Map<Integer, Tournee>`, une par livreur) et les range dans
+   `ProgrammeLivraisons` avec `definirTournees`, que la vue observe. Si elle
+   modifie les demandes (`CommandeAjouterDemande`,
+   `CommandeSupprimerDemande`), elle les change aussi. Le calcul se fait
+   **avant** la commande, et les tournées des autres livreurs sont reprises
+   telles quelles ; annuler et rétablir ne recalculent rien. Elle implémente
+   `memoriserTourneesAvant` et `memoriserTourneesApres`, pour qu'un « Calculer »
+   fait après coup ne soit pas écrasé.
 4. **Une action dans `Etat`** (méthode par défaut qui ignore l'action,
    redéfinie dans l'état qui la permet) et ses boutons dans `MapScreen`
-   (implémentés dans `MainView` et dans le faux écran des tests).
-5. **Un refus** s'affiche par l'écran et n'exécute pas la commande : la tournée
-   et l'historique restent intacts.
+   (implémentés dans `MainView` et dans le faux écran des tests). Une action
+   sur un arrêt porte le **livreur** et le rang dans sa tournée.
+5. **Un refus** s'affiche par l'écran et n'exécute pas la commande : les
+   tournées et l'historique restent intacts.
 6. **Un calcul long** tourne hors du thread JavaFX (voir *Architecture*).
-7. Tests d'abord ; README et diagrammes dans la même PR.
+7. **La consigne** « ordre non optimisé » s'affiche après une modification qui
+   garde un ordre (suppression, changement d'ordre) ; elle nomme le livreur
+   s'il y en a plusieurs.
+8. Tests d'abord ; README et diagrammes dans la même PR.
 
-Aujourd'hui l'application gère une seule tournée (un livreur), gardée dans le
-cache du contrôleur. Quand TIG-95 (plusieurs livreurs) publiera son contrat
-(tournées dans le modèle, `Arret` qui connaît sa demande), cette section, le
-cache et l'[ADR 0004](docs/adr/0004-design-pattern-command-annulation.md)
-seront à adapter, avec un nouvel ADR.
+Les tournées sont une donnée du modèle (une par livreur) ; il n'y a plus de
+cache dans le contrôleur ([ADR 0006](docs/adr/0006-plusieurs-livreurs.md)). Le
+voyageur de commerce n'est lancé que par « Calculer » ; `Plan` y garde en
+mémoire l'ordre déjà trouvé, ce que ne consulte jamais une modification.
 
 ## Glossaire : nommer avec les mots du projet
 
@@ -150,7 +168,9 @@ correspondance dans le code. Règles :
   `config/checkstyle.xml`). Suivre le style du code autour.
 - Lecture XML : passer par `Plan.creerLecteurXml()` (DOCTYPE interdit). Une
   erreur de fichier devient une `SAXException` au message lisible par
-  l'utilisateur ; une tournée impossible, une `IllegalStateException`.
+  l'utilisateur ; une adresse inaccessible ou un calcul sans solution, une
+  `IllegalStateException` ; un retour après 13 h, une tournée renvoyée avec
+  `Tournee.estPossible()` faux.
 - `docs/code-fourni/` est en lecture seule. `algo/tsp` ne sera nettoyé (garder
   seulement `TSP3`) qu'à la fin du projet : ne pas le faire sans demande.
 
@@ -159,7 +179,7 @@ correspondance dans le code. Règles :
 - JUnit 4 ; `Foo` est testé par `FooTest`, dans le même package sous
   `src/test/java` (ADR 0001). Pas de suite de tests.
 - Méthodes de test aux noms descriptifs en français
-  (`retourApres13hRefuse()`), avec une ligne de Javadoc.
+  (`retourApres13hSignale()`), avec une ligne de Javadoc.
 - Tests d'abord pour tout calcul (exigence du cours).
 - Données : fichiers fournis via `getResourceAsStream("/data/...")` ; petits
   XML écrits dans le test (voir `PlansPourTests`).
