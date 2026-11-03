@@ -449,20 +449,22 @@ public final class Plan {
                 rangsGardes.add(rang);
             }
         }
-        return recalculerEnGardant(tournee, rangsGardes);
+        return recalculerDansLOrdre(tournee, rangsGardes);
     }
 
     /**
-     * Tournée qui ne garde que certains arrêts de la tournée actuelle, dans le
-     * même ordre. Un trajet entre deux arrêts gardés qui se suivaient déjà est
-     * repris tel quel ; seuls les trajets entre deux arrêts gardés qui ne se
-     * suivaient pas (les jonctions créées) sont calculés par A*.
+     * Tournée qui visite des arrêts de la tournée actuelle dans un ordre donné
+     * (arrêts retirés, ou arrêts échangés). Un trajet entre deux arrêts qui se
+     * suivaient déjà dans la tournée actuelle, dans le même sens, est repris
+     * tel quel ; seuls les trajets des jonctions créées par le changement sont
+     * calculés par A*.
      *
      * @param tournee tournée actuelle
-     * @param rangsGardes rangs des arrêts gardés, dans l'ordre : le premier est
-     *        le départ de l'entrepôt, le dernier le retour à l'entrepôt
+     * @param rangsGardes rangs dans la tournée actuelle des arrêts de la
+     *        nouvelle tournée, dans leur nouvel ordre : le premier est le
+     *        départ de l'entrepôt, le dernier le retour à l'entrepôt
      */
-    private Tournee recalculerEnGardant(Tournee tournee,
+    private Tournee recalculerDansLOrdre(Tournee tournee,
             List<Integer> rangsGardes) {
         List<Tournee.Arret> arrets = tournee.arrets();
         // Le retour à l'entrepôt (dernier rang gardé) n'est pas un sommet :
@@ -495,6 +497,78 @@ public final class Plan {
         // départ de la tournée.
         return calculerHeuresDePassage(arrets.get(0).arrivee(), sommets,
                 chemins, ordre);
+    }
+
+    /**
+     * Change l'ordre de passage d'une tournée déjà calculée en <b>échangeant un
+     * arrêt avec son voisin</b> (« Monter » ou « Descendre ») : tous les autres
+     * arrêts gardent leur ordre. Le voyageur de commerce n'est pas relancé, et
+     * A* ne tourne que sur les trois trajets autour des deux arrêts échangés ;
+     * les autres trajets sont repris de la tournée actuelle, puis les heures
+     * sont recalculées.
+     *
+     * <p>La contrainte d'ordre est vérifiée <b>avant</b> le recalcul. Échanger
+     * deux arrêts voisins ne change que leur ordre mutuel : l'échange n'est
+     * donc interdit que si ces deux arrêts sont le point de collecte (en
+     * premier) et le point de livraison (en second) d'une même demande, que
+     * chaque arrêt connaît. Avec deux demandes identiques, l'échange est aussi
+     * refusé : c'est prudent, sans ambiguïté sur les arrêts.
+     *
+     * <p>Comme le calcul complet, la méthode renvoie la tournée même si elle
+     * finit après {@link #HEURE_LIMITE_RETOUR} : c'est à l'appelant de la
+     * refuser avec {@link Tournee#estPossible()}.
+     *
+     * @param tournee tournée actuelle d'un livreur
+     * @param rang rang de l'arrêt à déplacer dans la tournée (0 est le départ
+     *        de l'entrepôt, le dernier rang le retour à l'entrepôt)
+     * @param decalage {@code -1} pour monter l'arrêt (le faire passer plus
+     *        tôt), {@code 1} pour le descendre (plus tard)
+     * @return la nouvelle tournée, avec ses heures de passage
+     * @throws IllegalArgumentException si l'arrêt est l'entrepôt, s'il n'a pas
+     *         de voisin dans ce sens, ou si l'échange ferait passer un point de
+     *         livraison avant son point de collecte
+     * @throws IllegalStateException si une jonction est inaccessible
+     */
+    public Tournee calculerTourneeOrdreChange(Tournee tournee, int rang,
+            int decalage) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        int dernier = arrets.size() - 1; // retour à l'entrepôt
+        if (rang < 1 || rang >= dernier) {
+            throw new IllegalArgumentException("Le départ et le retour à "
+                    + "l'entrepôt ne peuvent pas être déplacés : choisissez "
+                    + "un arrêt.");
+        }
+        int voisin = rang + decalage;
+        if (voisin < 1) {
+            throw new IllegalArgumentException("Cet arrêt est déjà le premier "
+                    + "de la tournée.");
+        }
+        if (voisin >= dernier) {
+            throw new IllegalArgumentException("Cet arrêt est déjà le dernier "
+                    + "de la tournée.");
+        }
+        // Les deux arrêts échangés, dans leur ordre actuel.
+        Tournee.Arret premier = arrets.get(Math.min(rang, voisin));
+        Tournee.Arret second = arrets.get(Math.max(rang, voisin));
+        if (premier.type() == TypeArret.COLLECTE
+                && second.type() == TypeArret.LIVRAISON
+                && premier.demande().equals(second.demande())) {
+            Demande demande = premier.demande();
+            throw new IllegalArgumentException("Contrainte d'ordre non "
+                    + "respectée : le point de collecte (nœud "
+                    + demande.collecte().identifiant() + ") doit être "
+                    + "visité avant son point de livraison (nœud "
+                    + demande.livraison().identifiant() + ").");
+        }
+        // Nouvel ordre : les rangs de la tournée actuelle, avec les deux rangs
+        // échangés. Seuls les trois trajets autour des deux arrêts échangés
+        // sont nouveaux ; tous les autres sont repris de la tournée actuelle.
+        List<Integer> rangs = new ArrayList<>();
+        for (int i = 0; i < arrets.size(); i++) {
+            rangs.add(i);
+        }
+        Collections.swap(rangs, rang, voisin);
+        return recalculerDansLOrdre(tournee, rangs);
     }
 
     /**

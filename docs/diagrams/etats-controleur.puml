@@ -9,7 +9,7 @@ EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
-EtatTourneeCalculee : (sous-classe)
+EtatTourneeCalculee : + Monter, Descendre (sous-classe)
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
 EtatAjoutLivraison : idCollecte : long
@@ -28,6 +28,9 @@ EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> choix : annuler / refaire
 EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
 EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
+EtatTourneeCalculee --> EtatCalculEnCours : changerOrdre (livreur, rang)
+EtatCalculEnCours --> choix : fin du changement d'ordre / CommandeChangerOrdre
+EtatCalculEnCours --> EtatTourneeCalculee : fin du changement d'ordre [refusé]
 choix --> EtatTourneeCalculee : [tournées rangées dans le programme]
 choix --> EtatProgrammeCharge : [sinon]
 

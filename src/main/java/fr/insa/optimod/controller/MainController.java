@@ -47,19 +47,21 @@ public final class MainController {
             Logger.getLogger(MainController.class.getName());
 
     /**
-     * Consigne affichée quand la tournée vient d'un recalcul local et qu'il n'y
-     * a qu'un livreur. Elle ne conseille pas « Calculer », qui remplacerait
-     * aussi les ordres choisis à la main.
+     * Consigne affichée quand la tournée ne vient pas du voyageur de commerce
+     * (recalcul local après une suppression, ou ordre changé à la main) et
+     * qu'il n'y a qu'un livreur. Elle ne conseille pas « Calculer », qui
+     * remplacerait aussi les ordres choisis à la main.
      */
-    static final String CONSIGNE_ORDRE_GARDE = "Ordre des autres arrêts "
-            + "gardé : il n'est peut-être plus le plus court.";
+    static final String CONSIGNE_ORDRE_GARDE = "Ordre non optimisé : il "
+            + "n'est peut-être plus le plus court.";
 
     /**
      * Même consigne avec plusieurs livreurs : {@code %d} est le livreur dont la
-     * tournée vient d'être recalculée, les autres tournées ne changent pas.
+     * tournée vient d'être recalculée ou modifiée, les autres tournées ne
+     * changent pas.
      */
-    static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre des "
-            + "autres arrêts gardé, il n'est peut-être plus le plus court.";
+    static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre non "
+            + "optimisé, il n'est peut-être plus le plus court.";
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
@@ -137,6 +139,10 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
+        ecran.definirActionMonterArret((livreur, rang) ->
+                etat.changerOrdre(this, livreur, rang, -1));
+        ecran.definirActionDescendreArret((livreur, rang) ->
+                etat.changerOrdre(this, livreur, rang, 1));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
@@ -378,12 +384,23 @@ public final class MainController {
         }
         executer(suppression);
         if (locale != null) {
-            ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
-                    ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
-                    : CONSIGNE_ORDRE_GARDE);
+            afficherConsigneOrdreNonOptimise(livreur);
         } else {
             signalerEchecRecalculLocal(echec);
         }
+    }
+
+    /**
+     * Prévient que la tournée d'un livreur ne vient plus du voyageur de
+     * commerce (recalcul local ou ordre changé à la main). Le livreur n'est
+     * nommé que s'il y en a plusieurs.
+     *
+     * @param livreur numéro du livreur dont la tournée a changé
+     */
+    private void afficherConsigneOrdreNonOptimise(int livreur) {
+        ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
+                ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
+                : CONSIGNE_ORDRE_GARDE);
     }
 
     /**
@@ -403,6 +420,103 @@ public final class MainController {
         } else {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue du recalcul local",
                     echec);
+            ecran.afficherErreurCalcul(echec.getMessage() != null
+                    ? echec.getMessage() : echec.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Change l'ordre d'un arrêt de la tournée d'un livreur (« Monter » ou
+     * « Descendre ») par une commande annulable. Comme pour la suppression
+     * d'une demande, le nouvel ordre est calculé localement
+     * ({@link Plan#calculerTourneeOrdreChange}) hors du thread de l'interface,
+     * avec l'attente affichée et toutes les actions bloquées
+     * ({@link EtatCalculEnCours}). Le résultat est traité sur le thread de
+     * l'interface ({@link #finirChangementOrdre}). Les tournées des autres
+     * livreurs ne changent pas.
+     *
+     * @param livreur numéro du livreur de l'arrêt sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    void changerOrdreTournee(int livreur, int rang, int decalage) {
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee apres = planCalcule.calculerTourneeOrdreChange(
+                        avant.get(livreur), rang, decalage);
+                interfaceUtilisateur.execute(() -> finirChangementOrdre(
+                        livreur, avant, apres, rang + decalage, null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirChangementOrdre(
+                        livreur, avant, null, rang + decalage, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du changement d'ordre, sur le thread de l'interface. S'il est refusé
+     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou retour à
+     * l'entrepôt rendu impossible après 13 h), l'écran affiche la raison et
+     * rien n'est modifié, pas même l'historique. Sinon la commande range, à la
+     * place des tournées d'avant, les mêmes avec la nouvelle tournée du
+     * livreur, et l'arrêt déplacé reste sélectionné.
+     *
+     * <p>Un changement qui ne fait que garder une tournée déjà en retard est
+     * accepté : seul un changement qui rend possible une tournée impossible est
+     * refusé.
+     *
+     * @param livreur numéro du livreur de la tournée
+     * @param avant tournées d'avant le changement
+     * @param apres tournée du livreur avec le nouvel ordre, ou {@code null} en
+     *        cas de refus
+     * @param nouveauRang rang de l'arrêt déplacé dans la nouvelle tournée
+     * @param echec cause du refus, ou {@code null}
+     */
+    private void finirChangementOrdre(int livreur,
+            Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
+            RuntimeException echec) {
+        ecran.afficherAttente(false);
+        RuntimeException refus = echec;
+        if (refus == null && !apres.estPossible()
+                && avant.get(livreur).estPossible()) {
+            refus = new IllegalStateException("Changement d'ordre refusé : le "
+                    + "retour à l'entrepôt serait à "
+                    + apres.obtenirHeureRetour() + ", après "
+                    + Plan.HEURE_LIMITE_RETOUR + ".");
+        }
+        if (refus != null) {
+            changerEtat(new EtatTourneeCalculee());
+            signalerRefusOrdre(refus);
+            return;
+        }
+        Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+        tournees.put(livreur, apres);
+        executer(new CommandeChangerOrdre(programme, avant,
+                Collections.unmodifiableMap(tournees)));
+        afficherConsigneOrdreNonOptimise(livreur);
+        // executer réaffiche les tournées, ce qui efface la sélection de la
+        // liste : on la remet sur l'arrêt déplacé pour pouvoir le redéplacer.
+        ecran.selectionnerArretTournee(livreur, nouveauRang);
+    }
+
+    /**
+     * Distingue les refus du changement d'ordre : une raison attendue
+     * (contrainte d'ordre, entrepôt, premier ou dernier arrêt, retour après
+     * 13 h) est expliquée à l'utilisateur ; une erreur inattendue est signalée
+     * et journalisée, au lieu de laisser les actions bloquées.
+     */
+    private void signalerRefusOrdre(RuntimeException echec) {
+        if (echec instanceof IllegalArgumentException
+                || echec instanceof IllegalStateException) {
+            ecran.afficherRefusOrdre(echec.getMessage());
+        } else {
+            JOURNAL.log(Level.SEVERE, "Erreur inattendue du changement "
+                    + "d'ordre", echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
                     ? echec.getMessage() : echec.getClass().getSimpleName());
         }

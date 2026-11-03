@@ -33,7 +33,8 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
 | Plusieurs livreurs : une tournée par livreur (modèle et calcul) | fait |
-| Régler le nombre de livreurs, déplacer un point, changer l'ordre des arrêts | à faire |
+| Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
+| Régler le nombre de livreurs, déplacer un point | à faire |
 | Sauvegarder et restaurer les tournées | à faire |
 
 ## Installer le projet
@@ -115,8 +116,17 @@ de même taille.
      cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
      mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls
      les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s).
-     Une consigne rappelle que cet ordre n'est pas optimisé : *Calculer* en
-     cherche un meilleur ;
+     Une consigne prévient que cet ordre n'est peut-être plus le plus court
+     (elle nomme le livreur s'il y en a plusieurs) ;
+   - *Monter* / *Descendre* : sélectionner un arrêt dans la liste de la
+     tournée (à droite), puis cliquer sur le bouton sous la liste. L'arrêt
+     échange sa place avec son voisin et les heures de passage sont recalculées
+     tout de suite ; seule la tournée de son livreur change. L'arrêt reste
+     sélectionné, on peut donc le déplacer de plusieurs rangs en recliquant.
+     L'entrepôt (départ et retour) ne se déplace pas. Si le point de livraison
+     d'une demande passerait avant son point de collecte (contrainte d'ordre),
+     ou si le changement ferait dépasser 13 h à une tournée qui rentrait à
+     l'heure, une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -208,7 +218,8 @@ tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres
 arrêts est gardé, les trajets des jonctions créées (A*) sont les seuls
 recalculés, les autres trajets sont repris de la tournée actuelle, et les
 heures de passage sont refaites. La suppression d'une demande passe par
-`Plan.calculerTourneeSansDemande`. « Recalcul local » est un terme technique,
+`Plan.calculerTourneeSansDemande` et le changement d'ordre d'un arrêt par
+`Plan.calculerTourneeOrdreChange`. « Recalcul local » est un terme technique,
 pas du vocabulaire métier.
 
 ## Structure du dépôt

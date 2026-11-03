@@ -3,6 +3,7 @@ package fr.insa.optimod.controller;
 import java.io.File;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -27,6 +28,8 @@ public interface MapScreen {
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */
         SUPPRIMER_DEMANDE,
+        /** Boutons « Monter » et « Descendre » (arrêt sélectionné). */
+        CHANGER_ORDRE,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -112,6 +115,26 @@ public interface MapScreen {
     void definirActionSupprimerDemande(IntConsumer action);
 
     /**
+     * Définit l'action du bouton « Monter » (faire passer plus tôt l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionMonterArret(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Descendre » (faire passer plus tard l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionDescendreArret(BiConsumer<Integer, Integer> action);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter
@@ -146,6 +169,26 @@ public interface MapScreen {
      * @param waiting {@code true} tant que le calcul est en cours
      */
     void afficherAttente(boolean waiting);
+
+    /**
+     * Sélectionne un arrêt dans la liste des tournées. Après un changement
+     * d'ordre, la liste est refaite (la vue observe le programme) et la
+     * sélection perdue : le contrôleur resélectionne l'arrêt déplacé, à sa
+     * nouvelle place.
+     *
+     * @param livreur numéro du livreur de la tournée
+     * @param rang rang de l'arrêt dans sa tournée (0 est le départ de
+     *        l'entrepôt)
+     */
+    void selectionnerArretTournee(int livreur, int rang);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement d'ordre est refusé ; les
+     * tournées affichées n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusOrdre(String detail);
 
     /**
      * Signale que le calcul a échoué.

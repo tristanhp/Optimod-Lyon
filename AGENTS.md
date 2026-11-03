@@ -76,6 +76,55 @@ Règles :
   `MainController.executer(...)`, pour qu'Annuler et Rétablir marchent. Ne
   jamais modifier le modèle directement depuis un état ou la vue.
 
+## Modifier une tournée déjà calculée (cas 4)
+
+Règle du 26/10 : après le calcul, le voyageur de commerce n'est plus relancé.
+Toute modification du programme de livraisons garde l'ordre des autres arrêts
+et recalcule seulement les trajets touchés (A*) puis les heures de passage
+(*recalcul local*, voir le [README](README.md#architecture)). Chaque
+modification est une `Commande` annulable. Le ticket parent est TIG-42 : l'état
+et le responsable de chaque sous-issue se lisent dans Linear, pas ici.
+
+Pour brancher une nouvelle modification :
+
+1. **Calcul dans `Plan`** : une méthode publique, sur la tournée **d'un
+   livreur**, qui vérifie les règles, puis s'appuie sur le recalcul local
+   existant (voir `calculerTourneeSansDemande`, `calculerTourneeOrdreChange`).
+   Chaque `Arret` connaît sa demande et son type : on retrouve un arrêt par
+   `arret.demande()`, jamais par son nœud. Pas de classe de calcul à part (voir
+   *Architecture*).
+2. **Règles avant le recalcul** (contrainte d'ordre, arrêt qui ne peut pas
+   bouger) : lever `IllegalArgumentException` (demande refusée) ou
+   `IllegalStateException` (adresse inaccessible) avec un message lisible par
+   l'utilisateur. Un retour après 13 h n'est **pas** une exception : la méthode
+   renvoie la tournée, `Tournee.estPossible()` est faux ; c'est au contrôleur de
+   refuser, si la règle du ticket le demande.
+3. **Une commande** (`Commande`) : elle garde les tournées d'avant et d'après
+   (`Map<Integer, Tournee>`, une par livreur) et les range dans
+   `ProgrammeLivraisons` avec `definirTournees`, que la vue observe. Si elle
+   modifie les demandes (`CommandeAjouterDemande`,
+   `CommandeSupprimerDemande`), elle les change aussi. Le calcul se fait
+   **avant** la commande, et les tournées des autres livreurs sont reprises
+   telles quelles ; annuler et rétablir ne recalculent rien. Elle implémente
+   `memoriserTourneesAvant` et `memoriserTourneesApres`, pour qu'un « Calculer »
+   fait après coup ne soit pas écrasé.
+4. **Une action dans `Etat`** (méthode par défaut qui ignore l'action,
+   redéfinie dans l'état qui la permet) et ses boutons dans `MapScreen`
+   (implémentés dans `MainView` et dans le faux écran des tests). Une action
+   sur un arrêt porte le **livreur** et le rang dans sa tournée.
+5. **Un refus** s'affiche par l'écran et n'exécute pas la commande : les
+   tournées et l'historique restent intacts.
+6. **Un calcul long** tourne hors du thread JavaFX (voir *Architecture*).
+7. **La consigne** « ordre non optimisé » s'affiche après une modification qui
+   garde un ordre (suppression, changement d'ordre) ; elle nomme le livreur
+   s'il y en a plusieurs.
+8. Tests d'abord ; README et diagrammes dans la même PR.
+
+Les tournées sont une donnée du modèle (une par livreur) ; il n'y a plus de
+cache dans le contrôleur ([ADR 0006](docs/adr/0006-plusieurs-livreurs.md)). Le
+voyageur de commerce n'est lancé que par « Calculer » ; `Plan` y garde en
+mémoire l'ordre déjà trouvé, ce que ne consulte jamais une modification.
+
 ## Glossaire : nommer avec les mots du projet
 
 Le vocabulaire est fixé par le document Linear *AGILE Glossaire du projet*,

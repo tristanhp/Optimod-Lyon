@@ -70,6 +70,17 @@ avant le code et relu dans la PR.
    de l'interface. Ce n'est pas un cache d'affichage : la vue lit toujours les
    tournées du programme.
 
+10. **Changer l'ordre des arrêts (TIG-44)** : « Monter » et « Descendre »
+    échangent un arrêt avec son voisin dans la tournée **d'un livreur**. La vue
+    transmet le livreur et le rang de la ligne sélectionnée ; `MapScreen`
+    reçoit donc les deux, et resélectionne l'arrêt déplacé par (livreur, rang).
+    `Plan.calculerTourneeOrdreChange` vérifie la contrainte d'ordre sur les
+    arrêts eux-mêmes (une collecte suivie de la livraison de la même demande),
+    sans chercher les arrêts par leur nœud. `CommandeChangerOrdre` garde les
+    tournées d'avant et d'après, comme les autres commandes. Le contrôleur
+    refuse un changement qui rend impossible une tournée possible (retour
+    après 13 h) ; il accepte de changer l'ordre d'une tournée déjà en retard.
+
 ## Alternatives envisagées
 
 - **Un nouvel objet observable pour les tournées** : sépare demandes et

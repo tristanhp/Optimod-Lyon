@@ -82,6 +82,20 @@ interface Etat {
     }
 
     /**
+     * Clic sur « Monter » ou « Descendre » : change l'ordre d'un arrêt de la
+     * tournée d'un livreur. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param livreur numéro du livreur de l'arrêt sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    default void changerOrdre(MainController controleur, int livreur,
+            int rang, int decalage) {
+    }
+
+    /**
      * Clic sur une intersection de la carte. Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter

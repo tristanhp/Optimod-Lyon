@@ -14,6 +14,7 @@ package "model" {
     +obtenirTroncons() : List<Troncon>
     +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
+    +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     -ordresMemorises : Map<List<Sommet>, List<Integer>>
     -calculerTournee(entrepot, heureDepart, demandes, limiteTemps) : Tournee
     -calculerPlusCourtsChemins(sommets) : Chemin[][]
@@ -104,6 +105,7 @@ package "controller" {
     ~executer(commande : Commande)
     ~rangerTournees(tournees : Map<Integer, Tournee>)
     ~supprimerDemandeEnGardantLOrdre(position : int)
+    ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
   }
   interface MapScreen
   interface Etat
@@ -125,6 +127,7 @@ package "controller" {
   }
   class CommandeAjouterDemande
   class CommandeSupprimerDemande
+  class CommandeChangerOrdre
 }
 
 package "view" {
@@ -168,6 +171,7 @@ EtatAjoutLivraison ..|> Etat
 ListeDeCommandes o--> "*" Commande
 CommandeAjouterDemande ..|> Commande
 CommandeSupprimerDemande ..|> Commande
+CommandeChangerOrdre ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur
