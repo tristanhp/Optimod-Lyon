@@ -9,7 +9,8 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * sont celles de {@link EtatProgrammeCharge} : recalculer, importer, modifier
  * les demandes, annuler ou rétablir. Ajouter une demande retire la tournée
  * affichée ; en supprimer une la met à jour (recalcul local). On peut en plus
- * changer l'ordre des arrêts (« Monter », « Descendre »).
+ * changer l'ordre des arrêts (« Monter », « Descendre ») et déplacer un point
+ * de collecte ou de livraison (« Déplacer »).
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
@@ -33,11 +34,17 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
     }
 
     @Override
+    public void deplacerPoint(MainController controleur, int rang) {
+        controleur.choisirPointADeplacer(rang);
+    }
+
+    @Override
     public Set<Action> actionsPermises(MainController controleur) {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
         // besoin de le copier.
         Set<Action> actions = super.actionsPermises(controleur);
         actions.add(Action.CHANGER_ORDRE);
+        actions.add(Action.DEPLACER_POINT);
         return actions;
     }
 }

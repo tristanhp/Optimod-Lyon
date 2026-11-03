@@ -46,6 +46,7 @@ public class MainControllerTest {
         private IntConsumer actionSupprimer;
         private IntConsumer actionMonter;
         private IntConsumer actionDescendre;
+        private IntConsumer actionDeplacer;
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
         private LongConsumer actionClicNoeud;
@@ -59,6 +60,7 @@ public class MainControllerTest {
         private Tournee tournee;
         private String erreurCalcul;
         private String refusOrdre;
+        private String refusDeplacement;
         private int arretSelectionne = -1;
 
         @Override
@@ -186,6 +188,17 @@ public class MainControllerTest {
         }
 
         @Override
+        public void definirActionDeplacerPoint(IntConsumer action) {
+            actionDeplacer = action;
+        }
+
+        @Override
+        public void afficherRefusDeplacement(String detail) {
+            refusDeplacement = detail;
+            evenements.add("refus deplacement");
+        }
+
+        @Override
         public void afficherRefusOrdre(String detail) {
             refusOrdre = detail;
             evenements.add("refus");
@@ -217,7 +230,7 @@ public class MainControllerTest {
     private static final Set<Action> MODIFIABLE_AVEC_TOURNEE = EnumSet.of(
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
-            Action.CHANGER_ORDRE);
+            Action.CHANGER_ORDRE, Action.DEPLACER_POINT);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
@@ -227,7 +240,7 @@ public class MainControllerTest {
             EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME,
                     Action.CALCULER, Action.AJOUTER_DEMANDE,
                     Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
-                    Action.ANNULER);
+                    Action.DEPLACER_POINT, Action.ANNULER);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -1255,5 +1268,100 @@ public class MainControllerTest {
 
         assertTrue("au moins un ordre refusé après 13 h", refus13h > 0);
         assertSame(limite, ecran.tournee);
+    }
+
+    /** Nœud du petit plan qui n'est un point d'aucune des deux demandes. */
+    private static final long NOEUD_AILLEURS = 26086130L;
+
+    /**
+     * Déplacer un point sans relancer le voyageur de commerce : l'arrêt
+     * change d'adresse à la même place, reste sélectionné ; Annuler remet la
+     * tournée d'avant et Rétablir celle d'après, sans aucun calcul.
+     */
+    @Test
+    public void deplacerUnPointPuisAnnulerEtRetablir() throws Exception {
+        Tournee avant = afficherUneTourneeDeDeuxDemandes();
+        ecran.actionDeplacer.accept(1);
+        assertTrue(controleur.obtenirEtat() instanceof EtatDeplacementPoint);
+        ecran.actionClicNoeud.accept(NOEUD_AILLEURS);
+
+        Tournee apres = ecran.tournee;
+        assertEquals(NOEUD_AILLEURS,
+                apres.arrets().get(1).noeud().identifiant());
+        assertEquals(avant.arrets().size(), apres.arrets().size());
+        assertEquals(1, ecran.arretSelectionne);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        ecran.actionAnnuler.run();
+        assertSame(avant, ecran.tournee);
+        ecran.actionRefaire.run();
+        assertSame(apres, ecran.tournee);
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * Sans arrêt sélectionné, ou avec l'entrepôt, « Déplacer » explique quoi
+     * faire par une consigne ; un second clic sur « Déplacer » annule la
+     * saisie en cours.
+     */
+    @Test
+    public void deplacerSansPointChoisiOuAnnulerLaSaisie() throws Exception {
+        afficherUneTourneeDeDeuxDemandes();
+        ecran.actionDeplacer.accept(-1);
+        assertEquals(MainController.CONSIGNE_AUCUN_POINT, ecran.consigne);
+        ecran.actionDeplacer.accept(0);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+
+        ecran.actionDeplacer.accept(1);
+        ecran.actionDeplacer.accept(1);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertFalse(ecran.actions.contains(Action.ANNULER));
+    }
+
+    /**
+     * Les déplacements qui rendent la tournée impossible (adresse inaccessible,
+     * ou retour après 13 h, le départ étant réglé pour rentrer à 13 h pile)
+     * sont refusés avec un message : demandes, tournée affichée et historique
+     * ne changent pas.
+     */
+    @Test
+    public void deplacerUnPointImpossibleNeChangeRien() throws Exception {
+        Tournee deHuitHeures = afficherUneTourneeDeDeuxDemandes();
+        LocalTime depart = LocalTime.of(13, 0).minusSeconds(
+                deHuitHeures.arrets().get(0).arrivee().until(
+                        deHuitHeures.obtenirHeureRetour(),
+                        java.time.temporal.ChronoUnit.SECONDS));
+        importerProgramme(ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<demandeDeLivraisons><entrepot adresse=\"2835339774\" "
+                + "heureDepart=\"" + depart.getHour() + ":"
+                + depart.getMinute() + ":" + depart.getSecond() + "\"/>"
+                + "<livraison adresseEnlevement=\"1679901320\" "
+                + "adresseLivraison=\"208769457\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"600\"/>"
+                + "<livraison adresseEnlevement=\"208769120\" "
+                + "adresseLivraison=\"25336179\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"480\"/></demandeDeLivraisons>"));
+        ecran.actionCalculer.run();
+        Tournee limite = ecran.tournee;
+
+        int refus = 0;
+        for (Noeud noeud : ecran.planAffiche.obtenirNoeuds()) {
+            ecran.refusDeplacement = null;
+            ecran.actionDeplacer.accept(1);
+            ecran.actionClicNoeud.accept(noeud.identifiant());
+            if (ecran.refusDeplacement == null) {
+                if (ecran.actions.contains(Action.ANNULER)) {
+                    ecran.actionAnnuler.run();
+                }
+                continue;
+            }
+            // Une adresse inaccessible est aussi refusée, avec un autre texte.
+            if (ecran.refusDeplacement.contains("13:00")) {
+                refus++;
+            }
+            assertSame(limite, ecran.tournee);
+            assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+            assertFalse(ecran.actions.contains(Action.ANNULER));
+        }
+        assertTrue("au moins un retour refusé après 13 h", refus > 0);
     }
 }

@@ -405,6 +405,16 @@ public final class Plan {
      */
     private Tournee recalculerDansLOrdre(Tournee tournee,
             List<Integer> rangsGardes) {
+        return recalculerDansLOrdre(tournee, rangsGardes, -1);
+    }
+
+    /**
+     * Comme {@link #recalculerDansLOrdre(Tournee, List)}, mais les trajets qui
+     * arrivent à l'arrêt de rang {@code rangDeplace} (nouveau nœud, ou -1 si
+     * aucun) ou en partent sont toujours recalculés par A*.
+     */
+    private Tournee recalculerDansLOrdre(Tournee tournee,
+            List<Integer> rangsGardes, int rangDeplace) {
         List<Tournee.Arret> arrets = tournee.arrets();
         // Le retour à l'entrepôt (dernier rang gardé) n'est pas un sommet :
         // l'étape des heures de passage l'ajoute elle-même, comme dans
@@ -427,7 +437,9 @@ public final class Plan {
             int rangSuivant = rangsGardes.get(sommet + 1);
             // Les deux arrêts se suivaient déjà : on reprend leur trajet. Sinon
             // c'est une jonction créée par la suppression : A*.
-            Chemin chemin = rangSuivant == rang + 1
+            boolean trajetInchange = rangSuivant == rang + 1
+                    && rang != rangDeplace && rangSuivant != rangDeplace;
+            Chemin chemin = trajetInchange
                     ? tournee.chemins().get(rang)
                     : plusCourtChemin(arrets.get(rang).noeud(),
                             arrets.get(rangSuivant).noeud());
@@ -508,6 +520,42 @@ public final class Plan {
         }
         Collections.swap(rangs, rang, voisin);
         return recalculerDansLOrdre(tournee, rangs);
+    }
+
+    /**
+     * Déplace un point de collecte ou de livraison d'une tournée déjà
+     * calculée : l'arrêt change d'adresse, <b>l'ordre de passage ne change
+     * pas</b> et le voyageur de commerce n'est pas relancé. A* ne tourne que
+     * sur les deux trajets autour de l'arrêt déplacé, les autres sont repris
+     * de la tournée actuelle, puis les heures de passage sont refaites. L'arrêt
+     * est reconnu par son nœud et sa durée sur place.
+     *
+     * @param tournee tournée actuelle
+     * @param ancienNoeud nœud actuel du point à déplacer
+     * @param duree durée sur place du point, en secondes (conservée)
+     * @param nouveauNoeud nouvelle adresse du point
+     * @return la nouvelle tournée, avec ses heures de passage
+     * @throws IllegalArgumentException si l'arrêt est introuvable ou ambigu
+     * @throws IllegalStateException si un trajet est inaccessible, ou si le
+     *         retour à l'entrepôt dépasse {@link #HEURE_LIMITE_RETOUR}
+     */
+    public Tournee calculerTourneeAvecPointDeplace(Tournee tournee,
+            Noeud ancienNoeud, int duree, Noeud nouveauNoeud) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        int rang = trouverRangArret(arrets, ancienNoeud, duree);
+        // Même tournée, mais l'arrêt a son nouveau nœud (mêmes heures : seule
+        // la durée sur place en est lue). Les trajets autour de cet arrêt
+        // seront recalculés, les autres repris.
+        List<Tournee.Arret> arretsDeplaces = new ArrayList<>(arrets);
+        Tournee.Arret arret = arrets.get(rang);
+        arretsDeplaces.set(rang, new Tournee.Arret(nouveauNoeud,
+                arret.arrivee(), arret.depart()));
+        List<Integer> rangs = new ArrayList<>();
+        for (int i = 0; i < arrets.size(); i++) {
+            rangs.add(i);
+        }
+        return recalculerDansLOrdre(
+                new Tournee(arretsDeplaces, tournee.chemins()), rangs, rang);
     }
 
     /** Vrai si cet arrêt a ce nœud et cette durée sur place. */

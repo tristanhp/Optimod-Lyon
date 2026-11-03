@@ -210,6 +210,21 @@ public final class ProgrammeLivraisons extends Observable {
     }
 
     /**
+     * Remplace une demande par une autre (par exemple quand un de ses points
+     * est déplacé) et prévient les observateurs une seule fois.
+     *
+     * @param position rang de la demande à remplacer
+     * @param demande nouvelle demande
+     * @return la demande remplacée
+     * @throws IndexOutOfBoundsException si la position est hors de la liste
+     */
+    public Demande remplacerDemande(int position, Demande demande) {
+        Demande remplacee = demandes.set(position, demande);
+        notifierObservateurs();
+        return remplacee;
+    }
+
+    /**
      * Retire une demande et prévient les observateurs.
      *
      * @param position rang de la demande à retirer

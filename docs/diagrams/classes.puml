@@ -15,6 +15,7 @@ package "model" {
     +calculerTournee(programme : ProgrammeLivraisons) : Tournee
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee, demandes, rang, decalage) : Tournee
+    +calculerTourneeAvecPointDeplace(tournee, ancien, duree, nouveau) : Tournee
     -calculerPlusCourtsChemins(adresses) : Chemin[][]
     -calculerOrdreDePassage(chemins) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
@@ -85,6 +86,8 @@ package "controller" {
     ~executer(commande : Commande)
     ~supprimerDemandeEnGardantLOrdre(position : int)
     ~changerOrdreTournee(rang : int, decalage : int)
+    ~choisirPointADeplacer(rang : int)
+    ~deplacerPoint(rang : int, idNoeud : long)
     -tourneesCalculees : Map<List<Demande>, TourneeEnCache>
   }
   interface MapScreen
@@ -96,6 +99,7 @@ package "controller" {
   class EtatCalculEnCours
   class EtatAjoutCollecte
   class EtatAjoutLivraison
+  class EtatDeplacementPoint
   interface Commande {
     +executer()
     +annuler()
@@ -104,6 +108,7 @@ package "controller" {
   class CommandeAjouterDemande
   class CommandeSupprimerDemande
   class CommandeChangerOrdre
+  class CommandeDeplacerPoint
 }
 
 package "view" {
@@ -141,10 +146,12 @@ EtatTourneeCalculee --|> EtatProgrammeCharge
 EtatCalculEnCours ..|> Etat
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
+EtatDeplacementPoint ..|> Etat
 ListeDeCommandes o--> "*" Commande
 CommandeAjouterDemande ..|> Commande
 CommandeSupprimerDemande ..|> Commande
 CommandeChangerOrdre ..|> Commande
+CommandeDeplacerPoint ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur

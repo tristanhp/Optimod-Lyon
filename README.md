@@ -33,7 +33,8 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
 | Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
-| Déplacer un point, plusieurs livreurs | à faire |
+| Déplacer un point de collecte ou de livraison | fait |
+| Plusieurs livreurs | à faire |
 | Sauvegarder et restaurer les tournées | à faire |
 
 ## Installer le projet
@@ -123,6 +124,12 @@ de même taille.
      pas. Si le point de livraison d'une demande passerait avant son point de
      collecte (contrainte d'ordre), ou si le retour à l'entrepôt dépasserait
      13 h, une fenêtre explique le refus et rien ne change ;
+   - *Déplacer* : sélectionner un point de collecte ou de livraison dans la
+     liste de la tournée, cliquer sur *Déplacer*, puis sur sa nouvelle adresse
+     sur la carte (un second clic sur *Déplacer* annule). L'ordre des arrêts ne
+     change pas : seuls les deux trajets autour du point sont recalculés. Si
+     la tournée devient impossible (adresse inaccessible, retour après 13 h),
+     une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.

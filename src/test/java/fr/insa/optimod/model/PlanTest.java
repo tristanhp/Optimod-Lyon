@@ -781,4 +781,56 @@ public class PlanTest {
                         1));
         assertTrue(erreur.getMessage().contains("13:00"));
     }
+
+    /**
+     * Déplacer un point garde l'ordre et les durées sur place : la tournée est
+     * celle d'un recalcul sur les nouvelles adresses, et seuls les deux
+     * trajets autour de l'arrêt déplacé sont calculés, les autres sont repris
+     * de la tournée actuelle (même objet).
+     */
+    @Test
+    public void deplacerUnPointRecalculeLesDeuxTrajetsAutourDeLArret()
+            throws Exception {
+        Plan plan = lirePlanFourni("moyenPlan");
+        ProgrammeLivraisons programme = lireProgrammeFourni(plan,
+                "demandeMoyen5");
+        Tournee tournee = plan.calculerTournee(programme);
+        List<Noeud> adresses = adressesDe(tournee);
+        List<Integer> durees = dureesDe(tournee);
+        Noeud nouveau = plan.obtenirNoeuds().stream()
+                .filter(noeud -> !adresses.contains(noeud)).findFirst()
+                .orElseThrow();
+        Set<Chemin> anciens = Collections.newSetFromMap(
+                new IdentityHashMap<>());
+        anciens.addAll(tournee.chemins());
+        for (int rang = 1; rang < adresses.size() - 1; rang++) {
+            Tournee deplacee = plan.calculerTourneeAvecPointDeplace(tournee,
+                    adresses.get(rang), durees.get(rang), nouveau);
+            List<Noeud> attendues = new ArrayList<>(adresses);
+            attendues.set(rang, nouveau);
+            assertEquals(tourneeDansLOrdre(plan, programme.obtenirHeureDepart(),
+                    attendues, durees), deplacee);
+            assertEquals(2, deplacee.chemins().stream()
+                    .filter(chemin -> !anciens.contains(chemin)).count());
+        }
+    }
+
+    /**
+     * Un arrêt introuvable est refusé ; un déplacement qui fait rentrer après
+     * 13 h est refusé avec un message qui cite l'heure limite.
+     */
+    @Test
+    public void deplacerUnPointRefuseArretIntrouvableOuRetourApres13h()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = tourneeDeDeuxDemandes(plan, LocalTime.of(12, 59, 59));
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.calculerTourneeAvecPointDeplace(tournee,
+                        plan.obtenirNoeud(1), 99, plan.obtenirNoeud(2)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTourneeAvecPointDeplace(tournee,
+                        plan.obtenirNoeud(3), 60, plan.obtenirNoeud(2)));
+        assertTrue(erreur.getMessage().contains("13:00"));
+    }
 }

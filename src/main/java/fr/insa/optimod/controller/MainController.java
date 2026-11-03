@@ -2,17 +2,20 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.xml.sax.SAXException;
 
+import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
@@ -63,6 +66,30 @@ public final class MainController {
      *        elle vient d'un recalcul local ou d'un changement d'ordre
      */
     private record TourneeEnCache(Tournee tournee, boolean calculComplet) {
+    }
+
+    /** Consigne quand aucun point de collecte ou de livraison n'est choisi. */
+    static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
+            + "liste de la tournée, le point de collecte ou de livraison à "
+            + "déplacer.";
+
+    /** Début de consigne quand la nouvelle adresse est déjà celle du couple. */
+    static final String CONSIGNE_MEME_ADRESSE = "La collecte et la livraison "
+            + "d'une demande doivent être à des adresses différentes. ";
+
+    /**
+     * Consigne quand le point à déplacer ne peut pas être identifié : plusieurs
+     * demandes ont le même nœud et la même durée sur place.
+     */
+    static final String CONSIGNE_POINT_AMBIGU = "Ce point ne peut pas être "
+            + "identifié : plusieurs demandes ont la même adresse et la même "
+            + "durée sur place.";
+
+    /**
+     * Point d'une demande : rang de la demande, et vrai pour la collecte, faux
+     * pour la livraison.
+     */
+    private record PointDeDemande(int position, boolean collecte) {
     }
 
     /** Issue de la lecture d'un fichier choisi par l'utilisateur. */
@@ -145,6 +172,8 @@ public final class MainController {
                 rang -> etat.changerOrdre(this, rang, -1));
         ecran.definirActionDescendreArret(
                 rang -> etat.changerOrdre(this, rang, 1));
+        ecran.definirActionDeplacerPoint(
+                rang -> etat.deplacerPoint(this, rang));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
@@ -476,7 +505,8 @@ public final class MainController {
         ecran.afficherAttente(false);
         if (echec != null) {
             changerEtat(new EtatTourneeCalculee());
-            signalerRefusOrdre(echec);
+            signalerRefus(echec, ecran::afficherRefusOrdre,
+                    "du changement d'ordre");
             return;
         }
         TourneeEnCache nouvelle = new TourneeEnCache(apres, false);
@@ -501,21 +531,156 @@ public final class MainController {
     }
 
     /**
-     * Distingue les refus du changement d'ordre : une raison attendue
-     * (contrainte d'ordre, entrepôt, premier ou dernier arrêt, retour après
-     * 13 h) est expliquée à l'utilisateur ; une erreur inattendue est signalée
-     * et journalisée, au lieu de laisser les actions bloquées.
+     * Distingue les refus d'une modification de la tournée : une raison
+     * attendue (par exemple contrainte d'ordre, retour après 13 h) est
+     * expliquée à l'utilisateur ; une erreur inattendue est signalée et
+     * journalisée, au lieu de laisser les actions bloquées.
+     *
+     * @param echec cause du refus
+     * @param afficher affiche la raison attendue
+     * @param modification ce qui était demandé, pour le journal
      */
-    private void signalerRefusOrdre(RuntimeException echec) {
+    private void signalerRefus(RuntimeException echec,
+            Consumer<String> afficher, String modification) {
         if (echec instanceof IllegalArgumentException
                 || echec instanceof IllegalStateException) {
-            ecran.afficherRefusOrdre(echec.getMessage());
+            afficher.accept(echec.getMessage());
         } else {
-            JOURNAL.log(Level.SEVERE, "Erreur inattendue du changement "
-                    + "d'ordre", echec);
+            JOURNAL.log(Level.SEVERE, "Erreur inattendue lors "
+                    + modification, echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
                     ? echec.getMessage() : echec.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Commence le déplacement du point de collecte ou de livraison sélectionné
+     * dans la liste de la tournée : l'écran attend alors un clic sur sa
+     * nouvelle adresse ({@link EtatDeplacementPoint}). Sans arrêt sélectionné,
+     * ou si l'arrêt n'est pas un point identifiable, une consigne l'explique.
+     *
+     * @param rang rang de l'arrêt sélectionné dans la liste de la tournée, ou
+     *        {@code -1} si aucun arrêt n'est sélectionné
+     */
+    void choisirPointADeplacer(int rang) {
+        int dernier = tourneesCalculees.get(List.copyOf(
+                programme.obtenirDemandes())).tournee().arrets().size() - 1;
+        if (rang < 1 || rang >= dernier) {
+            ecran.afficherConsigne(CONSIGNE_AUCUN_POINT);
+        } else if (identifierPoint(rang) == null) {
+            ecran.afficherConsigne(CONSIGNE_POINT_AMBIGU);
+        } else {
+            changerEtat(new EtatDeplacementPoint(rang));
+            ecran.afficherConsigne(EtatDeplacementPoint.CONSIGNE);
+        }
+    }
+
+    /**
+     * Retrouve le point de demande de l'arrêt affiché à ce rang, par son nœud
+     * et sa durée sur place (comme {@link Plan}) ; {@code null} s'il n'y en a
+     * pas exactement un.
+     */
+    private PointDeDemande identifierPoint(int rang) {
+        List<Demande> demandes = programme.obtenirDemandes();
+        Tournee.Arret arret = tourneesCalculees.get(List.copyOf(demandes))
+                .tournee().arrets().get(rang);
+        long duree = arret.arrivee().until(arret.depart(),
+                ChronoUnit.SECONDS);
+        PointDeDemande trouve = null;
+        for (int position = 0; position < demandes.size(); position++) {
+            Demande demande = demandes.get(position);
+            boolean collecte = demande.collecte().equals(arret.noeud())
+                    && demande.dureeCollecte() == duree;
+            boolean livraison = demande.livraison().equals(arret.noeud())
+                    && demande.dureeLivraison() == duree;
+            if (collecte || livraison) {
+                if (trouve != null || collecte == livraison) {
+                    return null; // plusieurs possibilités
+                }
+                trouve = new PointDeDemande(position, collecte);
+            }
+        }
+        return trouve;
+    }
+
+    /**
+     * Déplace un point de la tournée affichée vers le nœud cliqué, par une
+     * commande annulable. La tournée est recalculée localement ({@link
+     * Plan#calculerTourneeAvecPointDeplace}) hors du thread de l'interface,
+     * actions bloquées ({@link EtatCalculEnCours}).
+     *
+     * @param rang rang de l'arrêt à déplacer dans la tournée affichée
+     * @param idNoeud nœud cliqué, nouvelle adresse du point
+     */
+    void deplacerPoint(int rang, long idNoeud) {
+        Noeud nouveau = plan.obtenirNoeud(idNoeud);
+        PointDeDemande point = identifierPoint(rang);
+        if (nouveau == null || point == null) {
+            return;
+        }
+        List<Demande> avant = List.copyOf(programme.obtenirDemandes());
+        Demande d = avant.get(point.position());
+        Noeud ancien = point.collecte() ? d.collecte() : d.livraison();
+        if (nouveau.equals(d.collecte()) || nouveau.equals(d.livraison())) {
+            ecran.afficherConsigne(CONSIGNE_MEME_ADRESSE
+                    + EtatDeplacementPoint.CONSIGNE);
+            return;
+        }
+        Demande deplacee = point.collecte()
+                ? new Demande(nouveau, d.livraison(), d.dureeCollecte(),
+                        d.dureeLivraison())
+                : new Demande(d.collecte(), nouveau, d.dureeCollecte(),
+                        d.dureeLivraison());
+        List<Demande> apres = new ArrayList<>(avant);
+        apres.set(point.position(), deplacee);
+        TourneeEnCache connue = tourneesCalculees.get(apres);
+        if (connue != null && connue.calculComplet()) {
+            // Un calcul complet de ces demandes existe : on ne l'écrase pas.
+            finirDeplacement(point.position(), rang, deplacee, apres, null,
+                    null);
+            return;
+        }
+        Plan planCalcule = plan;
+        Tournee actuelle = tourneesCalculees.get(avant).tournee();
+        int duree = point.collecte() ? d.dureeCollecte() : d.dureeLivraison();
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee locale = planCalcule.calculerTourneeAvecPointDeplace(
+                        actuelle, ancien, duree, nouveau);
+                interfaceUtilisateur.execute(() -> finirDeplacement(
+                        point.position(), rang, deplacee, apres, locale,
+                        null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirDeplacement(
+                        point.position(), rang, deplacee, apres, null, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du déplacement, sur le thread de l'interface. En cas de refus la
+     * commande n'est pas appliquée et l'écran l'explique. Sinon la tournée
+     * {@code locale} (ou {@code null} si le cache a déjà un calcul complet)
+     * est rangée dans le cache <b>avant</b> la commande, que {@link #executer}
+     * réaffiche ; l'arrêt déplacé reste sélectionné.
+     */
+    private void finirDeplacement(int position, int rang, Demande deplacee,
+            List<Demande> apres, Tournee locale, RuntimeException echec) {
+        ecran.afficherAttente(false);
+        if (echec != null) {
+            retrouverEtatProgramme();
+            signalerRefus(echec, ecran::afficherRefusDeplacement,
+                    "du déplacement d'un point");
+            return;
+        }
+        if (locale != null) {
+            tourneesCalculees.put(apres, new TourneeEnCache(locale, false));
+        }
+        executer(new CommandeDeplacerPoint(programme, position, deplacee));
+        // executer réaffiche la tournée, ce qui efface la sélection.
+        ecran.selectionnerArretTournee(rang);
     }
 
     /**

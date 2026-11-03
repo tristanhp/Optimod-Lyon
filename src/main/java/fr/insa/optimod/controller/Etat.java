@@ -93,6 +93,17 @@ interface Etat {
     }
 
     /**
+     * Clic sur « Déplacer » : commence le déplacement d'un point de la tournée
+     * affichée, ou l'annule s'il est en cours. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param rang rang de l'arrêt sélectionné dans la liste de la tournée, ou
+     *        {@code -1} si aucun arrêt n'est sélectionné
+     */
+    default void deplacerPoint(MainController controleur, int rang) {
+    }
+
+    /**
      * Clic sur une intersection de la carte. Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter

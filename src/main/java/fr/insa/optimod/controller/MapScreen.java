@@ -30,6 +30,8 @@ public interface MapScreen {
         SUPPRIMER_DEMANDE,
         /** Boutons « Monter » et « Descendre » (arrêt sélectionné). */
         CHANGER_ORDRE,
+        /** Bouton « Déplacer » (ou annuler le déplacement en cours). */
+        DEPLACER_POINT,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -133,6 +135,15 @@ public interface MapScreen {
     void definirActionDescendreArret(IntConsumer action);
 
     /**
+     * Définit l'action du bouton « Déplacer » (déplacer un point de collecte
+     * ou de livraison de la tournée).
+     *
+     * @param action reçoit le rang de l'arrêt sélectionné dans la liste de la
+     *        tournée, ou {@code -1} si aucun arrêt n'est sélectionné
+     */
+    void definirActionDeplacerPoint(IntConsumer action);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter
@@ -195,6 +206,14 @@ public interface MapScreen {
      * @param detail explication du refus
      */
     void afficherRefusOrdre(String detail);
+
+    /**
+     * Explique à l'utilisateur pourquoi le déplacement du point est refusé
+     * (tournée impossible) ; la tournée et les demandes n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusDeplacement(String detail);
 
     /**
      * Signale que le calcul a échoué.
