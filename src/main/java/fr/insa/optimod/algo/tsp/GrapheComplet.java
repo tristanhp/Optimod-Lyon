@@ -52,8 +52,9 @@ public class GrapheComplet implements Graphe {
     public int obtenirCoutArc(int indiceSommet, int indiceDestination) {
         if (indiceSommet < 0 || indiceSommet >= nombreSommets
                 || indiceDestination < 0
-                || indiceDestination >= nombreSommets)
+                || indiceDestination >= nombreSommets) {
             return -1;
+        }
         return coutsArcs[indiceSommet][indiceDestination];
     }
 
@@ -61,8 +62,9 @@ public class GrapheComplet implements Graphe {
     public boolean estArc(int indiceSommet, int indiceDestination) {
         if (indiceSommet < 0 || indiceSommet >= nombreSommets
                 || indiceDestination < 0
-                || indiceDestination >= nombreSommets)
+                || indiceDestination >= nombreSommets) {
             return false;
+        }
         return indiceSommet != indiceDestination;
     }
 

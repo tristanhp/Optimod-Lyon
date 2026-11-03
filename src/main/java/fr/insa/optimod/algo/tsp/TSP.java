@@ -6,6 +6,7 @@ package fr.insa.optimod.algo.tsp;
  */
 public interface TSP {
 
+    /** Résultat possible d'un calcul du voyageur de commerce. */
     enum ResultatCalculTSP {
         // Le temps de calcul depasse le temps maximum autorise
         CALCUL_TROP_LONG,
