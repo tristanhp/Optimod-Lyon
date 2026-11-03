@@ -19,6 +19,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee.TypeArret;
 
 /**
  * Sauvegarde XML version 1 pour le modèle actuel à un livreur.
@@ -37,13 +38,16 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
      *
      * @param fichier destination XML
      * @param fichierPlan référence du plan
-     * @param programme programme courant
-     * @param tournee tournée courante
-     * @throws IOException si l'écriture échoue
+     * @param programme programme courant, dont les tournées sont calculées
+     * @throws IOException si l'écriture échoue, ou si le programme a plusieurs
+     *         livreurs (le format ne gère qu'un livreur)
      */
     public static void sauvegarder(Path fichier, Path fichierPlan,
-            ProgrammeLivraisons programme, Tournee tournee)
-            throws IOException {
+            ProgrammeLivraisons programme) throws IOException {
+        Tournee tournee = programme.obtenirTournees().get(1);
+        if (programme.obtenirTournees().size() != 1 || tournee == null) {
+            throw new IOException("La sauvegarde ne gère qu'un seul livreur.");
+        }
         try (OutputStream sortie = Files.newOutputStream(fichier)) {
             XMLStreamWriter xml = XMLOutputFactory.newFactory()
                     .createXMLStreamWriter(sortie, "UTF-8");
@@ -139,13 +143,22 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
             }
             int nombreAttendu = demandes.isEmpty()
                     ? 1 : 2 * demandes.size() + 2;
+            List<TypeArret> types = new ArrayList<>();
+            List<Demande> servies = new ArrayList<>();
+            types.add(TypeArret.ENTREPOT);
+            servies.add(null);
             if (adresses.size() != nombreAttendu
                     || !respecteDemandes(adresses, durees, demandes,
-                            new int[demandes.size()], 1)) {
+                            new int[demandes.size()], 1, types, servies)) {
                 throw new SAXException("Les arrêts ne respectent pas les "
                         + "demandes et leur contrainte d'ordre.");
             }
-            Tournee tournee = plan.recalculerTournee(depart, adresses, durees);
+            if (adresses.size() > 1) {
+                types.add(TypeArret.ENTREPOT); // retour à l'entrepôt
+                servies.add(null);
+            }
+            Tournee tournee = plan.recalculerTournee(depart, adresses, durees,
+                    types, servies);
             List<Tournee.Arret> passages = new ArrayList<>();
             for (int i = 0; i < arrets.getLength(); i++) {
                 Element element = (Element) arrets.item(i);
@@ -153,9 +166,9 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                 if (element.hasAttribute("debutPlage")
                         || element.hasAttribute("finPlage")) {
                     arret = new Tournee.Arret(arret.noeud(), arret.arrivee(),
-                            arret.depart(), LocalTime.parse(attribut(element,
-                                    "debutPlage")), LocalTime.parse(attribut(
-                                            element, "finPlage")));
+                            arret.depart(), arret.type(), arret.demande(),
+                            LocalTime.parse(attribut(element, "debutPlage")),
+                            LocalTime.parse(attribut(element, "finPlage")));
                 }
                 passages.add(arret);
             }
@@ -171,10 +184,12 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
     /**
      * Retrouve une affectation valide même si des demandes partagent une
      * adresse et une durée. 0 : avant collecte, 1 : collectée, 2 : livrée.
+     * Range dans {@code types} et {@code servies} ce que fait chaque arrêt
+     * visité (à partir du rang 1) quand l'affectation est valide.
      */
     private static boolean respecteDemandes(List<Noeud> adresses,
             List<Integer> durees, List<Demande> demandes, int[] progression,
-            int rang) {
+            int rang, List<TypeArret> types, List<Demande> servies) {
         if (rang >= adresses.size() - 1) {
             for (int etape : progression) {
                 if (etape != 2) {
@@ -193,10 +208,15 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
             if (etape < 2 && adresse.equals(adresses.get(rang))
                     && duree == durees.get(rang)) {
                 progression[i]++;
+                types.add(etape == 0 ? TypeArret.COLLECTE
+                        : TypeArret.LIVRAISON);
+                servies.add(demande);
                 if (respecteDemandes(adresses, durees, demandes, progression,
-                        rang + 1)) {
+                        rang + 1, types, servies)) {
                     return true;
                 }
+                types.remove(types.size() - 1);
+                servies.remove(servies.size() - 1);
                 progression[i]--;
             }
         }

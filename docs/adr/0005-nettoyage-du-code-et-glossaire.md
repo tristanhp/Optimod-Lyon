@@ -1,6 +1,7 @@
 # 0005. Nettoyage du code et vocabulaire du glossaire
 
-- **Statut** : Acceptée
+- **Statut** : Acceptée ; point 3 (exception après 13 h) remplacé par
+  [0006](0006-plusieurs-livreurs.md)
 - **Date** : 2026-10-25
 
 ## Contexte

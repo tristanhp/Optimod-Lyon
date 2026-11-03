@@ -4,10 +4,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -34,9 +36,10 @@ public class SauvegardeTourneeTest {
                 plan.obtenirNoeud(1), LocalTime.of(8, 0),
                 List.of(new Demande(plan.obtenirNoeud(3),
                         plan.obtenirNoeud(2), 120, 240)));
-        Tournee tournee = plan.calculerTournee(programme);
+        programme.definirTournees(plan.calculerTournees(programme));
+        Tournee tournee = programme.obtenirTournees().get(1);
         Path fichier = dossier.newFile("tournee.xml").toPath();
-        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme, tournee);
+        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
         SauvegardeTournee restauree = SauvegardeTournee.restaurer(fichier);
         assertEquals(programme.obtenirDemandes(),
                 restauree.programme().obtenirDemandes());
@@ -80,20 +83,35 @@ public class SauvegardeTourneeTest {
                 plan.obtenirNoeud(1), LocalTime.of(8, 0),
                 List.of(new Demande(plan.obtenirNoeud(3),
                         plan.obtenirNoeud(2), 120, 240)));
-        Tournee avant = plan.calculerTournee(programme);
+        Tournee avant = plan.calculerTournees(programme).get(1);
         List<Tournee.Arret> arrets = avant.arrets().stream().map(arret ->
                 new Tournee.Arret(arret.noeud(), arret.arrivee(),
-                        arret.depart(),
+                        arret.depart(), arret.type(), arret.demande(),
                         LocalTime.of(6, 0), LocalTime.of(7, 0))).toList();
         Tournee annoncee = new Tournee(arrets, avant.chemins());
+        programme.definirTournees(Map.of(1, annoncee));
         Path fichier = dossier.newFile("plages.xml").toPath();
-        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme,
-                annoncee);
+        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
         assertEquals(annoncee, SauvegardeTournee.restaurer(fichier).tournee());
         String contenu = Files.readString(fichier);
         Files.writeString(fichier, contenu.replace(" finPlage=\"07:00\"", ""));
         assertThrows(SAXException.class,
                 () -> SauvegardeTournee.restaurer(fichier));
+    }
+
+    /** Plusieurs livreurs ne tiennent pas dans le format : refusé à l'écriture. */
+    @Test
+    public void plusieursLivreursRefuses() throws Exception {
+        Path fichierPlan = dossier.newFile("plan.xml").toPath();
+        Files.writeString(fichierPlan, PlansPourTests.PETIT_RESEAU);
+        Plan plan = new Plan(fichierPlan.toString());
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of());
+        programme.definirNombreLivreurs(2);
+        programme.definirTournees(plan.calculerTournees(programme));
+        Path fichier = dossier.newFile("deux.xml").toPath();
+        assertThrows(IOException.class, () -> SauvegardeTournee.sauvegarder(
+                fichier, fichierPlan, programme));
     }
 
     /** Un document étranger n'est pas une sauvegarde. */
@@ -135,8 +153,9 @@ public class SauvegardeTourneeTest {
         ProgrammeLivraisons programme = new ProgrammeLivraisons(
                 plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of());
         Path fichier = dossier.newFile("vide.xml").toPath();
-        Tournee tournee = plan.calculerTournee(programme);
-        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme, tournee);
+        programme.definirTournees(plan.calculerTournees(programme));
+        Tournee tournee = programme.obtenirTournees().get(1);
+        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
         assertEquals(tournee,
                 SauvegardeTournee.restaurer(fichier).tournee());
     }

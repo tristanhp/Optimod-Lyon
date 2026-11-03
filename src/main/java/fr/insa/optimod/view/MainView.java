@@ -2,9 +2,12 @@ package fr.insa.optimod.view;
 
 import java.io.File;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -34,6 +37,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
@@ -72,6 +76,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     private final Button boutonAjouter = new Button("Ajouter une demande");
     private final Button boutonSupprimer = new Button("Supprimer la demande");
+    private final Button boutonMonter = new Button("Monter");
+    private final Button boutonDescendre = new Button("Descendre");
     private final Button boutonAnnuler = new Button("Annuler");
     private final Button boutonRefaire = new Button("Rétablir");
 
@@ -81,14 +87,35 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
 
+    /** Vrai si l'état du contrôleur permet de changer l'ordre des arrêts. */
+    private boolean changementOrdrePermis;
+
     /** Indicateur d'attente affiché pendant le calcul. */
     private final ProgressIndicator indicateurAttente = new ProgressIndicator();
 
     /** Carte du plan. */
     private final MapCanvas carte = new MapCanvas();
 
-    /** Liste textuelle de la tournée. */
-    private final ListView<Tournee.Arret> listeTournee = new ListView<>();
+    /** Liste textuelle des tournées. */
+    private final ListView<String> listeTournee = new ListView<>();
+
+    /**
+     * Ce que représente chaque ligne de la liste des tournées : un titre de
+     * livreur ({@code rang} vaut -1) ou l'un de ses arrêts. Refaite avec la
+     * liste, pour retrouver le livreur et le rang de la ligne sélectionnée.
+     *
+     * @param livreur numéro du livreur de la ligne
+     * @param rang rang de l'arrêt dans la tournée du livreur (0 est le départ
+     *        de l'entrepôt), ou -1 pour un titre
+     * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
+     * @param horsPlage vrai si l'arrivée sort de la plage annoncée
+     */
+    private record LigneTournee(int livreur, int rang, int dernierRang,
+            boolean horsPlage) {
+    }
+
+    /** Lignes de {@link #listeTournee}, dans le même ordre. */
+    private final List<LigneTournee> lignesTournee = new ArrayList<>();
 
     /** Liste textuelle des demandes importées. */
     private final ListView<String> listeDemandes = new ListView<>();
@@ -121,26 +148,13 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         listeTournee.setManaged(false);
         listeTournee.setCellFactory(liste -> new ListCell<>() {
             @Override
-            protected void updateItem(Tournee.Arret arret, boolean vide) {
-                super.updateItem(arret, vide);
-                if (vide || arret == null) {
-                    setText(null);
-                    setStyle("");
-                    return;
-                }
-                long decalage = arret.obtenirDecalageSecondes();
-                String signe = decalage >= 0 ? "+" : "−";
-                long secondes = Math.abs(decalage);
-                setText(HEURE.format(arret.arrivee()) + " → "
-                        + HEURE.format(arret.depart()) + "   nœud "
-                        + arret.noeud().identifiant() + "\nPlage : "
-                        + HEURE.format(arret.debutPlage()) + " – "
-                        + HEURE.format(arret.finPlage()) + "\nDécalage : "
-                        + signe + secondes / 60 + " min "
-                        + secondes % 60 + " s"
-                        + (arret.estHorsPlage() ? " — Hors plage" : ""));
-                setStyle(arret.estHorsPlage()
-                        ? "-fx-text-fill: #c62828;" : "");
+            protected void updateItem(String texte, boolean vide) {
+                super.updateItem(texte, vide);
+                setText(vide ? null : texte);
+                boolean horsPlage = !vide && getIndex() >= 0
+                        && getIndex() < lignesTournee.size()
+                        && lignesTournee.get(getIndex()).horsPlage();
+                setStyle(horsPlage ? "-fx-text-fill: #c62828;" : "");
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -166,6 +180,18 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                     carte.mettreEnEvidence(nouveau.intValue());
                     actualiserBoutonSupprimer();
                 });
+        listeTournee.getSelectionModel().selectedIndexProperty().addListener(
+                (observable, ancien, nouveau) -> actualiserBoutonsOrdre());
+        boutonMonter.setMaxWidth(Double.MAX_VALUE);
+        boutonDescendre.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(boutonMonter, Priority.ALWAYS);
+        HBox.setHgrow(boutonDescendre, Priority.ALWAYS);
+        VBox.setVgrow(listeTournee, Priority.ALWAYS);
+        VBox panneauTournee = new VBox(4, listeTournee,
+                new HBox(4, boutonMonter, boutonDescendre));
+        panneauTournee.visibleProperty().bind(listeTournee.visibleProperty());
+        panneauTournee.managedProperty().bind(listeTournee.managedProperty());
+        actualiserBoutonsOrdre();
         VBox.setVgrow(listeDemandes, Priority.ALWAYS);
         boutonSupprimer.setMaxWidth(Double.MAX_VALUE);
         VBox panneauDemandes = new VBox(4, listeDemandes, boutonSupprimer);
@@ -185,7 +211,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         setLeft(panneauDemandes);
         setTop(barreOutils);
         setCenter(carte);
-        setRight(listeTournee);
+        setRight(panneauTournee);
     }
 
     @Override
@@ -211,6 +237,29 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonRefaire.setDisable(!actions.contains(Action.REFAIRE));
         suppressionPermise = actions.contains(Action.SUPPRIMER_DEMANDE);
         actualiserBoutonSupprimer();
+        changementOrdrePermis = actions.contains(Action.CHANGER_ORDRE);
+        actualiserBoutonsOrdre();
+    }
+
+    /**
+     * Monter et Descendre : action permise et arrêt sélectionné. Un titre de
+     * livreur, le départ et le retour de l'entrepôt de chaque tournée ne se
+     * déplacent pas.
+     */
+    private void actualiserBoutonsOrdre() {
+        LigneTournee ligne = ligneSelectionnee();
+        boolean arretSelectionne = ligne != null && ligne.rang() >= 1
+                && ligne.rang() < ligne.dernierRang();
+        boutonMonter.setDisable(!changementOrdrePermis || !arretSelectionne);
+        boutonDescendre.setDisable(!changementOrdrePermis
+                || !arretSelectionne);
+    }
+
+    /** @return la ligne sélectionnée de la liste des tournées, ou null */
+    private LigneTournee ligneSelectionnee() {
+        int indice = listeTournee.getSelectionModel().getSelectedIndex();
+        return indice >= 0 && indice < lignesTournee.size()
+                ? lignesTournee.get(indice) : null;
     }
 
     /** Supprimer demande une action permise et une demande sélectionnée. */
@@ -228,6 +277,25 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     public void definirActionSupprimerDemande(IntConsumer action) {
         boutonSupprimer.setOnAction(event -> action.accept(
                 listeDemandes.getSelectionModel().getSelectedIndex()));
+    }
+
+    @Override
+    public void definirActionMonterArret(BiConsumer<Integer, Integer> action) {
+        boutonMonter.setOnAction(event -> deplacerArretSelectionne(action));
+    }
+
+    @Override
+    public void definirActionDescendreArret(
+            BiConsumer<Integer, Integer> action) {
+        boutonDescendre.setOnAction(event -> deplacerArretSelectionne(action));
+    }
+
+    /** Transmet le livreur et le rang de l'arrêt sélectionné. */
+    private void deplacerArretSelectionne(BiConsumer<Integer, Integer> action) {
+        LigneTournee ligne = ligneSelectionnee();
+        if (ligne != null && ligne.rang() >= 0) {
+            action.accept(ligne.livreur(), ligne.rang());
+        }
     }
 
     @Override
@@ -263,7 +331,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         TextField collecte = new TextField("5");
         TextField livraison = new TextField("5");
         ComboBox<Integer> livreurs = new ComboBox<>();
-        livreurs.getItems().add(1);
+        for (int livreur = 1; livreur <= programmeObserve
+                .obtenirNombreLivreurs(); livreur++) {
+            livreurs.getItems().add(livreur);
+        }
         livreurs.setValue(1);
         Label erreur = new Label();
         dialogue.getDialogPane().setContent(new VBox(8,
@@ -315,12 +386,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         return dialogue.showAndWait().map(valeur -> choix.indexOf(valeur) + 1);
     }
 
-    @Override
-    public void effacerTournee() {
-        effacerListeTournee();
-    }
-
-    @Override
     public void afficherAttente(boolean enAttente) {
         indicateurAttente.setVisible(enAttente);
     }
@@ -380,18 +445,31 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void afficherTournee(Tournee tournee) {
-        carte.afficherArrets(tournee.arrets());
-        listeTournee.getItems().setAll(tournee.arrets());
-        listeTournee.setVisible(true);
-        listeTournee.setManaged(true);
-    }
-
-    @Override
     public void afficherErreurCalcul(String detail) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Calcul de la tournée impossible");
+        alert.setContentText(detail);
+        alert.initOwner(getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    @Override
+    public void selectionnerArretTournee(int livreur, int rang) {
+        for (int indice = 0; indice < lignesTournee.size(); indice++) {
+            LigneTournee ligne = lignesTournee.get(indice);
+            if (ligne.livreur() == livreur && ligne.rang() == rang) {
+                listeTournee.getSelectionModel().select(indice);
+                return;
+            }
+        }
+    }
+
+    @Override
+    public void afficherRefusOrdre(String detail) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Changement d'ordre impossible");
         alert.setContentText(detail);
         alert.initOwner(getScene().getWindow());
         alert.showAndWait();
@@ -432,10 +510,14 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         observer(programme);
     }
 
-    /** Les demandes observées ont changé : redessine la liste et la carte. */
+    /**
+     * Le programme observé a changé (demandes ou tournées) : redessine la
+     * liste des demandes, la carte et la liste des tournées.
+     */
     @Override
     public void mettreAJour(Observable source) {
         dessinerDemandes();
+        dessinerTournees();
     }
 
     /**
@@ -452,6 +534,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             programme.ajouterObservateur(this);
         }
         dessinerDemandes();
+        dessinerTournees();
     }
 
     private void dessinerDemandes() {
@@ -472,6 +555,55 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 + programmeObserve.obtenirDemandes().size() + " demande(s)");
     }
 
+    /**
+     * Liste les arrêts des tournées rangées dans le programme, avec leurs
+     * heures de passage ; un titre par livreur s'il y en a plusieurs. La liste
+     * est cachée tant qu'aucune tournée n'est calculée.
+     */
+    private void dessinerTournees() {
+        Map<Integer, Tournee> tournees = programmeObserve == null ? Map.of()
+                : programmeObserve.obtenirTournees();
+        if (tournees.isEmpty()) {
+            effacerListeTournee();
+            return;
+        }
+        listeTournee.getItems().clear();
+        lignesTournee.clear();
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            int livreur = entree.getKey();
+            int dernierRang = entree.getValue().arrets().size() - 1;
+            if (tournees.size() > 1) {
+                listeTournee.getItems().add("Livreur " + livreur);
+                lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
+                        false));
+            }
+            int rang = 0;
+            for (Tournee.Arret arret : entree.getValue().arrets()) {
+                listeTournee.getItems().add(decrireArret(arret));
+                lignesTournee.add(new LigneTournee(livreur, rang++,
+                        dernierRang, arret.estHorsPlage()));
+            }
+        }
+        carte.afficherArrets(tournees.values().stream()
+                .flatMap(tournee -> tournee.arrets().stream()).toList());
+        listeTournee.setVisible(true);
+        listeTournee.setManaged(true);
+    }
+
+    /** Heures, plage annoncée et décalage d'un arrêt. */
+    private static String decrireArret(Tournee.Arret arret) {
+        long decalage = arret.obtenirDecalageSecondes();
+        String signe = decalage >= 0 ? "+" : "−";
+        long secondes = Math.abs(decalage);
+        return HEURE.format(arret.arrivee()) + " → "
+                + HEURE.format(arret.depart()) + "   nœud "
+                + arret.noeud().identifiant() + "\nPlage : "
+                + HEURE.format(arret.debutPlage()) + " – "
+                + HEURE.format(arret.finPlage()) + "\nDécalage : " + signe
+                + secondes / 60 + " min " + secondes % 60 + " s"
+                + (arret.estHorsPlage() ? " — Hors plage" : "");
+    }
+
     private void effacerDemandes() {
         observer(null);
     }
@@ -479,6 +611,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void effacerListeTournee() {
         carte.afficherArrets(List.of());
         listeTournee.getItems().clear();
+        lignesTournee.clear();
         listeTournee.setVisible(false);
         listeTournee.setManaged(false);
     }

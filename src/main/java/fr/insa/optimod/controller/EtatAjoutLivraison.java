@@ -66,12 +66,15 @@ final class EtatAjoutLivraison implements Etat {
                         saisie.dureeCollecte());
                 int dureeLivraison = MapScreen.SaisieDemande.convertirDuree(
                         saisie.dureeLivraison());
-                if (saisie.livreur() != 1) {
-                    throw new IllegalArgumentException(
-                            "Seul le livreur 1 est disponible.");
+                int nombreLivreurs = controleur.obtenirProgramme()
+                        .obtenirNombreLivreurs();
+                if (saisie.livreur() < 1 || saisie.livreur() > nombreLivreurs) {
+                    throw new IllegalArgumentException("Livreur "
+                            + saisie.livreur() + " inconnu : il y a "
+                            + nombreLivreurs + " livreur(s).");
                 }
                 controleur.ajouterDemande(new Demande(collecte, livraison,
-                        dureeCollecte, dureeLivraison));
+                        dureeCollecte, dureeLivraison, saisie.livreur()));
             } catch (IllegalArgumentException erreur) {
                 controleur.afficherConsigne(erreur.getMessage());
             }

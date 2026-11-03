@@ -4,13 +4,14 @@ import java.io.File;
 import java.util.Optional;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Ce que le contrôleur attend de l'écran de la carte. Séparer cette interface
@@ -22,7 +23,7 @@ public interface MapScreen {
      * Saisie des durées en minutes et du livreur choisi.
      * @param dureeCollecte minutes de collecte saisies
      * @param dureeLivraison minutes de livraison saisies
-     * @param livreur numéro du livreur (1 dans le modèle actuel)
+     * @param livreur numéro du livreur 
      */
     record SaisieDemande(String dureeCollecte, String dureeLivraison,
             int livreur) {
@@ -85,6 +86,8 @@ public interface MapScreen {
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */
         SUPPRIMER_DEMANDE,
+        /** Boutons « Monter » et « Descendre » (arrêt sélectionné). */
+        CHANGER_ORDRE,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -180,6 +183,26 @@ public interface MapScreen {
     void definirActionSupprimerDemande(IntConsumer action);
 
     /**
+     * Définit l'action du bouton « Monter » (faire passer plus tôt l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionMonterArret(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Descendre » (faire passer plus tard l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionDescendreArret(BiConsumer<Integer, Integer> action);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter
@@ -208,9 +231,6 @@ public interface MapScreen {
      */
     void afficherConsigne(String consigne);
 
-    /** Retire la tournée affichée (elle ne correspond plus aux demandes). */
-    void effacerTournee();
-
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.
      *
@@ -219,11 +239,24 @@ public interface MapScreen {
     void afficherAttente(boolean waiting);
 
     /**
-     * Affiche la tournée calculée.
+     * Sélectionne un arrêt dans la liste des tournées. Après un changement
+     * d'ordre, la liste est refaite (la vue observe le programme) et la
+     * sélection perdue : le contrôleur resélectionne l'arrêt déplacé, à sa
+     * nouvelle place.
      *
-     * @param tournee arrêts de la tournée avec leurs heures de passage
+     * @param livreur numéro du livreur de la tournée
+     * @param rang rang de l'arrêt dans sa tournée (0 est le départ de
+     *        l'entrepôt)
      */
-    void afficherTournee(Tournee tournee);
+    void selectionnerArretTournee(int livreur, int rang);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement d'ordre est refusé ; les
+     * tournées affichées n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusOrdre(String detail);
 
     /**
      * Signale que le calcul a échoué.

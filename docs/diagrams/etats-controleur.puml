@@ -10,8 +10,7 @@ EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatProgrammeCharge : Restaurer
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
-EtatTourneeCalculee : (sous-classe)
-EtatTourneeCalculee : Sauvegarder
+EtatTourneeCalculee : + Monter, Descendre, Sauvegarder (sous-classe)
 EtatRestauration : boutons : aucun
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
@@ -20,30 +19,34 @@ EtatAjoutLivraison : idCollecte : long
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
-EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
 EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
 EtatTourneeCalculee --> EtatCalculEnCours : calculer
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
-state "Choix de l'état selon le cache" as cache <<choice>>
-EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
-EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
-cache --> EtatTourneeCalculee : [tournée des demandes en cache]
-cache --> EtatProgrammeCharge : [sinon]
+state "Choix de l'état selon les tournées du programme" as choix <<choice>>
+EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
+EtatTourneeCalculee --> choix : annuler / refaire
+EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
+EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
+EtatTourneeCalculee --> EtatCalculEnCours : changerOrdre (livreur, rang)
+EtatCalculEnCours --> choix : fin du changement d'ordre / CommandeChangerOrdre
+EtatCalculEnCours --> EtatTourneeCalculee : fin du changement d'ordre [refusé]
+choix --> EtatTourneeCalculee : [tournées rangées dans le programme]
+choix --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
 EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud [valide] / afficher collecte provisoire
-EtatAjoutLivraison --> cache : saisie valide [sans tournée] / commande
-EtatAjoutLivraison --> EtatCalculEnCours : durées et position validées [tournée en cache] / insertion
-EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande et cache
-EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conservé, alerte
-EtatAjoutLivraison --> cache : dialogue annulé / effacer points provisoires
 EtatAjoutLivraison --> EtatAjoutLivraison : second clic / afficher livraison provisoire
+EtatAjoutLivraison --> choix : saisie valide [sans tournées] / CommandeAjouterDemande
+EtatAjoutLivraison --> EtatCalculEnCours : saisie valide [tournées calculées] / insertion
+EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / CommandeAjouterDemande
+EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conservé, alerte
 EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
-EtatAjoutCollecte --> cache : ajouterDemande ou annuler / effacer aperçu
-EtatAjoutLivraison --> cache : ajouterDemande ou annuler / effacer aperçu
+EtatAjoutCollecte --> choix : ajouterDemande ou annuler / effacer aperçu
+EtatAjoutLivraison --> choix : ajouterDemande, annuler ou dialogue annulé / effacer aperçu
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]

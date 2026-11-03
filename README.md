@@ -32,10 +32,12 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Calculer la meilleure tournée (départ à l'heure du fichier, 15 km/h, retour avant 13 h) | fait |
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
-| Saisir les durées et insérer une demande sans relancer le TSP | fait (un livreur) |
+| Plusieurs livreurs : une tournée par livreur (modèle et calcul) | fait |
+| Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
+| Saisir les durées et insérer une demande sans relancer le TSP | fait |
 | Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
-| Déplacer un point, changer l'ordre des arrêts, plusieurs livreurs | à faire |
-| Sauvegarder et restaurer la tournée d'un livreur (XML) | fait |
+| Régler le nombre de livreurs, déplacer un point | à faire |
+| Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
 ## Installer le projet
 
@@ -135,21 +137,36 @@ de même taille.
    (losange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
    à gauche. Survoler un point met sa demande en évidence.
-3. **Calculer** : l'application calcule la meilleure tournée et affiche à
-   droite les arrêts avec leurs heures d'arrivée et de départ. Si aucune
-   tournée possible n'existe (adresse inaccessible, retour après 13 h), un
-   message l'explique.
+3. **Calculer** : l'application calcule la meilleure tournée de chaque
+   livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
+   départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
+   inaccessible, un message l'explique ; si un livreur revient après 13 h,
+   sa tournée est affichée quand même, sans message d'erreur (les arrêts en
+   retard seront mis en rouge : TIG-71).
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
      entières strictement positives en minutes (5 par défaut) et choisir le
-     livreur (seul le livreur 1 est disponible actuellement) ;
+     livreur ;
      le carré de collecte apparaît dès le premier clic, puis le rond de
      livraison au second, avant validation du dialogue. Recliquer sur le
      bouton, utiliser *Annuler* (Ctrl+Z) avant le second clic ou annuler un
      dialogue efface ces points provisoires sans modifier le programme ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
-     cliquer sur le bouton sous la liste ;
+     cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
+     mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls
+     les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s).
+     Une consigne prévient que cet ordre n'est peut-être plus le plus court
+     (elle nomme le livreur s'il y en a plusieurs) ;
+   - *Monter* / *Descendre* : sélectionner un arrêt dans la liste de la
+     tournée (à droite), puis cliquer sur le bouton sous la liste. L'arrêt
+     échange sa place avec son voisin et les heures de passage sont recalculées
+     tout de suite ; seule la tournée de son livreur change. L'arrêt reste
+     sélectionné, on peut donc le déplacer de plusieurs rangs en recliquant.
+     L'entrepôt (départ et retour) ne se déplace pas. Si le point de livraison
+     d'une demande passerait avant son point de collecte (contrainte d'ordre),
+     ou si le changement ferait dépasser 13 h à une tournée qui rentrait à
+     l'heure, une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -185,18 +202,18 @@ Termes principaux et leur traduction dans le code :
 | Tronçon | Un bout de rue entre deux nœuds, avec nom et longueur | `Troncon` |
 | Adresse | Un nœud du plan où l'on passe | `Noeud` (champ `entrepot`, `collecte`…) |
 | Entrepôt | Lieu de départ et de retour des livreurs | `ProgrammeLivraisons.obtenirEntrepot()` |
-| Livreur | Cycliste qui fait la tournée (un seul par défaut) | — |
+| Livreur | Cycliste qui fait une tournée (un seul par défaut), numéroté à partir de 1 | `Demande.livreur()`, `ProgrammeLivraisons.obtenirNombreLivreurs()` |
 | Demande de livraison | Un colis à récupérer puis à déposer | `ProgrammeLivraisons.Demande` |
 | Programme de livraisons | Toutes les demandes à traiter, lues dans un fichier ou saisies | `ProgrammeLivraisons` |
 | Point de collecte | Où l'on récupère le colis (carré sur la carte) | `Demande.collecte()` |
 | Point de livraison | Où l'on dépose le colis (rond sur la carte) | `Demande.livraison()` |
 | Collecte / Livraison | Récupération / dépôt du colis par le livreur | — |
 | Durée sur place | Temps passé à récupérer ou déposer, en secondes | `dureeCollecte`, `dureeLivraison` |
-| Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h | `Tournee` |
-| Arrêt, heure de passage | Un point de la tournée et ses heures d'arrivée et de départ | `Tournee.Arret` |
+| Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h ; une par livreur | `Tournee`, `ProgrammeLivraisons.obtenirTournees()` |
+| Arrêt, heure de passage | Un point de la tournée (entrepôt, collecte ou livraison) et ses heures d'arrivée et de départ | `Tournee.Arret` |
 | Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
-| Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournee` |
-| Tournée possible | Tournée qui respecte toutes les règles | sinon `IllegalStateException` |
+| Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
+| Tournée possible | Tournée qui respecte toutes les règles, dont le retour avant 13 h | `Tournee.estPossible()` |
 | Contrainte d'ordre | Le colis est récupéré avant d'être livré | `GrapheDepandance` |
 | Vitesse | 15 km/h pour tous | `Plan.VITESSE_KMH` |
 | Modification interactive | Ajout, suppression, déplacement, changement d'ordre | `Commande*` |
@@ -240,12 +257,25 @@ Les trois design patterns :
   demandes changent ; la vue se redessine seule
   ([ADR 0003](docs/adr/0003-design-pattern-observer-modele-vue.md)).
 - **Command** (TIG-92) : chaque modification du programme est une commande
-  annulable ; les tournées calculées sont gardées en cache
-  ([ADR 0004](docs/adr/0004-design-pattern-command-annulation.md)).
+  annulable, qui garde les tournées d'avant et d'après
+  ([ADR 0004](docs/adr/0004-design-pattern-command-annulation.md),
+  [ADR 0006](docs/adr/0006-plusieurs-livreurs.md)).
 
-Le calcul de la tournée vit dans `Plan.calculerTournee` : A* entre chaque
-couple d'adresses, ordre de passage par séparation et évaluation (`TSP3`),
-puis heures de passage ([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md)).
+Le calcul des tournées vit dans `Plan.calculerTournees`, une tournée par
+livreur : A* entre chaque couple d'adresses, ordre de passage par séparation
+et évaluation (`TSP3`), puis heures de passage
+([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md),
+[ADR 0006](docs/adr/0006-plusieurs-livreurs.md)). Les tournées sont rangées
+dans le `ProgrammeLivraisons`, que la vue observe.
+
+Le voyageur de commerce ne sert qu'au bouton *Calculer*. Quand on modifie une
+tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres
+arrêts est gardé, les trajets des jonctions créées (A*) sont les seuls
+recalculés, les autres trajets sont repris de la tournée actuelle, et les
+heures de passage sont refaites. La suppression d'une demande passe par
+`Plan.calculerTourneeSansDemande` et le changement d'ordre d'un arrêt par
+`Plan.calculerTourneeOrdreChange`. « Recalcul local » est un terme technique,
+pas du vocabulaire métier.
 
 ## Structure du dépôt
 

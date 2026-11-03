@@ -1,5 +1,6 @@
 package fr.insa.optimod.controller;
 
+import java.util.Map;
 import java.util.Set;
 
 import fr.insa.optimod.model.Tournee;
@@ -59,15 +60,16 @@ interface Etat {
     }
 
     /**
-     * Fin du calcul de la tournée, sur le thread de l'interface. Ignorée par
+     * Fin du calcul des tournées, sur le thread de l'interface. Ignorée par
      * défaut.
      *
      * @param controleur contrôleur à piloter
-     * @param tournee tournée calculée, ou {@code null} en cas d'erreur
+     * @param tournees tournées par numéro de livreur, ou {@code null} en cas
+     *        d'erreur
      * @param erreur explication de l'erreur, ou {@code null}
      */
-    default void finirCalcul(MainController controleur, Tournee tournee,
-            String erreur) {
+    default void finirCalcul(MainController controleur,
+            Map<Integer, Tournee> tournees, String erreur) {
     }
 
     /**
@@ -85,6 +87,20 @@ interface Etat {
      * @param position rang de la demande sélectionnée
      */
     default void supprimerDemande(MainController controleur, int position) {
+    }
+
+    /**
+     * Clic sur « Monter » ou « Descendre » : change l'ordre d'un arrêt de la
+     * tournée d'un livreur. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param livreur numéro du livreur de l'arrêt sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    default void changerOrdre(MainController controleur, int livreur,
+            int rang, int decalage) {
     }
 
     /**
