@@ -191,7 +191,7 @@ public class TSPTest {
         } catch (IOException | SAXException e) {
             e.printStackTrace();
         }
-        plan.calculerTournee(livraisons);
+        plan.calculerTournees(livraisons);
     }
 
     /** Calcule une tournée sur le grand plan avec la demande moyenne 5. */
@@ -209,7 +209,7 @@ public class TSPTest {
         } catch (IOException | SAXException e) {
             e.printStackTrace();
         }
-        Tournee t = plan.calculerTournee(livraisons);
+        Tournee t = plan.calculerTournees(livraisons).get(1);
         Iterator<Arret> it = t.arrets().iterator();
         while (it.hasNext()) {
             Arret i = it.next();

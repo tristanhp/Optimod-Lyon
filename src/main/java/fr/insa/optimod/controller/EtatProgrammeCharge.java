@@ -12,6 +12,11 @@ import fr.insa.optimod.controller.MapScreen.Action;
 class EtatProgrammeCharge implements Etat {
 
     @Override
+    public void restaurer(MainController controleur) {
+        controleur.restaurerSauvegarde();
+    }
+
+    @Override
     public void calculer(MainController controleur) {
         controleur.changerEtat(new EtatCalculEnCours());
         controleur.lancerCalcul();
@@ -46,7 +51,8 @@ class EtatProgrammeCharge implements Etat {
     public Set<Action> actionsPermises(MainController controleur) {
         Set<Action> actions = EnumSet.of(Action.IMPORTER_PLAN,
                 Action.IMPORTER_PROGRAMME, Action.CALCULER,
-                Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE);
+                Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
+                Action.RESTAURER);
         if (controleur.peutAnnuler()) {
             actions.add(Action.ANNULER);
         }

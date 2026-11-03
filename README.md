@@ -32,9 +32,13 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Calculer la meilleure tournée (départ à l'heure du fichier, 15 km/h, retour avant 13 h) | fait |
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
+| Plusieurs livreurs : une tournée par livreur (modèle et calcul) | fait |
 | Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
-| Déplacer un point, plusieurs livreurs | à faire |
-| Sauvegarder et restaurer les tournées | à faire |
+| Saisir les durées et insérer une demande sans relancer le TSP | fait |
+| Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
+| Déplacer un point de collecte ou de livraison | fait |
+| Régler le nombre de livreurs | à faire |
+| Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
 ## Installer le projet
 
@@ -42,8 +46,9 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 
 - **JDK 27** (fixé dans [`.sdkmanrc`](.sdkmanrc) ; ce n'est pas une version
   LTS) et **Maven 3.9+**.
-- **Sous Windows : WSL** (Ubuntu conseillé). Le projet se clone, se compile et
-  se lance dans WSL ; VS Code s'y connecte avec l'extension *WSL*.
+- **Sous Windows :** le workflow de l'équipe utilise WSL (Ubuntu conseillé),
+  avec l'extension *WSL* de VS Code. Une installation native avec PowerShell
+  est aussi décrite ci-dessous, notamment pour Windows 10 sans WSLg.
 - **VS Code** avec les extensions recommandées, proposées à l'ouverture du
   dossier (liste dans [`.vscode/extensions.json`](.vscode/extensions.json)) :
   Java, Maven, tests, débogueur, EditorConfig, Coverage Gutters.
@@ -61,6 +66,26 @@ Si VS Code ne trouve pas le bon JDK, pointer `JAVA_HOME` vers
 
 ### Vérifier l'installation
 
+Sur un nouveau PC Windows, Java 11 ne suffit pas. Pour travailler directement
+dans PowerShell (notamment sans WSLg sous Windows 10) :
+
+1. Installer le **JDK 27**, puis **Apache Maven 3.9+** depuis leurs sites
+   officiels : [Java](https://www.oracle.com/java/technologies/downloads/),
+   [Maven](https://maven.apache.org/download.cgi).
+2. Dans les variables d'environnement utilisateur, définir `JAVA_HOME` vers
+   le dossier du JDK 27 (sans `bin`) et ajouter `%JAVA_HOME%\bin` et le dossier
+   `bin` de Maven au `Path`. Placer Java 27 avant les anciens Java.
+   Ces chemins dépendent du PC et ne doivent pas être committés.
+3. Fermer puis rouvrir VS Code. Installer les extensions recommandées via
+   l'onglet Extensions, filtre `@recommended`.
+4. Ouvrir le dossier contenant `pom.xml`, puis exécuter `Java: Configure
+   Java Runtime` dans la palette de commandes pour vérifier le JDK du projet.
+5. Dans un **nouveau terminal PowerShell**, vérifier `java -version`,
+   `javac -version` (27) et `mvn -version` (Maven 3.9+ utilisant Java 27).
+   Lancer ensuite `mvn clean verify`, puis `mvn javafx:run`.
+
+JavaFX est téléchargé par Maven ; aucun SDK JavaFX séparé n'est nécessaire.
+
 ```bash
 git clone https://github.com/tristanhp/Optimod-Lyon.git
 cd Optimod-Lyon
@@ -75,8 +100,11 @@ mvn clean verify    # compile, lance tous les tests, vérifie la couverture
 mvn javafx:run
 ```
 
-Maven télécharge JavaFX au premier lancement ; sous Windows, la fenêtre
-s'affiche grâce à WSLg (Windows 11). Autres façons de lancer :
+Maven télécharge JavaFX au premier lancement. Le lancement utilise le
+classpath pour rendre accessibles les bibliothèques natives du système,
+même si le projet embarque plusieurs variantes de JavaFX. Sous Windows,
+la fenêtre s'affiche directement avec Java natif ; sous WSL, elle nécessite
+WSLg ou un serveur d'affichage. Autres façons de lancer :
 
 - VS Code : *Exécuter et déboguer*, configuration **Interface JavaFX** ;
 - archive exécutable : `mvn clean package` puis
@@ -88,6 +116,15 @@ Ne pas lancer `MainApp` directement : JavaFX exige de passer par
 `AppLauncher`.
 
 ### Utiliser
+
+**Sauvegarde et restauration (modèle actuel : un livreur)** : après un calcul,
+cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
+dès l'ouverture et hors opération en cours, recharge le plan référencé et le
+programme, puis recalcule les trajets et les heures sans changer l'ordre des
+arrêts et sans relancer le TSP. La restauration réussie vide Annuler/Rétablir.
+Un fichier invalide laisse le travail courant intact. Garder le fichier du
+plan à son emplacement ; il n'est pas inclus dans la sauvegarde.
+Le [format XML](docs/sauvegarde-tournee.md) décrit les limites de cette version.
 
 Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 (`petitPlan.xml`, `moyenPlan.xml`, `grandPlan.xml`) et des fichiers de
@@ -101,31 +138,60 @@ de même taille.
    (losange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
    à gauche. Survoler un point met sa demande en évidence.
-3. **Calculer** : l'application calcule la meilleure tournée et affiche à
-   droite les arrêts avec leurs heures d'arrivée et de départ. Si aucune
-   tournée possible n'existe (adresse inaccessible, retour après 13 h), un
-   message l'explique.
+3. **Calculer** : l'application calcule la meilleure tournée de chaque
+   livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
+   départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
+   inaccessible, un message l'explique ; si un livreur revient après 13 h,
+   sa tournée est affichée quand même, sans message d'erreur (les arrêts en
+   retard seront mis en rouge : TIG-71).
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
-     collecte, puis sur le point de livraison (durées sur place : 5 min) ;
-     recliquer sur le bouton annule l'ajout ;
+     collecte, puis sur le point de livraison ; saisir les deux durées
+     entières strictement positives en minutes (5 par défaut) et choisir le
+     livreur ;
+     le carré de collecte apparaît dès le premier clic, puis le rond de
+     livraison au second, avant validation du dialogue. Recliquer sur le
+     bouton, utiliser *Annuler* (Ctrl+Z) avant le second clic ou annuler un
+     dialogue efface ces points provisoires sans modifier le programme ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
      cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
      mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls
      les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s).
-     Une consigne rappelle que cet ordre n'est pas optimisé : *Calculer* en
-     cherche un meilleur ;
+     Une consigne prévient que cet ordre n'est peut-être plus le plus court
+     (elle nomme le livreur s'il y en a plusieurs) ;
    - *Monter* / *Descendre* : sélectionner un arrêt dans la liste de la
      tournée (à droite), puis cliquer sur le bouton sous la liste. L'arrêt
      échange sa place avec son voisin et les heures de passage sont recalculées
-     tout de suite ; l'arrêt reste sélectionné, on peut donc le déplacer de
-     plusieurs rangs en recliquant. L'entrepôt (départ et retour) ne se déplace
-     pas. Si le point de livraison d'une demande passerait avant son point de
-     collecte (contrainte d'ordre), ou si le retour à l'entrepôt dépasserait
-     13 h, une fenêtre explique le refus et rien ne change ;
+     tout de suite ; seule la tournée de son livreur change. L'arrêt reste
+     sélectionné, on peut donc le déplacer de plusieurs rangs en recliquant.
+     L'entrepôt (départ et retour) ne se déplace pas. Si le point de livraison
+     d'une demande passerait avant son point de collecte (contrainte d'ordre),
+     ou si le changement ferait dépasser 13 h à une tournée qui rentrait à
+     l'heure, une fenêtre explique le refus et rien ne change ;
+   - *Déplacer* : sélectionner un point de collecte ou de livraison dans la
+     liste des tournées, cliquer sur *Déplacer*, puis sur sa nouvelle adresse
+     sur la carte (un second clic sur *Déplacer* annule). L'ordre des arrêts ne
+     change pas : seuls les deux trajets autour du point sont recalculés, et
+     seule la tournée de son livreur change. Si la tournée devient impossible
+     (adresse inaccessible, ou retour après 13 h pour une tournée qui rentrait
+     à l'heure), une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
+
+Après les clics sur la carte et la saisie des durées, choisir entre quels
+arrêts insérer la demande. La collecte puis la livraison sont insérées
+consécutivement à cette position, sans modifier l'ordre des anciens arrêts
+et sans relancer le TSP. Seuls les trois trajets reliant les voisins à la
+nouvelle demande sont recalculés. Annuler ce choix ne modifie rien.
+Un ajout impossible avant 13 h est refusé sans modifier le programme.
+Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
+L'insertion conserve les plages des anciens arrêts ; la liste signale les
+dépassements en rouge et affiche le décalage en minutes et secondes.
+Annuler reste disponible. Le bouton Calculer fixe de
+nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
+calcul volontaire. Survoler un arrêt affiche son heure et sa plage annoncée.
+Le support multi-livreurs reste à intégrer.
 
 Un fichier invalide (XML mal formé, adresse absente du plan, durée négative…)
 ouvre une fenêtre qui explique l'erreur ; rien n'est perdu.
@@ -144,17 +210,18 @@ Termes principaux et leur traduction dans le code :
 | Tronçon | Un bout de rue entre deux nœuds, avec nom et longueur | `Troncon` |
 | Adresse | Un nœud du plan où l'on passe | `Noeud` (champ `entrepot`, `collecte`…) |
 | Entrepôt | Lieu de départ et de retour des livreurs | `ProgrammeLivraisons.obtenirEntrepot()` |
-| Livreur | Cycliste qui fait la tournée (un seul par défaut) | — |
+| Livreur | Cycliste qui fait une tournée (un seul par défaut), numéroté à partir de 1 | `Demande.livreur()`, `ProgrammeLivraisons.obtenirNombreLivreurs()` |
 | Demande de livraison | Un colis à récupérer puis à déposer | `ProgrammeLivraisons.Demande` |
 | Programme de livraisons | Toutes les demandes à traiter, lues dans un fichier ou saisies | `ProgrammeLivraisons` |
 | Point de collecte | Où l'on récupère le colis (carré sur la carte) | `Demande.collecte()` |
 | Point de livraison | Où l'on dépose le colis (rond sur la carte) | `Demande.livraison()` |
 | Collecte / Livraison | Récupération / dépôt du colis par le livreur | — |
 | Durée sur place | Temps passé à récupérer ou déposer, en secondes | `dureeCollecte`, `dureeLivraison` |
-| Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h | `Tournee` |
-| Arrêt, heure de passage | Un point de la tournée et ses heures d'arrivée et de départ | `Tournee.Arret` |
-| Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournee` |
-| Tournée possible | Tournée qui respecte toutes les règles | sinon `IllegalStateException` |
+| Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h ; une par livreur | `Tournee`, `ProgrammeLivraisons.obtenirTournees()` |
+| Arrêt, heure de passage | Un point de la tournée (entrepôt, collecte ou livraison) et ses heures d'arrivée et de départ | `Tournee.Arret` |
+| Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
+| Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
+| Tournée possible | Tournée qui respecte toutes les règles, dont le retour avant 13 h | `Tournee.estPossible()` |
 | Contrainte d'ordre | Le colis est récupéré avant d'être livré | `GrapheDepandance` |
 | Vitesse | 15 km/h pour tous | `Plan.VITESSE_KMH` |
 | Modification interactive | Ajout, suppression, déplacement, changement d'ordre | `Commande*` |
@@ -198,12 +265,16 @@ Les trois design patterns :
   demandes changent ; la vue se redessine seule
   ([ADR 0003](docs/adr/0003-design-pattern-observer-modele-vue.md)).
 - **Command** (TIG-92) : chaque modification du programme est une commande
-  annulable ; les tournées calculées sont gardées en cache
-  ([ADR 0004](docs/adr/0004-design-pattern-command-annulation.md)).
+  annulable, qui garde les tournées d'avant et d'après
+  ([ADR 0004](docs/adr/0004-design-pattern-command-annulation.md),
+  [ADR 0006](docs/adr/0006-plusieurs-livreurs.md)).
 
-Le calcul de la tournée vit dans `Plan.calculerTournee` : A* entre chaque
-couple d'adresses, ordre de passage par séparation et évaluation (`TSP3`),
-puis heures de passage ([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md)).
+Le calcul des tournées vit dans `Plan.calculerTournees`, une tournée par
+livreur : A* entre chaque couple d'adresses, ordre de passage par séparation
+et évaluation (`TSP3`), puis heures de passage
+([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md),
+[ADR 0006](docs/adr/0006-plusieurs-livreurs.md)). Les tournées sont rangées
+dans le `ProgrammeLivraisons`, que la vue observe.
 
 Le voyageur de commerce ne sert qu'au bouton *Calculer*. Quand on modifie une
 tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres

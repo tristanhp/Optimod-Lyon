@@ -1,6 +1,8 @@
 package fr.insa.optimod.view;
 
 import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -9,6 +11,8 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Troncon;
+import fr.insa.optimod.model.Tournee;
+import javafx.scene.control.Tooltip;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
@@ -61,8 +65,9 @@ final class MapCanvas extends Pane {
     };
 
     /**
-     * @return couleur de la demande d'indice donné, la même sur la carte et
-     * dans la liste
+     * Renvoie la couleur commune à la carte et à la liste pour une demande.
+     * @param indice rang de la demande
+     * @return couleur de la demande
      */
     static Color couleurDemande(int indice) {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
@@ -75,11 +80,32 @@ final class MapCanvas extends Pane {
     /** Surface de dessin. */
     private final Canvas canevas = new Canvas();
 
+    /** Arrêts affichables dans le popup de survol. */
+    private List<Tournee.Arret> arrets = List.of();
+
+    /** Popup des heures et plages annoncées au nœud survolé. */
+    private final Tooltip detailsArret = new Tooltip();
+
     /** Plan affiché, ou {@code null}. */
     private Plan plan;
 
     /** Demandes affichées, ou {@code null}. */
     private ProgrammeLivraisons programme;
+
+    /** Points de la demande en cours, indépendants du programme validé. */
+    private Noeud collecteProvisoire;
+    private Noeud livraisonProvisoire;
+
+    /**
+     * Redessine les points choisis avant validation de la demande.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        collecteProvisoire = collecte;
+        livraisonProvisoire = livraison;
+        dessinerCarte();
+    }
 
     /** Zoom courant ; 1 affiche le plan entier. */
     private double zoom = 1;
@@ -107,6 +133,7 @@ final class MapCanvas extends Pane {
     /** Crée une carte vide. */
     MapCanvas() {
         getChildren().add(canevas);
+        Tooltip.install(this, detailsArret);
         setOnScroll(evenement -> {
             if (evenement.getDeltaY() != 0) {
                 zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1
@@ -139,9 +166,33 @@ final class MapCanvas extends Pane {
                 }
             }
         });
-        setOnMouseMoved(evenement -> signalerSurvol(
-                trouverDemande(evenement.getX(), evenement.getY())));
-        setOnMouseExited(evenement -> signalerSurvol(-1));
+        setOnMouseMoved(evenement -> {
+            signalerSurvol(trouverDemande(evenement.getX(), evenement.getY()));
+            Noeud noeud = trouverNoeud(evenement.getX(), evenement.getY());
+            DateTimeFormatter heure = DateTimeFormatter.ofPattern("HH:mm");
+            String texte = arrets.stream()
+                    .filter(arret -> arret.noeud().equals(noeud))
+                    .map(arret -> "Arrivée " + heure.format(arret.arrivee())
+                            + " — plage " + heure.format(arret.debutPlage())
+                            + " – " + heure.format(arret.finPlage())
+                            + (arret.estHorsPlage() ? " (hors plage)" : ""))
+                    .collect(Collectors.joining("\n"));
+            detailsArret.setText(texte);
+            if (texte.isEmpty()) {
+                detailsArret.hide();
+            }
+        });
+        setOnMouseExited(evenement -> {
+            signalerSurvol(-1);
+            detailsArret.hide();
+        });
+    }
+
+    /** @param passages arrêts à présenter au survol, vide pour les effacer */
+    void afficherArrets(List<Tournee.Arret> passages) {
+        arrets = List.copyOf(passages);
+        detailsArret.hide();
+        detailsArret.setText("");
     }
 
     /**
@@ -263,6 +314,8 @@ final class MapCanvas extends Pane {
      * @param nouveauPlan plan à dessiner
      */
     void afficherPlan(Plan nouveauPlan) {
+        collecteProvisoire = null;
+        livraisonProvisoire = null;
         plan = nouveauPlan;
         programme = null;
         demandeEnEvidence = -1;
@@ -286,6 +339,8 @@ final class MapCanvas extends Pane {
 
     /** Efface la carte. */
     void effacerCarte() {
+        collecteProvisoire = null;
+        livraisonProvisoire = null;
         plan = null;
         programme = null;
         demandeEnEvidence = -1;
@@ -333,6 +388,28 @@ final class MapCanvas extends Pane {
         }
         if (programme != null) {
             dessinerDemandes(contexteGraphique);
+        }
+        dessinerPointsProvisoires(contexteGraphique);
+    }
+
+    /** Dessine l'aperçu au-dessus des points déjà validés. */
+    private void dessinerPointsProvisoires(GraphicsContext contexte) {
+        int indice = programme == null ? 0 : programme.obtenirDemandes().size();
+        contexte.setFill(couleurDemande(indice));
+        contexte.setStroke(COULEUR_CONTOUR_EVIDENCE);
+        contexte.setLineWidth(2);
+        double taille = TAILLE_MARQUEUR * TAILLE_EN_EVIDENCE;
+        if (collecteProvisoire != null) {
+            double x = ecranX(collecteProvisoire.longitude()) - taille;
+            double y = ecranY(collecteProvisoire.latitude()) - taille;
+            contexte.fillRect(x, y, 2 * taille, 2 * taille);
+            contexte.strokeRect(x, y, 2 * taille, 2 * taille);
+        }
+        if (livraisonProvisoire != null) {
+            double x = ecranX(livraisonProvisoire.longitude()) - taille;
+            double y = ecranY(livraisonProvisoire.latitude()) - taille;
+            contexte.fillOval(x, y, 2 * taille, 2 * taille);
+            contexte.strokeOval(x, y, 2 * taille, 2 * taille);
         }
     }
 

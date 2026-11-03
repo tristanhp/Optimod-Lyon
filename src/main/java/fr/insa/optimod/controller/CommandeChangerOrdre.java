@@ -1,38 +1,58 @@
 package fr.insa.optimod.controller;
 
+import java.util.Map;
+
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.Tournee;
+
 /**
- * Change l'ordre des arrêts de la tournée affichée ; l'annulation remet l'ordre
- * précédent. Les deux tournées (avant et après) sont calculées par
- * {@code Plan.calculerTourneeOrdreChange} avant la commande : exécuter ou
- * annuler ne fait que ranger l'une ou l'autre dans le cache du contrôleur, sans
- * aucun calcul. Chaque rangement est fait par le contrôleur, qui ne remplace
- * que la tournée que cette commande avait rangée : un nouveau calcul fait
- * entre-temps n'est pas écrasé.
+ * Change l'ordre des arrêts de la tournée d'un livreur ; l'annulation remet
+ * l'ordre précédent. Les demandes ne changent pas, seules les tournées : la
+ * commande garde celles d'avant et celles d'après, calculées par
+ * {@code Plan.calculerTourneeOrdreChange} avant la commande. Exécuter ou
+ * annuler ne fait que ranger les unes ou les autres dans le programme, sans
+ * aucun calcul.
  */
 final class CommandeChangerOrdre implements Commande {
 
-    /** Range dans le cache la tournée avec le nouvel ordre. */
-    private final Runnable ranger;
+    private final ProgrammeLivraisons programme;
 
-    /** Remet dans le cache la tournée d'avant le changement d'ordre. */
-    private final Runnable remettre;
+    /** Tournées d'avant le changement, remises par l'annulation. */
+    private Map<Integer, Tournee> tourneesAvant;
+
+    /** Tournées d'après le changement, rangées en exécutant. */
+    private Map<Integer, Tournee> tourneesApres;
 
     /**
-     * @param ranger range dans le cache la tournée avec le nouvel ordre
-     * @param remettre remet dans le cache la tournée d'avant
+     * @param programme programme dont les tournées changent
+     * @param tourneesAvant tournées par numéro de livreur avant le changement
+     * @param tourneesApres les mêmes, avec la nouvelle tournée du livreur
      */
-    CommandeChangerOrdre(Runnable ranger, Runnable remettre) {
-        this.ranger = ranger;
-        this.remettre = remettre;
+    CommandeChangerOrdre(ProgrammeLivraisons programme,
+            Map<Integer, Tournee> tourneesAvant,
+            Map<Integer, Tournee> tourneesApres) {
+        this.programme = programme;
+        this.tourneesAvant = tourneesAvant;
+        this.tourneesApres = tourneesApres;
     }
 
     @Override
     public void executer() {
-        ranger.run();
+        programme.definirTournees(tourneesApres);
     }
 
     @Override
     public void annuler() {
-        remettre.run();
+        programme.definirTournees(tourneesAvant);
+    }
+
+    @Override
+    public void memoriserTourneesAvant(Map<Integer, Tournee> tournees) {
+        tourneesAvant = tournees;
+    }
+
+    @Override
+    public void memoriserTourneesApres(Map<Integer, Tournee> tournees) {
+        tourneesApres = tournees;
     }
 }

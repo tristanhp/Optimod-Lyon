@@ -6,9 +6,14 @@ import java.util.Set;
 import fr.insa.optimod.controller.MapScreen.Action;
 
 /**
- * Aucun plan chargé : seul l'import d'un plan est possible.
+ * Aucun plan chargé : importer un plan ou restaurer une tournée est possible.
  */
 final class EtatInitial implements Etat {
+
+    @Override
+    public void restaurer(MainController controleur) {
+        controleur.restaurerSauvegarde();
+    }
 
     @Override
     public void importerProgramme(MainController controleur) {
@@ -16,6 +21,6 @@ final class EtatInitial implements Etat {
 
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
-        return EnumSet.of(Action.IMPORTER_PLAN);
+        return EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER);
     }
 }

@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -183,6 +185,173 @@ public class ProgrammeLivraisonsTest {
         assertSame(seconde, programme.retirerDemande(0));
         assertEquals(List.of(premiere), vue);
         assertEquals(List.of(2, 1), tailles);
+    }
+
+    // --- Plusieurs livreurs (TIG-95) ---
+
+    /** Programme vide de deux livreurs, entrepôt en C. */
+    private static ProgrammeLivraisons deuxLivreurs() {
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(C,
+                LocalTime.of(8, 0), List.of());
+        programme.definirNombreLivreurs(2);
+        return programme;
+    }
+
+    /** Une tournée par livreur, toutes vides. */
+    private static Map<Integer, Tournee> tourneesVides(int nombre) {
+        Map<Integer, Tournee> tournees = new HashMap<>();
+        for (int livreur = 1; livreur <= nombre; livreur++) {
+            tournees.put(livreur, Tournee.vide(C, LocalTime.of(8, 0)));
+        }
+        return tournees;
+    }
+
+    /** Une demande créée sans livreur est confiée au livreur 1. */
+    @Test
+    public void demandeConfieeAuLivreur1ParDefaut() {
+        assertEquals(1, new Demande(A, B, 60, 60).livreur());
+    }
+
+    /** Un numéro de livreur inférieur à 1 est refusé. */
+    @Test(expected = IllegalArgumentException.class)
+    public void numeroDeLivreurInvalideRefuse() {
+        new Demande(A, B, 60, 60, 0);
+    }
+
+    /** Changer de livreur donne une copie ; l'original ne change pas. */
+    @Test
+    public void avecLivreurDonneUneCopie() {
+        Demande demande = new Demande(A, B, 60, 120);
+        Demande copie = demande.avecLivreur(2);
+        assertEquals(2, copie.livreur());
+        assertEquals(1, demande.livreur());
+        assertEquals(new Demande(A, B, 60, 120, 2), copie);
+    }
+
+    /** Un fichier de demandes donne un livreur, à qui tout est confié. */
+    @Test
+    public void demandesDuFichierAuLivreur1() throws Exception {
+        try (InputStream xml = getClass().getResourceAsStream(
+                "/data/demandePetit2.xml")) {
+            ProgrammeLivraisons programme = new ProgrammeLivraisons(xml,
+                    petitPlan);
+            assertEquals(1, programme.obtenirNombreLivreurs());
+            for (Demande demande : programme.obtenirDemandes()) {
+                assertEquals(1, demande.livreur());
+            }
+            assertTrue(programme.obtenirTournees().isEmpty());
+        }
+    }
+
+    /** Un programme a un seul livreur au départ : livreur 2 refusé. */
+    @Test(expected = IllegalArgumentException.class)
+    public void unSeulLivreurALaCreation() {
+        new ProgrammeLivraisons(C, LocalTime.of(8, 0),
+                List.of(new Demande(A, B, 0, 0, 2)));
+    }
+
+    /** Il faut au moins un livreur. */
+    @Test(expected = IllegalArgumentException.class)
+    public void zeroLivreurRefuse() {
+        deuxLivreurs().definirNombreLivreurs(0);
+    }
+
+    /** On ne retire pas un livreur qui a encore des demandes. */
+    @Test
+    public void retirerUnLivreurQuiADesDemandesRefuse() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.ajouterDemande(0, new Demande(A, B, 0, 0, 2));
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.definirNombreLivreurs(1));
+        assertEquals(2, programme.obtenirNombreLivreurs());
+    }
+
+    /** Une demande pour un livreur qui n'existe pas est refusée. */
+    @Test
+    public void demandePourUnLivreurInconnuRefusee() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.ajouterDemande(0, new Demande(A, B, 0, 0, 3)));
+        assertTrue(programme.obtenirDemandes().isEmpty());
+    }
+
+    /** Remplacer une demande (changer de livreur) prévient les observateurs. */
+    @Test
+    public void remplacerUneDemandePrevientLesObservateurs() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        Demande demande = new Demande(A, B, 0, 0);
+        programme.ajouterDemande(0, demande);
+        List<Integer> appels = new ArrayList<>();
+        programme.ajouterObservateur(source -> appels.add(1));
+        programme.remplacerDemande(0, demande.avecLivreur(2));
+        assertEquals(2, programme.obtenirDemandes().get(0).livreur());
+        assertEquals(List.of(1), appels);
+    }
+
+    /** Les tournées rangées sont relues par livreur et notifiées. */
+    @Test
+    public void tourneesRangeesParLivreur() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        List<Integer> appels = new ArrayList<>();
+        programme.ajouterObservateur(source -> appels.add(1));
+        Map<Integer, Tournee> tournees = tourneesVides(2);
+        programme.definirTournees(tournees);
+        assertEquals(List.of(1, 2),
+                new ArrayList<>(programme.obtenirTournees().keySet()));
+        assertSame(tournees.get(2), programme.obtenirTournees().get(2));
+        assertEquals(List.of(1), appels);
+    }
+
+    /** Il faut exactement une tournée par livreur. */
+    @Test
+    public void tourneesIncompletesRefusees() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.definirTournees(tourneesVides(1)));
+        assertTrue(programme.obtenirTournees().isEmpty());
+    }
+
+    /** Les tournées renvoyées sont une copie qu'on ne peut pas modifier. */
+    @Test
+    public void tourneesRenvoyeesNonModifiables() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.definirTournees(tourneesVides(2));
+        Map<Integer, Tournee> copie = programme.obtenirTournees();
+        assertThrows(UnsupportedOperationException.class,
+                () -> copie.remove(1));
+        programme.effacerTournees();
+        assertEquals(2, copie.size());
+        assertTrue(programme.obtenirTournees().isEmpty());
+    }
+
+    /** Remplacer la tournée d'un livreur après un recalcul local. */
+    @Test
+    public void remplacerLaTourneeDUnLivreur() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.definirTournees(tourneesVides(2));
+        Tournee nouvelle = Tournee.vide(C, LocalTime.of(9, 0));
+        programme.definirTournee(2, nouvelle);
+        assertSame(nouvelle, programme.obtenirTournees().get(2));
+    }
+
+    /** Sans tournées calculées, on ne peut pas en remplacer une seule. */
+    @Test(expected = IllegalStateException.class)
+    public void remplacerUneTourneeSansCalculRefuse() {
+        deuxLivreurs().definirTournee(1, Tournee.vide(C, LocalTime.of(8, 0)));
+    }
+
+    /** Un livreur ajouté après le calcul a une tournée vide. */
+    @Test
+    public void livreurAjouteApresLeCalculATourneeVide() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.definirTournees(tourneesVides(2));
+        programme.definirNombreLivreurs(3);
+        Tournee ajoutee = programme.obtenirTournees().get(3);
+        assertEquals(1, ajoutee.arrets().size());
+        assertEquals(LocalTime.of(8, 0), ajoutee.obtenirHeureRetour());
+        programme.definirNombreLivreurs(1);
+        assertEquals(List.of(1),
+                new ArrayList<>(programme.obtenirTournees().keySet()));
     }
 
     /** Une position invalide est refusée sans prévenir les observateurs. */
