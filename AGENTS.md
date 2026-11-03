@@ -72,6 +72,41 @@ Règles :
   `MainController.executer(...)`, pour qu'Annuler et Rétablir marchent. Ne
   jamais modifier le modèle directement depuis un état ou la vue.
 
+## Modifier une tournée déjà calculée (cas 4)
+
+Règle du 26/10 : après le calcul, le voyageur de commerce n'est plus relancé.
+Toute modification du programme de livraisons garde l'ordre des autres arrêts
+et recalcule seulement les trajets touchés (A*) puis les heures de passage
+(*recalcul local*, voir le [README](README.md#architecture)). Chaque
+modification est une `Commande` annulable. Le ticket parent est TIG-42 : l'état
+et le responsable de chaque sous-issue se lisent dans Linear, pas ici.
+
+Pour brancher une nouvelle modification :
+
+1. **Calcul dans `Plan`** : une méthode publique qui vérifie les règles, puis
+   s'appuie sur le recalcul local existant (voir `calculerTourneeSansDemande`).
+   Pas de classe de calcul à part (voir *Architecture*).
+2. **Règles avant le recalcul** (contrainte d'ordre, faisabilité) : lever
+   `IllegalArgumentException` (demande refusée) ou `IllegalStateException`
+   (tournée impossible) avec un message lisible par l'utilisateur.
+3. **Une commande** : soit elle modifie les demandes (`CommandeAjouterDemande`,
+   `CommandeSupprimerDemande`), soit elle range une tournée dans le cache du
+   contrôleur. Le calcul se fait **avant** la commande ; annuler et rétablir
+   ne recalculent rien.
+4. **Une action dans `Etat`** (méthode par défaut qui ignore l'action,
+   redéfinie dans l'état qui la permet) et ses boutons dans `MapScreen`
+   (implémentés dans `MainView` et dans le faux écran des tests).
+5. **Un refus** s'affiche par l'écran et n'exécute pas la commande : la tournée
+   et l'historique restent intacts.
+6. **Un calcul long** tourne hors du thread JavaFX (voir *Architecture*).
+7. Tests d'abord ; README et diagrammes dans la même PR.
+
+Aujourd'hui l'application gère une seule tournée (un livreur), gardée dans le
+cache du contrôleur. Quand TIG-95 (plusieurs livreurs) publiera son contrat
+(tournées dans le modèle, `Arret` qui connaît sa demande), cette section, le
+cache et l'[ADR 0004](docs/adr/0004-design-pattern-command-annulation.md)
+seront à adapter, avec un nouvel ADR.
+
 ## Glossaire : nommer avec les mots du projet
 
 Le vocabulaire est fixé par le document Linear *AGILE Glossaire du projet*,
