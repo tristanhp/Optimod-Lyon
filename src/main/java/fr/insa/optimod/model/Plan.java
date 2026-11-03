@@ -260,9 +260,10 @@ public final class Plan {
             case CALCUL_TROP_LONG_SANS_RESULTAT:
                 throw new IllegalStateException("Aucune tournée possible trouvée dans la limite de "
                         + LIMITE_TEMPS_TSP_MS / 1000 + " s.");
-            case CALCUL_TROP_LONG:
-                throw new IllegalStateException("Solution non prouvée optimale due à une durée de calcul trop élevé.");
             default:
+                // CALCUL_TROP_LONG : la meilleure solution trouvée avant la
+                // limite de temps est gardée, même si elle n'est pas prouvée
+                // optimale.
                 break;
         }
         List<Integer> ordre = new ArrayList<>();
