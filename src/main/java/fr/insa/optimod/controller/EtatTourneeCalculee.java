@@ -10,17 +10,14 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
     /**
      * Supprime une demande en gardant l'ordre de passage des autres arrêts :
-     * la nouvelle tournée est d'abord calculée localement (A*, sans relancer
-     * le voyageur de commerce) et rangée dans le cache du contrôleur, puis la
-     * suppression est exécutée comme d'habitude. En retrouvant l'état du
-     * programme, le contrôleur trouve cette tournée dans le cache et
-     * l'affiche tout de suite. Si le recalcul local est impossible, rien n'est
-     * rangé dans le cache et on retombe sur le comportement de
-     * {@link EtatProgrammeCharge} : la tournée affichée est retirée.
+     * le contrôleur recalcule la tournée localement (A*, sans relancer le
+     * voyageur de commerce) hors du thread de l'interface, puis exécute la
+     * suppression et affiche la nouvelle tournée. Si le recalcul est
+     * impossible, la tournée affichée est retirée et l'utilisateur est
+     * prévenu.
      */
     @Override
     public void supprimerDemande(MainController controleur, int position) {
-        controleur.memoriserTourneeSansDemande(position);
-        super.supprimerDemande(controleur, position);
+        controleur.supprimerDemandeEnGardantLOrdre(position);
     }
 }

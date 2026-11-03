@@ -13,7 +13,6 @@ package "model" {
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
     +calculerTournee(programme : ProgrammeLivraisons) : Tournee
-    +recalculerTournee(heureDepart, adresses, durees) : Tournee
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     -calculerPlusCourtsChemins(adresses) : Chemin[][]
     -calculerOrdreDePassage(chemins) : List<Integer>
@@ -83,8 +82,8 @@ package "controller" {
     +obtenirProgramme() : ProgrammeLivraisons
     ~changerEtat(nouvelEtat : Etat)
     ~executer(commande : Commande)
-    ~memoriserTourneeSansDemande(position : int)
-    -tourneesCalculees : Map<List<Demande>, Tournee>
+    ~supprimerDemandeEnGardantLOrdre(position : int)
+    -tourneesCalculees : Map<List<Demande>, TourneeEnCache>
   }
   interface MapScreen
   interface Etat

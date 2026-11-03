@@ -25,7 +25,10 @@ EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valide
 
 state "Choix de l'état selon le cache" as cache <<choice>>
 EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
-EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
+EtatTourneeCalculee --> cache : annuler / refaire
+EtatTourneeCalculee --> cache : supprimerDemande [déjà calculée]
+EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande [sinon]
+EtatCalculEnCours --> cache : fin du recalcul local / CommandeSupprimerDemande
 cache --> EtatTourneeCalculee : [tournée des demandes en cache]
 cache --> EtatProgrammeCharge : [sinon]
 
