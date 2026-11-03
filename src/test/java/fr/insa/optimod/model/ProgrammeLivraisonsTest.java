@@ -30,7 +30,9 @@ public class ProgrammeLivraisonsTest {
 
     private static Plan petitPlan;
 
-    /** Charge le petit plan fourni, où se trouvent les adresses des demandes. */
+    /**
+     * Charge le petit plan fourni, où se trouvent les adresses des demandes.
+     */
     @BeforeClass
     public static void chargerPlan() throws Exception {
         petitPlan = PlansPourTests.petitPlan();
@@ -103,8 +105,10 @@ public class ProgrammeLivraisonsTest {
                     "/data/demande" + jeux[indice][0] + ".xml")) {
                 ProgrammeLivraisons programme = new ProgrammeLivraisons(xml,
                         plan);
-                assertEquals(tailles[indice], programme.obtenirDemandes().size());
-                assertEquals(LocalTime.of(8, 0), programme.obtenirHeureDepart());
+                assertEquals(tailles[indice], programme.obtenirDemandes()
+                        .size());
+                assertEquals(LocalTime.of(8, 0),
+                        programme.obtenirHeureDepart());
             }
         }
     }
@@ -112,8 +116,10 @@ public class ProgrammeLivraisonsTest {
     /** L'heure de départ s'écrit 8:0:0, 08:00 ou 08:00:30. */
     @Test
     public void formatsDHeure() throws Exception {
-        assertEquals(LocalTime.of(8, 0), ProgrammeLivraisons.lireHeure("8:0:0"));
-        assertEquals(LocalTime.of(8, 0), ProgrammeLivraisons.lireHeure("08:00"));
+        assertEquals(LocalTime.of(8, 0),
+                ProgrammeLivraisons.lireHeure("8:0:0"));
+        assertEquals(LocalTime.of(8, 0),
+                ProgrammeLivraisons.lireHeure("08:00"));
         assertEquals(LocalTime.of(8, 0, 30),
                 ProgrammeLivraisons.lireHeure("08:00:30"));
         for (String invalide : new String[] {"8", "25:00", "8:x", "1:2:3:4"}) {

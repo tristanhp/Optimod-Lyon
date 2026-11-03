@@ -17,8 +17,9 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.Arret;
 
+/** Tests du voyageur de commerce sur les plans et demandes fournis. */
 public class TSPTest {
-    private static final int nbSommets = 10;
+    private static final int NB_SOMMETS = 10;
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
     private static GrapheDepandance grapheDepandance;
@@ -32,51 +33,59 @@ public class TSPTest {
     private Plan plan;
     private ProgrammeLivraisons livraisons;
 
+    /** Prépare le graphe et le voyageur de commerce utilisés par les tests. */
     @BeforeClass
     public static void initialisation() throws IOException, SAXException {
         int iseed = 1;
         int cout[][];
-        cout = new int[nbSommets][nbSommets];
-        for (int i = 0; i < nbSommets; i++) {
-            for (int j = 0; j < nbSommets; j++) {
-                if (i == j)
+        cout = new int[NB_SOMMETS][NB_SOMMETS];
+        for (int i = 0; i < NB_SOMMETS; i++) {
+            for (int j = 0; j < NB_SOMMETS; j++) {
+                if (i == j) {
                     cout[i][j] = -1;
-                else {
+                } else {
                     int it = 16807 * (iseed % 127773) - 2836 * (iseed / 127773);
-                    if (it > 0)
+                    if (it > 0) {
                         iseed = it;
-                    else
+                    } else {
                         iseed = 2147483647 + it;
+                    }
                     cout[i][j] = COUT_MIN + iseed % (COUT_MAX - COUT_MIN + 1);
                 }
             }
         }
 
         HashMap<Integer, Integer> depandance = new HashMap<>();
-        for (int livraison = 2; livraison < nbSommets; livraison += 2) {
+        for (int livraison = 2; livraison < NB_SOMMETS; livraison += 2) {
             depandance.put(livraison, livraison - 1);
         }
         // System.out.println("Dependance : " + depandance);
 
-        grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
+        grapheDepandance = new GrapheDepandance(NB_SOMMETS, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercherSolution(10000, grapheDepandance);
 
         tsp2 = new TSP2();
-        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercherSolution(10000, grapheDepandance);
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance);
 
         tsp4 = new TSP4();
-        tsp4.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp4.chercherSolution(10000, grapheDepandance);
 
         tsp5 = new TSP5();
-        tsp5.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp5.chercherSolution(10000, grapheDepandance);
 
         tsp6 = new TSP6();
-        tsp6.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
+        // Graphe à 10 sommet et temps limite =1s
+        tsp6.chercherSolution(10000, grapheDepandance);
 
     }
 
@@ -86,24 +95,41 @@ public class TSPTest {
         // TODO : FAIRE UN TEST MEILLEUR
 
         // Performance TSP1
-        System.out.println("Duree TPS1 : " + Long.toString(tsp1.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS2 : " + Long.toString(tsp2.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS3 : " + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS4 : " + Long.toString(tsp4.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS5 : " + Long.toString(tsp5.obtenirDureeCalcul()) + "ms");
-        System.out.println("Duree TPS6 : " + Long.toString(tsp6.obtenirDureeCalcul()) + "ms");
-        System.out.println("Solution TPS1 : " + Long.toString(tsp1.obtenirCoutSolution()));
-        System.out.println("Solution TPS2 : " + Long.toString(tsp2.obtenirCoutSolution()));
-        System.out.println("Solution TPS3 : " + Long.toString(tsp3.obtenirCoutSolution()));
-        System.out.println("Solution TPS4 : " + Long.toString(tsp4.obtenirCoutSolution()));
-        System.out.println("Solution TPS5 : " + Long.toString(tsp5.obtenirCoutSolution()));
-        System.out.println("Solution TPS6 : " + Long.toString(tsp6.obtenirCoutSolution()));
-        assertEquals(145, tsp1.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-        assertEquals(145, tsp2.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-        assertEquals(145, tsp3.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
-        // assertEquals(145, tsp4.obtenirCoutSolution()); // TSP4 utilise opt-2 pas
+        System.out.println("Duree TPS1 : "
+                + Long.toString(tsp1.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS2 : "
+                + Long.toString(tsp2.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS3 : "
+                + Long.toString(tsp3.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS4 : "
+                + Long.toString(tsp4.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS5 : "
+                + Long.toString(tsp5.obtenirDureeCalcul()) + "ms");
+        System.out.println("Duree TPS6 : "
+                + Long.toString(tsp6.obtenirDureeCalcul()) + "ms");
+        System.out.println("Solution TPS1 : "
+                + Long.toString(tsp1.obtenirCoutSolution()));
+        System.out.println("Solution TPS2 : "
+                + Long.toString(tsp2.obtenirCoutSolution()));
+        System.out.println("Solution TPS3 : "
+                + Long.toString(tsp3.obtenirCoutSolution()));
+        System.out.println("Solution TPS4 : "
+                + Long.toString(tsp4.obtenirCoutSolution()));
+        System.out.println("Solution TPS5 : "
+                + Long.toString(tsp5.obtenirCoutSolution()));
+        System.out.println("Solution TPS6 : "
+                + Long.toString(tsp6.obtenirCoutSolution()));
+        // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp1.obtenirCoutSolution());
+        // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp2.obtenirCoutSolution());
+        // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp3.obtenirCoutSolution());
+        // assertEquals(145, tsp4.obtenirCoutSolution()); // TSP4 utilise opt-2
+        // pas
         // applicable sur ce graphe
-        assertEquals(145, tsp5.obtenirCoutSolution()); // VERIFIER QUE C'EST LA BONNE REPONSE
+        // VERIFIER QUE C'EST LA BONNE REPONSE
+        assertEquals(145, tsp5.obtenirCoutSolution());
         // assertEquals(145, tsp6.obtenirCoutSolution()); // TSP6 actuellement
         // non-fonctionnelle
     }
@@ -112,16 +138,19 @@ public class TSPTest {
     @Test
     public void testGetSolution() {
         System.out.print("Solution (TSP4) : ");
-        for (int i = 0; i < nbSommets; ++i) {
+        for (int i = 0; i < NB_SOMMETS; ++i) {
             System.out.print(tsp4.obtenirSommetSolution(i) + " -> ");
-            assertEquals(tsp1.obtenirSommetSolution(i), tsp2.obtenirSommetSolution(i));
-            assertEquals(tsp2.obtenirSommetSolution(i), tsp3.obtenirSommetSolution(i));
-            assertEquals(tsp3.obtenirSommetSolution(i), tsp5.obtenirSommetSolution(i));
+            assertEquals(tsp1.obtenirSommetSolution(i),
+                    tsp2.obtenirSommetSolution(i));
+            assertEquals(tsp2.obtenirSommetSolution(i),
+                    tsp3.obtenirSommetSolution(i));
+            assertEquals(tsp3.obtenirSommetSolution(i),
+                    tsp5.obtenirSommetSolution(i));
         }
         System.out.println("0");
 
         System.out.print("Solution (TSP3) : ");
-        for (int i = 0; i < nbSommets; ++i) {
+        for (int i = 0; i < NB_SOMMETS; ++i) {
             System.out.print(tsp3.obtenirSommetSolution(i) + " -> ");
         }
         System.out.println("0");
@@ -131,19 +160,23 @@ public class TSPTest {
     @Test
     public void testDepandanceSolution() {
         ArrayList<Integer> vus = new ArrayList<>();
-        for (int i = 0; i < nbSommets; ++i) {
-            for (int indiceDejaVu = 0; indiceDejaVu < vus.size(); indiceDejaVu++) {
+        for (int i = 0; i < NB_SOMMETS; ++i) {
+            for (int indiceDejaVu = 0; indiceDejaVu
+                    < vus.size(); indiceDejaVu++) {
                 // i n'est pas une depandance d'un indice deja vus
-                assertTrue(grapheDepandance.getDepandance(tsp5.obtenirSommetSolution(indiceDejaVu)) != tsp5
+                assertTrue(grapheDepandance.getDepandance(
+                        tsp5.obtenirSommetSolution(indiceDejaVu)) != tsp5
                         .obtenirSommetSolution(i));
             }
             vus.add(tsp5.obtenirSommetSolution(i));
             // System.out.print(tsp5.obtenirSommetSolution(i) + "["
-            // + grapheDepandance.getDepandance(tsp5.obtenirSommetSolution(i)) + "] ");
+            // + grapheDepandance.getDepandance(tsp5.obtenirSommetSolution(i)) +
+            // "] ");
         }
         // System.out.println("\n" + vus);
     }
 
+    /** Calcule une tournée sur le grand plan avec la demande grande 9. */
     @Test
     public void testGrandPlaneDemandeGrande9() {
         try {
@@ -152,13 +185,16 @@ public class TSPTest {
             e.printStackTrace();
         }
         try {
-            livraisons = new ProgrammeLivraisons("src/main/resources/data/demandeGrand9.xml", plan);
+            livraisons =
+                    new ProgrammeLivraisons(
+                    "src/main/resources/data/demandeGrand9.xml", plan);
         } catch (IOException | SAXException e) {
             e.printStackTrace();
         }
         plan.calculerTournee(livraisons);
     }
 
+    /** Calcule une tournée sur le grand plan avec la demande moyenne 5. */
     @Test
     public void testGrandPlanDemandeMoyen5() {
         try {
@@ -167,7 +203,9 @@ public class TSPTest {
             e.printStackTrace();
         }
         try {
-            livraisons = new ProgrammeLivraisons("src/main/resources/data/demandeMoyen5.xml", plan);
+            livraisons =
+                    new ProgrammeLivraisons(
+                    "src/main/resources/data/demandeMoyen5.xml", plan);
         } catch (IOException | SAXException e) {
             e.printStackTrace();
         }
@@ -179,6 +217,8 @@ public class TSPTest {
         }
         System.out.println();
         System.out.println(
-                "4150019167 26155372 26317393 25610684 21717915 60755991 21992645 1400900990 1036842078 208769083 55444215 4150019167");
+                "4150019167 26155372 26317393 25610684 21717915 60755991 "
+                + "21992645 1400900990 1036842078 208769083 55444215 "
+                + "4150019167");
     }
 }

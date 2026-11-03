@@ -2,7 +2,6 @@ package fr.insa.optimod.view;
 
 import java.io.File;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntConsumer;
@@ -55,7 +54,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterDemandes = new Button("Importer les demandes");
+    private final Button boutonImporterDemandes =
+            new Button("Importer les demandes");
     private final Label message = new Label();
 
     private final Button boutonCalculer = new Button("Calculer");
@@ -105,7 +105,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         setBottom(message);
         boutonAnnuler.setTooltip(new Tooltip("Ctrl+Z"));
         boutonRefaire.setTooltip(new Tooltip("Ctrl+Y"));
-        HBox barreOutils = new HBox(8, boutonImporterPlan, boutonImporterDemandes,
+        HBox barreOutils = new HBox(8, boutonImporterPlan,
+                boutonImporterDemandes,
                 boutonCalculer, indicateurAttente, boutonAjouter,
                 boutonAnnuler, boutonRefaire, consigne);
         barreOutils.getStyleClass().add("tool-bar-box");

@@ -74,7 +74,8 @@ public final class Plan {
     }
 
     private final Map<Long, Noeud> noeuds = new LinkedHashMap<>();
-    private final Map<Noeud, List<Troncon>> tronconsSortants = new LinkedHashMap<>();
+    private final Map<Noeud, List<Troncon>> tronconsSortants =
+            new LinkedHashMap<>();
     private final List<Troncon> troncons = new ArrayList<>();
 
     /**
@@ -103,7 +104,8 @@ public final class Plan {
         documentXml.getDocumentElement().normalize();
         try {
             NodeList elementsNoeuds = documentXml.getElementsByTagName("noeud");
-            for (int indice = 0; indice < elementsNoeuds.getLength(); indice++) {
+            for (int indice = 0; indice
+                    < elementsNoeuds.getLength(); indice++) {
                 Element element = (Element) elementsNoeuds.item(indice);
                 Noeud noeud = new Noeud(
                         Long.parseLong(element.getAttribute("id")),
@@ -112,8 +114,10 @@ public final class Plan {
                 noeuds.put(noeud.identifiant(), noeud);
                 tronconsSortants.put(noeud, new ArrayList<>());
             }
-            NodeList elementsTroncons = documentXml.getElementsByTagName("troncon");
-            for (int indice = 0; indice < elementsTroncons.getLength(); indice++) {
+            NodeList elementsTroncons =
+                    documentXml.getElementsByTagName("troncon");
+            for (int indice = 0; indice
+                    < elementsTroncons.getLength(); indice++) {
                 Element element = (Element) elementsTroncons.item(indice);
                 Noeud origine = trouverNoeud(element.getAttribute("origine"));
                 Troncon troncon = new Troncon(origine,
@@ -137,7 +141,8 @@ public final class Plan {
      */
     static DocumentBuilder creerLecteurXml() {
         try {
-            DocumentBuilderFactory fabrique = DocumentBuilderFactory.newInstance();
+            DocumentBuilderFactory fabrique =
+                    DocumentBuilderFactory.newInstance();
             fabrique.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             fabrique.setFeature(
                     "http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -189,7 +194,8 @@ public final class Plan {
      * @param programme entrepôt, heure de départ et demandes
      * @return la tournée, avec ses heures de passage
      * @throws IllegalStateException si aucune tournée possible n'existe : une
-     *                               adresse est inaccessible, aucun ordre n'a été
+     *                               adresse est inaccessible, aucun ordre n'a
+     *                               été
      *                               trouvé dans la
      *                               limite de temps, ou le retour à l'entrepôt
      *                               dépasse
@@ -261,9 +267,11 @@ public final class Plan {
                 new GrapheDepandance(nombre, couts, collecteAvantLivraison));
         switch (res) {
             case PAS_DE_SOLUTION:
-                throw new IllegalStateException("Au moins un sommet du graphe est inaccessible.");
+                throw new IllegalStateException(
+                "Au moins un sommet du graphe est inaccessible.");
             case CALCUL_TROP_LONG_SANS_RESULTAT:
-                throw new IllegalStateException("Aucune tournée possible trouvée dans la limite de "
+                throw new IllegalStateException(
+                "Aucune tournée possible trouvée dans la limite de "
                         + LIMITE_TEMPS_TSP_MS / 1000 + " s.");
             default:
                 // CALCUL_TROP_LONG : la meilleure solution trouvée avant la
@@ -615,7 +623,8 @@ public final class Plan {
     static double heuristique(Noeud noeud, Noeud cible) {
         double latitudeA = Math.toRadians(noeud.latitude());
         double latitudeB = Math.toRadians(cible.latitude());
-        double ecartLongitude = Math.toRadians(cible.longitude() - noeud.longitude());
+        double ecartLongitude = Math.toRadians(cible.longitude()
+                - noeud.longitude());
         double h = Math.pow(Math.sin((latitudeB - latitudeA) / 2), 2)
                 + Math.cos(latitudeA) * Math.cos(latitudeB)
                         * Math.pow(Math.sin(ecartLongitude / 2), 2);
