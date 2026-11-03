@@ -6,8 +6,11 @@ import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
+
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Tests de {@link ListeDeCommandes}.
@@ -28,6 +31,18 @@ public class ListeDeCommandesTest {
             @Override
             public void annuler() {
                 journal.add("-" + nom);
+            }
+
+            @Override
+            public void memoriserTourneesAvant(
+                    Map<Integer, Tournee> tournees) {
+                journal.add("avant:" + nom);
+            }
+
+            @Override
+            public void memoriserTourneesApres(
+                    Map<Integer, Tournee> tournees) {
+                journal.add("apres:" + nom);
             }
         };
     }
@@ -90,5 +105,21 @@ public class ListeDeCommandesTest {
         historique.vider();
         assertFalse(historique.peutAnnuler());
         assertFalse(historique.peutRefaire());
+    }
+
+    /**
+     * Des tournées calculées après coup sont retenues par la dernière
+     * commande appliquée (pour Rétablir) et par la prochaine à rétablir
+     * (pour Annuler).
+     */
+    @Test
+    public void tourneesCalculeesTransmisesAuxCommandesVoisines() {
+        historique.memoriserTournees(Map.of());
+        historique.executer(commande("a"));
+        historique.executer(commande("b"));
+        historique.annuler();
+        journal.clear();
+        historique.memoriserTournees(Map.of());
+        assertEquals(List.of("apres:a", "avant:b"), journal);
     }
 }

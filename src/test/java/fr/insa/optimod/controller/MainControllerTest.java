@@ -16,9 +16,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
@@ -32,6 +34,7 @@ import fr.insa.optimod.controller.MapScreen.Action;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Tournee.TypeArret;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 
@@ -44,8 +47,8 @@ public class MainControllerTest {
         private Runnable actionCalculer;
         private Runnable actionAjouter;
         private IntConsumer actionSupprimer;
-        private IntConsumer actionMonter;
-        private IntConsumer actionDescendre;
+        private BiConsumer<Integer, Integer> actionMonter;
+        private BiConsumer<Integer, Integer> actionDescendre;
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
         private LongConsumer actionClicNoeud;
@@ -56,9 +59,9 @@ public class MainControllerTest {
         private ProgrammeLivraisons programmeAffiche;
         private Set<Action> actions;
         private boolean attente;
-        private Tournee tournee;
         private String erreurCalcul;
         private String refusOrdre;
+        private int livreurSelectionne = -1;
         private int arretSelectionne = -1;
 
         @Override
@@ -92,12 +95,14 @@ public class MainControllerTest {
         }
 
         @Override
-        public void definirActionMonterArret(IntConsumer action) {
+        public void definirActionMonterArret(
+                BiConsumer<Integer, Integer> action) {
             actionMonter = action;
         }
 
         @Override
-        public void definirActionDescendreArret(IntConsumer action) {
+        public void definirActionDescendreArret(
+                BiConsumer<Integer, Integer> action) {
             actionDescendre = action;
         }
 
@@ -119,12 +124,6 @@ public class MainControllerTest {
         @Override
         public void afficherConsigne(String texte) {
             consigne = texte;
-        }
-
-        @Override
-        public void effacerTournee() {
-            tournee = null;
-            evenements.add("effacer tournee");
         }
 
         @Override
@@ -168,21 +167,16 @@ public class MainControllerTest {
         }
 
         @Override
-        public void afficherTournee(Tournee passages) {
-            tournee = passages;
-            evenements.add("tournee");
-        }
-
-        @Override
         public void afficherErreurCalcul(String detail) {
             erreurCalcul = detail;
             evenements.add("erreur");
         }
 
         @Override
-        public void selectionnerArretTournee(int rang) {
+        public void selectionnerArretTournee(int livreur, int rang) {
+            livreurSelectionne = livreur;
             arretSelectionne = rang;
-            evenements.add("selection:" + rang);
+            evenements.add("selection:" + livreur + ":" + rang);
         }
 
         @Override
@@ -200,9 +194,22 @@ public class MainControllerTest {
             + "<noeud id=\"1\" latitude=\"45.75\" longitude=\"4.85\"/>"
             + "</reseau>";
 
-    private static final Tournee TOURNEE = new Tournee(List.of(
-            new Tournee.Arret(new Noeud(1, 4.85, 45.75), LocalTime.of(8, 0),
-                    LocalTime.of(8, 0))), List.of());
+    private static final Noeud ENTREPOT = new Noeud(1, 4.85, 45.75);
+
+    /** Tournée qui part de l'entrepôt et y revient à cette heure. */
+    private static Tournee tourneeRevenantA(LocalTime retour) {
+        return new Tournee(List.of(
+                new Tournee.Arret(ENTREPOT, LocalTime.of(8, 0),
+                        LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
+                new Tournee.Arret(ENTREPOT, retour, retour,
+                        TypeArret.ENTREPOT, null)), List.of());
+    }
+
+    private static final Tournee TOURNEE = tourneeRevenantA(
+            LocalTime.of(8, 0));
+
+    /** Tournées rendues par le calcul factice : un livreur. */
+    private static final Map<Integer, Tournee> TOURNEES = Map.of(1, TOURNEE);
 
     /** Deux nœuds du petit plan fourni, pour ajouter une demande. */
     private static final long NOEUD_A = 25175791L;
@@ -235,6 +242,7 @@ public class MainControllerTest {
     private Plan planRecu;
     private ProgrammeLivraisons lotRecu;
     private RuntimeException erreurDeCalcul;
+    private Map<Integer, Tournee> tourneesCalculees = TOURNEES;
 
     /** Nombre de calculs complets (voyageur de commerce) lancés. */
     private int nombreDeCalculs;
@@ -242,14 +250,14 @@ public class MainControllerTest {
     @Before
     public void creer() {
         ecran = new EcranFactice();
-        BiFunction<Plan, ProgrammeLivraisons, Tournee> calcul =
+        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul =
                 (plan, programme) -> {
             planRecu = plan;
             lotRecu = programme;
             if (erreurDeCalcul != null) {
                 throw erreurDeCalcul;
             }
-            return TOURNEE;
+            return tourneesCalculees;
         };
         controleur = new MainController(ecran, calcul, arrierePlan::add,
                 Runnable::run);
@@ -293,6 +301,11 @@ public class MainControllerTest {
         return controleur.obtenirProgramme().obtenirDemandes();
     }
 
+    /** Tournées rangées dans le programme chargé. */
+    private Map<Integer, Tournee> tournees() {
+        return controleur.obtenirProgramme().obtenirTournees();
+    }
+
     private void executerArrierePlan() {
         while (!arrierePlan.isEmpty()) {
             arrierePlan.remove().run();
@@ -301,13 +314,13 @@ public class MainControllerTest {
 
     /**
      * Remplace le contrôleur par un contrôleur qui fait le vrai calcul de
-     * {@link Plan#calculerTournee}, sur le thread appelant, en comptant les
+     * {@link Plan#calculerTournees}, sur le thread appelant, en comptant les
      * calculs complets lancés (donc les passages par le voyageur de commerce).
      */
     private void utiliserLeVraiCalcul() {
         controleur = new MainController(ecran, (plan, programme) -> {
             nombreDeCalculs++;
-            return plan.calculerTournee(programme);
+            return plan.calculerTournees(programme);
         }, Runnable::run, Runnable::run);
     }
 
@@ -319,14 +332,14 @@ public class MainControllerTest {
     private void utiliserLeVraiCalculEnArrierePlan() {
         controleur = new MainController(ecran, (plan, programme) -> {
             nombreDeCalculs++;
-            return plan.calculerTournee(programme);
+            return plan.calculerTournees(programme);
         }, arrierePlan::add, Runnable::run);
     }
 
     /**
      * Fichier de demandes dont deux demandes ont le même point de collecte et
-     * la même durée sur place : leurs arrêts ne se distinguent pas dans la
-     * tournée.
+     * la même durée sur place : avant que les arrêts connaissent leur demande,
+     * on ne pouvait pas les distinguer dans la tournée.
      */
     private File demandesAmbigues() throws Exception {
         return ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
@@ -490,17 +503,18 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertTrue(ecran.actions.isEmpty());
         assertTrue(ecran.attente);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
     }
 
+    /** Le calcul range les tournées dans le programme, que la vue observe. */
     @Test
-    public void calculAfficheLaTournee() throws Exception {
+    public void calculRangeLesTourneesDansLeProgramme() throws Exception {
         chargerPlanEtLivraison();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        assertEquals(List.of("attente:true", "attente:false", "tournee"),
+        assertEquals(List.of("attente:true", "attente:false"),
                 ecran.evenements);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
         assertSame(controleur.obtenirPlan(), planRecu);
         assertSame(controleur.obtenirProgramme(), lotRecu);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
@@ -526,7 +540,7 @@ public class MainControllerTest {
         assertSame(plan, controleur.obtenirPlan());
         assertSame(programme, controleur.obtenirProgramme());
         executerArrierePlan();
-        assertSame(TOURNEE, ecran.tournee);
+        assertSame(TOURNEE, tournees().get(1));
     }
 
     @Test
@@ -538,7 +552,7 @@ public class MainControllerTest {
         assertEquals(List.of("attente:true", "attente:false", "erreur"),
                 ecran.evenements);
         assertEquals("Tournée impossible", ecran.erreurCalcul);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         assertEquals(MODIFIABLE, ecran.actions);
     }
@@ -569,8 +583,7 @@ public class MainControllerTest {
         chargerPlanEtLivraison();
         ecran.actionCalculer.run();
         assertNull(ecran.erreurCalcul);
-        assertNotNull(ecran.tournee);
-        assertEquals(4, ecran.tournee.arrets().size());
+        assertEquals(4, tournees().get(1).arrets().size());
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
@@ -625,32 +638,29 @@ public class MainControllerTest {
 
     /**
      * La tournée factice ne contient pas les arrêts de la demande supprimée :
-     * le recalcul local est impossible, la tournée affichée est retirée,
-     * l'utilisateur en est informé par une consigne et Annuler la retrouve dans
-     * le cache.
+     * le recalcul local est impossible, les tournées sont retirées,
+     * l'utilisateur en est informé par une consigne (pas de fenêtre d'erreur)
+     * et Annuler les remet sans nouveau calcul.
      */
     @Test
-    public void modifierRetireLaTourneeEtAnnulerLaRetrouveDuCache()
+    public void modifierRetireLesTourneesEtAnnulerLesRemet()
             throws Exception {
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        ecran.evenements.clear();
 
         ecran.actionSupprimer.accept(1);
         executerArrierePlan();
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
-        assertNull(ecran.tournee);
+        assertTrue(tournees().isEmpty());
         assertEquals(MainController.CONSIGNE_ORDRE_NON_GARDE, ecran.consigne);
         assertNull(ecran.erreurCalcul);
 
         ecran.actionAnnuler.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
         assertEquals("", ecran.consigne);
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
-        assertEquals(List.of("attente:true", "attente:false",
-                "effacer tournee", "tournee"), ecran.evenements);
     }
 
     @Test
@@ -663,7 +673,62 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
         ecran.actionRefaire.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertSame(TOURNEE, ecran.tournee);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    /**
+     * Les tournées calculées après une annulation sont celles de l'état
+     * d'avant la commande : annuler à nouveau après « Rétablir » les remet.
+     */
+    @Test
+    public void annulerRetrouveLaTourneeCalculeeApresAnnulation()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionAnnuler.run();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        ecran.actionRefaire.run();
+        assertTrue(tournees().isEmpty());
+        ecran.actionAnnuler.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    // --- Plusieurs livreurs (TIG-95) ---
+
+    /**
+     * Une tournée qui revient après 13 h est rangée et affichée comme les
+     * autres : « Calculer » n'échoue pas à cause de 13 h, aucune fenêtre
+     * d'erreur ne s'ouvre. Le repérage des arrêts en retard est affaire de la
+     * vue ({@code Arret.estApresHeureLimite}).
+     */
+    @Test
+    public void tourneeApres13hRangeeSansErreur() throws Exception {
+        tourneesCalculees = Map.of(1, tourneeRevenantA(LocalTime.of(13, 42)));
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(tourneesCalculees, tournees());
+        assertFalse(tournees().get(1).estPossible());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertNull(ecran.erreurCalcul);
+        assertEquals(List.of("attente:true", "attente:false"),
+                ecran.evenements);
+    }
+
+    /** Deux livreurs : les deux tournées calculées sont rangées. */
+    @Test
+    public void deuxLivreursDeuxTourneesRangees() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        tourneesCalculees = Map.of(1, TOURNEE,
+                2, tourneeRevenantA(LocalTime.of(9, 0)));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(List.of(1, 2), List.copyOf(tournees().keySet()));
+        assertEquals(tourneesCalculees, tournees());
+        assertNull(ecran.erreurCalcul);
     }
 
     @Test
@@ -756,20 +821,20 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 
-    // --- Suppression d'une demande avec une tournée affichée (TIG-101) ---
+    // --- Suppression d'une demande avec des tournées calculées (TIG-101) ---
 
     /**
-     * Supprimer une demande quand la tournée est affichée met la tournée à
-     * jour tout de suite, sans relancer le voyageur de commerce, et garde
-     * l'ordre des autres arrêts.
+     * Supprimer une demande quand les tournées sont calculées met la tournée du
+     * livreur à jour tout de suite, sans relancer le voyageur de commerce, et
+     * garde l'ordre des autres arrêts.
      */
     @Test
-    public void supprimerAvecTourneeAfficheeNeRelancePasLeTsp()
+    public void supprimerAvecTourneesCalculeesNeRelancePasLeTsp()
             throws Exception {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
-        Tournee complete = ecran.tournee;
+        Tournee complete = tournees().get(1);
         assertEquals(1, nombreDeCalculs);
         assertEquals(6, complete.arrets().size());
         Demande supprimee = demandes().get(0);
@@ -779,19 +844,22 @@ public class MainControllerTest {
 
         assertEquals("pas de nouveau calcul complet", 1, nombreDeCalculs);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
-        assertEquals(List.of("attente:true", "attente:false", "tournee"),
+        assertEquals(List.of("attente:true", "attente:false"),
                 ecran.evenements);
         assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        assertFalse("pas de numéro de livreur avec un seul livreur",
+                ecran.consigne.contains("Livreur"));
+        assertFalse(ecran.consigne.contains("Calculer"));
         List<Noeud> attendus = noeudsDe(complete);
         attendus.remove(supprimee.collecte());
         attendus.remove(supprimee.livraison());
-        assertEquals(attendus, noeudsDe(ecran.tournee));
+        assertEquals(attendus, noeudsDe(tournees().get(1)));
         assertEquals(MODIFIABLE_APRES_SUPPRESSION, ecran.actions);
     }
 
     /**
-     * Annuler réaffiche la tournée complète et Rétablir la tournée recalculée,
-     * toutes deux depuis le cache : aucun calcul n'est relancé.
+     * Annuler remet la tournée complète et Rétablir la tournée recalculée, sans
+     * aucun calcul : les commandes ont gardé les tournées d'avant et d'après.
      */
     @Test
     public void annulerEtRetablirApresSuppressionLocaleSansCalcul()
@@ -799,62 +867,64 @@ public class MainControllerTest {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
-        Tournee complete = ecran.tournee;
+        Tournee complete = tournees().get(1);
         ecran.actionSupprimer.accept(0);
-        Tournee reduite = ecran.tournee;
+        Tournee reduite = tournees().get(1);
 
         ecran.actionAnnuler.run();
-        assertSame(complete, ecran.tournee);
+        assertSame(complete, tournees().get(1));
         assertEquals(2, demandes().size());
         ecran.actionRefaire.run();
-        assertSame(reduite, ecran.tournee);
+        assertSame(reduite, tournees().get(1));
         assertEquals(1, demandes().size());
         assertEquals(1, nombreDeCalculs);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
-    /** Une position hors de la liste est ignorée, la tournée reste affichée. */
+    /** Une position hors de la liste est ignorée, les tournées restent. */
     @Test
-    public void supprimerUnePositionInvalideAvecTourneeAfficheeEstIgnore()
+    public void supprimerUnePositionInvalideAvecTourneesCalculeesEstIgnore()
             throws Exception {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
-        Tournee complete = ecran.tournee;
+        Tournee complete = tournees().get(1);
         ecran.actionSupprimer.accept(-1);
         ecran.actionSupprimer.accept(2);
         assertEquals(2, demandes().size());
-        assertSame(complete, ecran.tournee);
+        assertSame(complete, tournees().get(1));
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertEquals(1, nombreDeCalculs);
     }
 
     /**
-     * Si la tournée des demandes restantes a déjà été calculée par le voyageur
-     * de commerce, elle est réaffichée telle quelle : le recalcul local ne
-     * l'écrase pas.
+     * Le recalcul local garde l'ordre affiché : il ne reprend jamais un ordre
+     * du voyageur de commerce trouvé plus tôt pour les mêmes demandes. Ici le
+     * voyageur de commerce a déjà calculé les demandes restantes, puis on
+     * annule ; supprimer à nouveau recalcule quand même en local.
      */
     @Test
-    public void tourneeDuTspDejaConnueNEstPasEcrasee() throws Exception {
+    public void suppressionNeReprendPasUnOrdreDuTspPlusAncien()
+            throws Exception {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         ecran.actionSupprimer.accept(0);
         ecran.actionCalculer.run(); // calcul complet des demandes restantes
-        Tournee duTsp = ecran.tournee;
         assertEquals(2, nombreDeCalculs);
 
         ecran.actionAnnuler.run();
         ecran.actionSupprimer.accept(0);
 
-        assertSame(duTsp, ecran.tournee);
         assertEquals(2, nombreDeCalculs);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
     /**
      * Le recalcul local tourne dans la file de calcul, pas sur le thread
      * appelant : tant qu'elle n'est pas exécutée, l'attente est affichée, les
-     * actions sont bloquées et ni les demandes ni la tournée ne changent.
+     * actions sont bloquées et ni les demandes ni les tournées ne changent.
      */
     @Test
     public void suppressionRecalculeHorsDuThreadDeLInterface()
@@ -863,7 +933,7 @@ public class MainControllerTest {
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        Tournee complete = ecran.tournee;
+        Tournee complete = tournees().get(1);
         ecran.evenements.clear();
 
         ecran.actionSupprimer.accept(0);
@@ -873,7 +943,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertTrue(ecran.actions.isEmpty());
         assertEquals(2, demandes().size());
-        assertSame(complete, ecran.tournee);
+        assertSame(complete, tournees().get(1));
 
         executerArrierePlan();
 
@@ -881,7 +951,7 @@ public class MainControllerTest {
         assertEquals(1, demandes().size());
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertEquals(complete.arrets().size() - 2,
-                ecran.tournee.arrets().size());
+                tournees().get(1).arrets().size());
         assertEquals(1, nombreDeCalculs);
         assertEquals(MODIFIABLE_APRES_SUPPRESSION, ecran.actions);
     }
@@ -889,63 +959,102 @@ public class MainControllerTest {
     /**
      * Supprimer toutes les demandes une à une garde l'ordre à chaque fois (la
      * tournée se réduit jusqu'au seul départ) sans nouveau calcul complet, et
-     * Annuler revient pas à pas aux tournées gardées en cache.
+     * Annuler revient pas à pas aux tournées d'avant.
      */
     @Test
     public void suppressionsSuccessivesGardentLOrdre() throws Exception {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
-        Tournee complete = ecran.tournee;
+        Tournee complete = tournees().get(1);
         ecran.actionSupprimer.accept(0);
-        Tournee uneDemande = ecran.tournee;
+        Tournee uneDemande = tournees().get(1);
         assertEquals(4, uneDemande.arrets().size());
         ecran.actionSupprimer.accept(0);
-        assertEquals(1, ecran.tournee.arrets().size());
+        assertEquals(1, tournees().get(1).arrets().size());
         assertTrue(demandes().isEmpty());
         assertEquals(1, nombreDeCalculs);
 
         ecran.actionAnnuler.run();
-        assertSame(uneDemande, ecran.tournee);
+        assertSame(uneDemande, tournees().get(1));
         ecran.actionAnnuler.run();
-        assertSame(complete, ecran.tournee);
+        assertSame(complete, tournees().get(1));
         assertEquals(1, nombreDeCalculs);
     }
 
     /**
-     * Quand deux demandes ont le même point de collecte et la même durée, on ne
-     * sait pas quel arrêt retirer : c'est le cas attendu du recalcul local
-     * impossible. La demande est supprimée, la tournée est retirée avec une
-     * consigne claire (pas de fenêtre d'erreur), et Annuler la retrouve.
+     * Deux demandes de même point de collecte et de même durée ne se
+     * confondent plus : chaque arrêt connaît sa demande, le recalcul local
+     * retire les bons arrêts et garde ceux de l'autre demande.
      */
     @Test
-    public void suppressionAmbigueRetireLaTourneeAvecUneConsigne()
+    public void suppressionDeDemandesDeMemePointDeCollecteGardeLAutre()
             throws Exception {
         utiliserLeVraiCalcul();
         importerPlan(ressource("/data/petitPlan.xml"));
         importerProgramme(demandesAmbigues());
         ecran.actionCalculer.run();
-        Tournee complete = ecran.tournee;
-        assertNotNull(complete);
+        Tournee complete = tournees().get(1);
+        Demande gardee = demandes().get(1);
 
         ecran.actionSupprimer.accept(0);
 
-        assertEquals(1, demandes().size());
-        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
-        assertNull(ecran.tournee);
-        assertFalse(ecran.attente);
+        assertEquals(List.of(gardee), demandes());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertNull(ecran.erreurCalcul);
-        assertEquals(MainController.CONSIGNE_ORDRE_NON_GARDE, ecran.consigne);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        for (Tournee.Arret arret : tournees().get(1).arrets()) {
+            assertTrue(arret.demande() == null
+                    || arret.demande().equals(gardee));
+        }
+        assertEquals(complete.arrets().size() - 2,
+                tournees().get(1).arrets().size());
+        assertEquals(1, nombreDeCalculs);
 
         ecran.actionAnnuler.run();
-        assertSame(complete, ecran.tournee);
+        assertSame(complete, tournees().get(1));
         assertEquals("", ecran.consigne);
-        assertEquals(1, nombreDeCalculs);
     }
 
     /**
-     * La consigne « ordre gardé » ne doit pas rester affichée une fois la
-     * tournée recalculée par le voyageur de commerce.
+     * Avec deux livreurs, seule la tournée du livreur de la demande supprimée
+     * est recalculée : l'autre est la même, et Annuler remet les deux.
+     */
+    @Test
+    public void suppressionNeRecalculeQueLeLivreurDeLaDemande()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1, demandes().get(1).avecLivreur(2));
+        ecran.actionCalculer.run();
+        Tournee premierLivreur = tournees().get(1);
+        Tournee secondLivreur = tournees().get(2);
+        assertEquals(4, premierLivreur.arrets().size());
+        assertEquals(4, secondLivreur.arrets().size());
+
+        ecran.actionSupprimer.accept(1); // demande du livreur 2
+
+        assertEquals(1, demandes().size());
+        assertSame(premierLivreur, tournees().get(1));
+        assertEquals(1, tournees().get(2).arrets().size());
+        assertEquals(List.of(1, 2), List.copyOf(tournees().keySet()));
+        assertEquals(1, nombreDeCalculs);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(2),
+                ecran.consigne);
+        assertTrue(ecran.consigne.startsWith("Livreur 2 :"));
+        assertFalse(ecran.consigne.contains("Calculer"));
+
+        ecran.actionAnnuler.run();
+        assertSame(premierLivreur, tournees().get(1));
+        assertSame(secondLivreur, tournees().get(2));
+        assertEquals(2, demandes().size());
+    }
+
+    /**
+     * La consigne « ordre gardé » ne doit pas rester affichée une fois les
+     * tournées recalculées par le voyageur de commerce.
      */
     @Test
     public void calculerEffaceLaConsigneDuRecalculLocal() throws Exception {
@@ -965,23 +1074,23 @@ public class MainControllerTest {
 
     /**
      * Charge les deux demandes, calcule la tournée avec le vrai calcul et
-     * rend la tournée affichée.
+     * rend la tournée du livreur 1.
      */
     private Tournee afficherUneTourneeDeDeuxDemandes() throws Exception {
         utiliserLeVraiCalcul();
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
-        return ecran.tournee;
+        return tournees().get(1);
     }
 
     /**
-     * Descend le premier arrêt qui peut l'être (la contrainte d'ordre en
-     * interdit certains) et rend son rang.
+     * Descend le premier arrêt du livreur 1 qui peut l'être (la contrainte
+     * d'ordre en interdit certains) et rend son rang.
      */
     private int descendreUnArretPermis(Tournee tournee) {
         for (int rang = 1; rang < tournee.arrets().size() - 2; rang++) {
             ecran.refusOrdre = null;
-            ecran.actionDescendre.accept(rang);
+            ecran.actionDescendre.accept(1, rang);
             if (ecran.refusOrdre == null) {
                 return rang;
             }
@@ -1000,7 +1109,7 @@ public class MainControllerTest {
         int rang = descendreUnArretPermis(avant);
         List<Noeud> attendus = new ArrayList<>(noeudsDe(avant));
         Collections.swap(attendus, rang, rang + 1);
-        assertEquals(attendus, noeudsDe(ecran.tournee));
+        assertEquals(attendus, noeudsDe(tournees().get(1)));
         assertEquals(1, nombreDeCalculs);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertTrue(ecran.actions.contains(Action.ANNULER));
@@ -1012,12 +1121,12 @@ public class MainControllerTest {
     public void annulerEtRetablirLeChangementDOrdre() throws Exception {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         descendreUnArretPermis(avant);
-        Tournee apres = ecran.tournee;
+        Tournee apres = tournees().get(1);
         ecran.actionAnnuler.run();
-        assertEquals(avant, ecran.tournee);
+        assertSame(avant, tournees().get(1));
         assertTrue(ecran.actions.contains(Action.REFAIRE));
         ecran.actionRefaire.run();
-        assertEquals(apres, ecran.tournee);
+        assertSame(apres, tournees().get(1));
         assertEquals(1, nombreDeCalculs);
     }
 
@@ -1026,8 +1135,8 @@ public class MainControllerTest {
     public void monterApresDescendreRedonneLaTournee() throws Exception {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         int rang = descendreUnArretPermis(avant);
-        ecran.actionMonter.accept(rang + 1);
-        assertEquals(avant, ecran.tournee);
+        ecran.actionMonter.accept(1, rang + 1);
+        assertEquals(avant, tournees().get(1));
     }
 
     /**
@@ -1037,42 +1146,41 @@ public class MainControllerTest {
     @Test
     public void ordreRefuseAfficheLeMessageEtNeChangeRien() throws Exception {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
-        ecran.actionMonter.accept(1);
+        ecran.actionMonter.accept(1, 1);
         assertTrue(ecran.refusOrdre.contains("premier"));
-        assertSame(avant, ecran.tournee);
+        assertSame(avant, tournees().get(1));
         assertFalse(ecran.actions.contains(Action.ANNULER));
-        ecran.actionMonter.accept(0);
+        ecran.actionMonter.accept(1, 0);
         assertTrue(ecran.refusOrdre.contains("entrepôt"));
-        assertSame(avant, ecran.tournee);
+        assertSame(avant, tournees().get(1));
     }
 
     /** Sans tournée affichée, Monter et Descendre sont ignorés. */
     @Test
     public void changerLOrdreSansTourneeEstIgnore() throws Exception {
         chargerDeuxDemandes();
-        ecran.actionMonter.accept(1);
-        ecran.actionDescendre.accept(1);
+        ecran.actionMonter.accept(1, 1);
+        ecran.actionDescendre.accept(1, 1);
         assertTrue(ecran.evenements.isEmpty());
         assertNull(ecran.refusOrdre);
         assertFalse(ecran.actions.contains(Action.CHANGER_ORDRE));
     }
 
     /**
-     * Descend le premier arrêt qui peut l'être (la contrainte d'ordre en
-     * interdit certains) sans toucher aux deux arrêts de la demande à
-     * supprimer, et rend son rang.
+     * Descend le premier arrêt du livreur 1 qui peut l'être (la contrainte
+     * d'ordre en interdit certains) sans toucher aux deux arrêts de la demande
+     * à supprimer, et rend son rang.
      */
     private int descendreUnArretHorsDeLaDemande(Tournee tournee,
             Demande demande) {
         for (int rang = 1; rang < tournee.arrets().size() - 2; rang++) {
-            Noeud haut = tournee.arrets().get(rang).noeud();
-            Noeud bas = tournee.arrets().get(rang + 1).noeud();
-            if (List.of(demande.collecte(), demande.livraison())
-                    .stream().anyMatch(n -> n.equals(haut) || n.equals(bas))) {
+            if (demande.equals(tournee.arrets().get(rang).demande())
+                    || demande.equals(
+                            tournee.arrets().get(rang + 1).demande())) {
                 continue;
             }
             ecran.refusOrdre = null;
-            ecran.actionDescendre.accept(rang);
+            ecran.actionDescendre.accept(1, rang);
             if (ecran.refusOrdre == null) {
                 return rang;
             }
@@ -1082,19 +1190,18 @@ public class MainControllerTest {
 
     /**
      * Après un déplacement réussi, l'arrêt déplacé reste sélectionné à sa
-     * nouvelle place (la sélection est remise après le réaffichage de la
-     * tournée), pour pouvoir le déplacer de plusieurs rangs de suite.
+     * nouvelle place (la sélection est remise après le réaffichage des
+     * tournées), pour pouvoir le déplacer de plusieurs rangs de suite.
      */
     @Test
     public void arretDeplaceResteSelectionne() throws Exception {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         ecran.evenements.clear();
         int rang = descendreUnArretPermis(avant);
+        assertEquals(1, ecran.livreurSelectionne);
         assertEquals(rang + 1, ecran.arretSelectionne);
-        assertEquals("selection:" + (rang + 1), ecran.evenements.get(
+        assertEquals("selection:1:" + (rang + 1), ecran.evenements.get(
                 ecran.evenements.size() - 1));
-        assertEquals("tournee", ecran.evenements.get(
-                ecran.evenements.size() - 2));
     }
 
     /**
@@ -1109,10 +1216,11 @@ public class MainControllerTest {
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         executerArrierePlan();
-        Tournee avant = ecran.tournee;
+        Tournee avant = tournees().get(1);
         int rang = -1;
         for (int i = 1; i < avant.arrets().size() - 2 && rang < 0; i++) {
-            ecran.actionDescendre.accept(i);
+            ecran.refusOrdre = null;
+            ecran.actionDescendre.accept(1, i);
             executerArrierePlan();
             if (ecran.refusOrdre == null) {
                 rang = i;
@@ -1120,14 +1228,15 @@ public class MainControllerTest {
         }
         assertTrue("un arrêt peut descendre", rang > 0);
         ecran.actionAnnuler.run();
-        assertSame(avant.arrets().size(), ecran.tournee.arrets().size());
+        assertSame(avant, tournees().get(1));
 
-        ecran.actionDescendre.accept(rang);
+        ecran.actionDescendre.accept(1, rang);
 
         assertEquals(1, arrierePlan.size());
         assertTrue(ecran.attente);
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertTrue(ecran.actions.isEmpty());
+        assertSame(avant, tournees().get(1));
         executerArrierePlan();
         assertFalse(ecran.attente);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
@@ -1136,9 +1245,8 @@ public class MainControllerTest {
 
     /**
      * Réordonner, supprimer, annuler, réordonner, supprimer : l'ordre choisi à
-     * la main est gardé. La tournée recalculée localement par la première
-     * suppression est restée dans le cache, mais elle ne doit pas masquer
-     * l'ordre de la tournée réordonnée.
+     * la main est gardé. La première suppression recalculée localement ne doit
+     * pas masquer l'ordre de la tournée réordonnée.
      */
     @Test
     public void reordonnerSupprimerAnnulerGardeLOrdreChoisi()
@@ -1147,43 +1255,43 @@ public class MainControllerTest {
         importerPlan(ressource("/data/moyenPlan.xml"));
         importerProgramme(ressource("/data/demandeMoyen5.xml"));
         ecran.actionCalculer.run();
-        Tournee t1 = ecran.tournee;
+        Tournee t1 = tournees().get(1);
         Demande supprimee = demandes().get(0);
 
         ecran.actionSupprimer.accept(0);
-        List<Noeud> localeSansReordre = noeudsDe(ecran.tournee);
+        List<Noeud> localeSansReordre = noeudsDe(tournees().get(1));
         ecran.actionAnnuler.run();
-        assertSame(t1, ecran.tournee);
+        assertSame(t1, tournees().get(1));
         descendreUnArretHorsDeLaDemande(t1, supprimee);
-        Tournee t2 = ecran.tournee;
+        Tournee t2 = tournees().get(1);
         ecran.actionSupprimer.accept(0);
 
         List<Noeud> attendus = new ArrayList<>(noeudsDe(t2));
         attendus.remove(supprimee.collecte());
         attendus.remove(supprimee.livraison());
-        assertEquals(attendus, noeudsDe(ecran.tournee));
-        assertNotEquals(localeSansReordre, noeudsDe(ecran.tournee));
+        assertEquals(attendus, noeudsDe(tournees().get(1)));
+        assertNotEquals(localeSansReordre, noeudsDe(tournees().get(1)));
         assertEquals(1, nombreDeCalculs);
     }
 
     /**
-     * Annuler après un nouveau « Calculer » ne remplace pas la tournée du
-     * voyageur de commerce par l'ancienne : la commande ne remplace que ce
-     * qu'elle avait rangé. Rétablir ne la remplace pas non plus.
+     * Annuler après un nouveau « Calculer » revient à l'état d'avant le
+     * changement d'ordre, et rétablir remet les tournées de ce calcul : les
+     * commandes voisines ont retenu les tournées calculées après coup.
      */
     @Test
-    public void annulerApresUnNouveauCalculGardeLaTourneeCalculee()
+    public void annulerApresUnNouveauCalculRevientAvantLeChangement()
             throws Exception {
         Tournee t1 = afficherUneTourneeDeDeuxDemandes();
         descendreUnArretPermis(t1);
         ecran.actionCalculer.run();
-        Tournee t3 = ecran.tournee;
+        Tournee t3 = tournees().get(1);
         assertEquals(2, nombreDeCalculs);
 
         ecran.actionAnnuler.run();
-        assertSame(t3, ecran.tournee);
+        assertSame(t1, tournees().get(1));
         ecran.actionRefaire.run();
-        assertSame(t3, ecran.tournee);
+        assertSame(t3, tournees().get(1));
         assertEquals(2, nombreDeCalculs);
     }
 
@@ -1199,20 +1307,34 @@ public class MainControllerTest {
         importerPlan(ressource("/data/petitPlan.xml"));
         importerProgramme(ressource("/data/demandePetit1.xml"));
         ecran.actionCalculer.run();
-        Tournee avant = ecran.tournee;
+        Tournee avant = tournees().get(1);
         assertEquals(4, avant.arrets().size());
 
-        ecran.actionDescendre.accept(1);
+        ecran.actionDescendre.accept(1, 1);
         assertTrue(ecran.refusOrdre.contains("Contrainte d'ordre"));
         ecran.refusOrdre = null;
-        ecran.actionMonter.accept(2);
+        ecran.actionMonter.accept(1, 2);
         assertTrue(ecran.refusOrdre.contains("Contrainte d'ordre"));
 
-        assertSame(avant, ecran.tournee);
+        assertSame(avant, tournees().get(1));
         assertFalse(ecran.attente);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertFalse(ecran.actions.contains(Action.ANNULER));
         assertEquals(1, nombreDeCalculs);
+    }
+
+    /** Fichier de deux demandes sur le petit plan, partant à l'heure dite. */
+    private File deuxDemandesPartantA(LocalTime depart) throws Exception {
+        return ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                + "<demandeDeLivraisons><entrepot adresse=\"2835339774\" "
+                + "heureDepart=\"" + depart.getHour() + ":"
+                + depart.getMinute() + ":" + depart.getSecond() + "\"/>"
+                + "<livraison adresseEnlevement=\"1679901320\" "
+                + "adresseLivraison=\"208769457\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"600\"/>"
+                + "<livraison adresseEnlevement=\"208769120\" "
+                + "adresseLivraison=\"25336179\" dureeEnlevement=\"420\" "
+                + "dureeLivraison=\"480\"/></demandeDeLivraisons>");
     }
 
     /**
@@ -1227,25 +1349,16 @@ public class MainControllerTest {
         long secondes = deHuitHeures.arrets().get(0).arrivee().until(
                 deHuitHeures.obtenirHeureRetour(),
                 java.time.temporal.ChronoUnit.SECONDS);
-        LocalTime depart = LocalTime.of(13, 0).minusSeconds(secondes);
-        importerProgramme(ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-                + "<demandeDeLivraisons><entrepot adresse=\"2835339774\" "
-                + "heureDepart=\"" + depart.getHour() + ":"
-                + depart.getMinute() + ":" + depart.getSecond() + "\"/>"
-                + "<livraison adresseEnlevement=\"1679901320\" "
-                + "adresseLivraison=\"208769457\" dureeEnlevement=\"420\" "
-                + "dureeLivraison=\"600\"/>"
-                + "<livraison adresseEnlevement=\"208769120\" "
-                + "adresseLivraison=\"25336179\" dureeEnlevement=\"420\" "
-                + "dureeLivraison=\"480\"/></demandeDeLivraisons>"));
+        importerProgramme(deuxDemandesPartantA(
+                LocalTime.of(13, 0).minusSeconds(secondes)));
         ecran.actionCalculer.run();
-        Tournee limite = ecran.tournee;
+        Tournee limite = tournees().get(1);
         assertEquals(LocalTime.of(13, 0), limite.obtenirHeureRetour());
 
         int refus13h = 0;
         for (int rang = 1; rang < limite.arrets().size() - 2; rang++) {
             ecran.refusOrdre = null;
-            ecran.actionDescendre.accept(rang);
+            ecran.actionDescendre.accept(1, rang);
             if (ecran.refusOrdre == null) {
                 ecran.actionAnnuler.run(); // échange accepté : on le défait
             } else if (ecran.refusOrdre.contains("13:00")) {
@@ -1254,6 +1367,74 @@ public class MainControllerTest {
         }
 
         assertTrue("au moins un ordre refusé après 13 h", refus13h > 0);
-        assertSame(limite, ecran.tournee);
+        assertSame(limite, tournees().get(1));
+    }
+
+    /**
+     * Une tournée déjà en retard n'est pas bloquée : on peut encore changer
+     * l'ordre de ses arrêts. Seul un changement qui rend impossible une tournée
+     * possible est refusé.
+     */
+    @Test
+    public void changerLOrdreDUneTourneeDejaEnRetardEstAccepte()
+            throws Exception {
+        utiliserLeVraiCalcul();
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(deuxDemandesPartantA(LocalTime.of(12, 59)));
+        ecran.actionCalculer.run();
+        Tournee enRetard = tournees().get(1);
+        assertFalse(enRetard.estPossible());
+
+        descendreUnArretPermis(enRetard);
+
+        assertNull(ecran.refusOrdre);
+        assertTrue(ecran.actions.contains(Action.ANNULER));
+        assertNotEquals(noeudsDe(enRetard), noeudsDe(tournees().get(1)));
+    }
+
+    /**
+     * Avec deux livreurs, seule la tournée du livreur de l'arrêt change : l'autre
+     * est la même, la consigne nomme le livreur, c'est son arrêt qui reste
+     * sélectionné, et Annuler remet les deux tournées.
+     */
+    @Test
+    public void changerLOrdreNeChangeQueLeLivreurConcerne() throws Exception {
+        utiliserLeVraiCalcul();
+        importerPlan(ressource("/data/moyenPlan.xml"));
+        importerProgramme(ressource("/data/demandeMoyen3.xml"));
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(2, demandes().get(2).avecLivreur(2));
+        ecran.actionCalculer.run();
+        Tournee premierLivreur = tournees().get(1);
+        Tournee secondLivreur = tournees().get(2);
+
+        int rang = descendreUnArretPermis(premierLivreur);
+
+        assertNotEquals(noeudsDe(premierLivreur), noeudsDe(tournees().get(1)));
+        assertSame(secondLivreur, tournees().get(2));
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(1),
+                ecran.consigne);
+        assertEquals(1, ecran.livreurSelectionne);
+        assertEquals(rang + 1, ecran.arretSelectionne);
+        assertEquals(1, nombreDeCalculs);
+
+        ecran.actionAnnuler.run();
+        assertSame(premierLivreur, tournees().get(1));
+        assertSame(secondLivreur, tournees().get(2));
+    }
+
+    /**
+     * Après un changement d'ordre, la consigne prévient que l'ordre n'est plus
+     * celui du voyageur de commerce ; avec un seul livreur, elle ne le nomme
+     * pas et ne conseille pas « Calculer ».
+     */
+    @Test
+    public void consigneApresUnChangementDOrdre() throws Exception {
+        Tournee avant = afficherUneTourneeDeDeuxDemandes();
+        descendreUnArretPermis(avant);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        assertFalse(ecran.consigne.contains("Livreur"));
+        assertFalse(ecran.consigne.contains("Calculer"));
     }
 }

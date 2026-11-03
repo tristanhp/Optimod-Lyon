@@ -4,12 +4,15 @@ import static org.junit.Assert.assertEquals;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Tournee.TypeArret;
 
 /**
  * Tests de {@link CommandeAjouterDemande} et {@link CommandeSupprimerDemande}.
@@ -58,5 +61,38 @@ public class CommandesDemandesTest {
         historique.refaire();
         historique.refaire();
         assertEquals(List.of(a, c), programme.obtenirDemandes());
+    }
+
+    /** Tournée vide partant de l'entrepôt à cette heure. */
+    private static Tournee tourneeVide(LocalTime depart) {
+        return new Tournee(List.of(new Tournee.Arret(noeud(0), depart, depart,
+                TypeArret.ENTREPOT, null)), List.of());
+    }
+
+    /**
+     * Une modification retire les tournées ; annuler remet celles d'avant,
+     * rétablir celles d'après, sans recalcul.
+     */
+    @Test
+    public void annulerEtRetablirRemettentLesTournees() {
+        Map<Integer, Tournee> avant =
+                Map.of(1, tourneeVide(LocalTime.of(8, 0)));
+        Map<Integer, Tournee> apres =
+                Map.of(1, tourneeVide(LocalTime.of(9, 0)));
+        programme.definirTournees(avant);
+        for (Commande commande : List.of(
+                new CommandeSupprimerDemande(programme, 0),
+                new CommandeAjouterDemande(programme, c))) {
+            programme.definirTournees(avant);
+            commande.executer();
+            assertEquals(Map.of(), programme.obtenirTournees());
+            commande.memoriserTourneesApres(apres);
+            commande.annuler();
+            assertEquals(avant, programme.obtenirTournees());
+            commande.executer();
+            assertEquals(apres, programme.obtenirTournees());
+            commande.annuler();
+        }
+        assertEquals(List.of(a, b), programme.obtenirDemandes());
     }
 }

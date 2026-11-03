@@ -2,10 +2,10 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
@@ -29,10 +29,16 @@ import fr.insa.optimod.model.Plan;
  * suivant. Le contrôleur fournit aux états les opérations élémentaires (lire
  * un fichier, lancer le calcul, mettre à jour l'écran).
  *
- * <p>Les modifications des demandes passent par des commandes annulables
- * ({@link Commande}, design pattern Command). Les tournées déjà calculées sont
- * gardées en cache par liste de demandes : annuler ou rétablir une
- * modification réaffiche la tournée correspondante sans la recalculer.
+ * <p>Les tournées calculées sont rangées dans le programme de livraisons, une
+ * par livreur ; la vue les observe. Les modifications des demandes passent
+ * par des commandes annulables ({@link Commande}, design pattern Command),
+ * qui gardent les tournées d'avant et d'après : annuler ou rétablir une
+ * modification remet les tournées correspondantes sans les recalculer.
+ *
+ * <p>Supprimer une demande quand les tournées sont calculées ne relance pas le
+ * voyageur de commerce : seule la tournée du livreur de la demande est
+ * recalculée localement, en gardant l'ordre de ses autres arrêts
+ * ({@link #supprimerDemandeEnGardantLOrdre}).
  */
 public final class MainController {
 
@@ -41,29 +47,26 @@ public final class MainController {
             Logger.getLogger(MainController.class.getName());
 
     /**
-     * Consigne affichée quand la tournée ne vient pas du voyageur de commerce :
-     * recalcul local après une suppression, ou ordre changé à la main.
+     * Consigne affichée quand la tournée ne vient pas du voyageur de commerce
+     * (recalcul local après une suppression, ou ordre changé à la main) et
+     * qu'il n'y a qu'un livreur. Elle ne conseille pas « Calculer », qui
+     * remplacerait aussi les ordres choisis à la main.
      */
-    static final String CONSIGNE_ORDRE_GARDE = "Ordre non optimisé : cliquez "
-            + "sur Calculer pour chercher un meilleur ordre.";
-
-    /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
-    static final String CONSIGNE_ORDRE_NON_GARDE = "Tournée retirée : les "
-            + "arrêts de la demande n'ont pas pu être identifiés. Cliquez sur "
-            + "Calculer pour recalculer la tournée.";
+    static final String CONSIGNE_ORDRE_GARDE = "Ordre non optimisé : il "
+            + "n'est peut-être plus le plus court.";
 
     /**
-     * Tournée gardée en cache, avec la façon dont elle a été obtenue : seule
-     * une tournée du voyageur de commerce est le meilleur ordre connu ; une
-     * tournée issue d'un recalcul local ou d'un changement d'ordre à la main
-     * garde l'ordre d'avant et peut s'en éloigner.
-     *
-     * @param tournee tournée calculée
-     * @param calculComplet vrai si elle vient du voyageur de commerce, faux si
-     *        elle vient d'un recalcul local ou d'un changement d'ordre
+     * Même consigne avec plusieurs livreurs : {@code %d} est le livreur dont la
+     * tournée vient d'être recalculée ou modifiée, les autres tournées ne
+     * changent pas.
      */
-    private record TourneeEnCache(Tournee tournee, boolean calculComplet) {
-    }
+    static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre non "
+            + "optimisé, il n'est peut-être plus le plus court.";
+
+    /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
+    static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
+            + "arrêts de la demande n'ont pas pu être identifiés. Cliquez sur "
+            + "Calculer pour recalculer les tournées.";
 
     /** Issue de la lecture d'un fichier choisi par l'utilisateur. */
     enum Lecture {
@@ -78,8 +81,9 @@ public final class MainController {
     /** Écran piloté. */
     private final MapScreen ecran;
 
-    /** Calcul de la tournée ({@link Plan#calculerTournee} hors tests). */
-    private final BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee;
+    /** Calcul des tournées ({@link Plan#calculerTournees} hors tests). */
+    private final BiFunction<Plan, ProgrammeLivraisons,
+            Map<Integer, Tournee>> calculTournees;
 
     /** Exécute le calcul hors du thread de l'interface. */
     private final Executor arrierePlan;
@@ -100,19 +104,12 @@ public final class MainController {
     private final ListeDeCommandes historique = new ListeDeCommandes();
 
     /**
-     * Tournées déjà calculées pour le plan et les demandes chargés, indexées
-     * par la liste des demandes (dans l'ordre).
-     */
-    private final Map<List<Demande>, TourneeEnCache> tourneesCalculees =
-            new HashMap<>();
-
-    /**
      * Crée un contrôleur qui calcule la tournée sur le thread appelant.
      *
      * @param ecran écran à piloter
      */
     public MainController(MapScreen ecran) {
-        this(ecran, Plan::calculerTournee, Runnable::run, Runnable::run);
+        this(ecran, Plan::calculerTournees, Runnable::run, Runnable::run);
     }
 
     /**
@@ -120,17 +117,18 @@ public final class MainController {
      * l'état initial (seul l'import d'un plan est possible).
      *
      * @param ecran écran à piloter
-     * @param calculTournee calcul de la tournée d'un programme sur un plan
-     *        ({@code Plan::calculerTournee} ; remplaçable dans les tests)
+     * @param calculTournees calcul des tournées d'un programme sur un plan
+     *        ({@code Plan::calculerTournees} ; remplaçable dans les tests)
      * @param arrierePlan exécute le calcul hors du thread de l'interface
      * @param interfaceUtilisateur exécute les mises à jour de la vue sur le
      *        thread de l'interface
      */
     public MainController(MapScreen ecran,
-            BiFunction<Plan, ProgrammeLivraisons, Tournee> calculTournee,
+            BiFunction<Plan, ProgrammeLivraisons,
+                    Map<Integer, Tournee>> calculTournees,
             Executor arrierePlan, Executor interfaceUtilisateur) {
         this.ecran = ecran;
-        this.calculTournee = calculTournee;
+        this.calculTournees = calculTournees;
         this.arrierePlan = arrierePlan;
         this.interfaceUtilisateur = interfaceUtilisateur;
         ecran.definirActionImportPlan(() -> etat.importerPlan(this));
@@ -141,10 +139,10 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
-        ecran.definirActionMonterArret(
-                rang -> etat.changerOrdre(this, rang, -1));
-        ecran.definirActionDescendreArret(
-                rang -> etat.changerOrdre(this, rang, 1));
+        ecran.definirActionMonterArret((livreur, rang) ->
+                etat.changerOrdre(this, livreur, rang, -1));
+        ecran.definirActionDescendreArret((livreur, rang) ->
+                etat.changerOrdre(this, livreur, rang, 1));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
@@ -232,19 +230,14 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         ProgrammeLivraisons programmeCalcule = programme;
-        List<Demande> demandesCalculees = List.copyOf(
-                programme.obtenirDemandes());
         ecran.afficherConsigne(""); // efface la consigne d'un recalcul local
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
-                Tournee tournee = calculTournee.apply(planCalcule,
-                        programmeCalcule);
-                interfaceUtilisateur.execute(() -> {
-                    tourneesCalculees.put(demandesCalculees,
-                            new TourneeEnCache(tournee, true));
-                    etat.finirCalcul(this, tournee, null);
-                });
+                Map<Integer, Tournee> tournees = calculTournees.apply(
+                        planCalcule, programmeCalcule);
+                interfaceUtilisateur.execute(
+                        () -> etat.finirCalcul(this, tournees, null));
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
@@ -259,9 +252,15 @@ public final class MainController {
         ecran.afficherAttente(false);
     }
 
-    /** @param tournee tournée calculée à afficher */
-    void afficherTournee(Tournee tournee) {
-        ecran.afficherTournee(tournee);
+    /**
+     * Range les tournées calculées dans le programme (la vue les observe) et
+     * les fait retenir par l'historique, pour annuler et rétablir.
+     *
+     * @param tournees tournées par numéro de livreur
+     */
+    void rangerTournees(Map<Integer, Tournee> tournees) {
+        programme.definirTournees(tournees);
+        historique.memoriserTournees(programme.obtenirTournees());
     }
 
     /** @param detail explication de l'échec du calcul */
@@ -307,105 +306,108 @@ public final class MainController {
     }
 
     /**
-     * Revient à l'état qui correspond au programme actuel : si leur tournée
-     * a déjà été calculée, elle est réaffichée depuis le cache
-     * ({@link EtatTourneeCalculee}) ; sinon la tournée est retirée
-     * ({@link EtatProgrammeCharge}).
+     * Revient à l'état qui correspond au programme actuel :
+     * {@link EtatTourneeCalculee} si ses tournées sont calculées, sinon
+     * {@link EtatProgrammeCharge}.
      */
     void retrouverEtatProgramme() {
         ecran.afficherConsigne("");
-        TourneeEnCache enCache = tourneesCalculees.get(
-                List.copyOf(programme.obtenirDemandes()));
-        if (enCache != null) {
-            changerEtat(new EtatTourneeCalculee());
-            ecran.afficherTournee(enCache.tournee());
-            if (!enCache.calculComplet()) {
-                // L'ordre n'est pas celui du voyageur de commerce : on le dit.
-                ecran.afficherConsigne(CONSIGNE_ORDRE_GARDE);
-            }
-        } else {
+        if (programme.obtenirTournees().isEmpty()) {
             changerEtat(new EtatProgrammeCharge());
-            ecran.effacerTournee();
+        } else {
+            changerEtat(new EtatTourneeCalculee());
         }
     }
 
     /**
-     * Supprime une demande quand sa tournée est affichée, en gardant l'ordre
-     * des autres arrêts et sans relancer le voyageur de commerce. La tournée
-     * affichée (elle est dans le cache) est recalculée localement
+     * Supprime une demande quand les tournées sont calculées, en gardant
+     * l'ordre des autres arrêts du livreur et sans relancer le voyageur de
+     * commerce. La tournée de ce livreur est recalculée localement
      * ({@link Plan#calculerTourneeSansDemande}) hors du thread de l'interface,
      * avec l'attente affichée et toutes les actions bloquées comme pendant le
-     * calcul complet ({@link EtatCalculEnCours}). Le résultat est ensuite
-     * traité sur le thread de l'interface ({@link #finirSuppression}).
-     *
-     * <p>Si la tournée des demandes restantes est déjà connue par un calcul
-     * complet (voyageur de commerce), il n'y a rien à recalculer : la
-     * suppression est exécutée et cette tournée est réaffichée depuis le
-     * cache.
+     * calcul complet ({@link EtatCalculEnCours}) ; les tournées des autres
+     * livreurs ne changent pas. Le résultat est ensuite traité sur le thread
+     * de l'interface ({@link #finirSuppression}).
      *
      * @param position rang dans le programme de la demande à supprimer ; une
      *        position invalide est ignorée
      */
     void supprimerDemandeEnGardantLOrdre(int position) {
-        List<Demande> avant = List.copyOf(programme.obtenirDemandes());
-        if (position < 0 || position >= avant.size()) {
+        List<Demande> demandes = programme.obtenirDemandes();
+        if (position < 0 || position >= demandes.size()) {
             return;
         }
-        List<Demande> apres = new ArrayList<>(avant);
-        Demande retiree = apres.remove(position);
-        TourneeEnCache connue = tourneesCalculees.get(apres);
-        if (connue != null && connue.calculComplet()) {
-            executer(new CommandeSupprimerDemande(programme, position));
-            return;
-        }
+        Demande retiree = demandes.get(position);
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
         Plan planCalcule = plan;
-        Tournee actuelle = tourneesCalculees.get(avant).tournee();
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
                 Tournee locale = planCalcule.calculerTourneeSansDemande(
-                        actuelle, retiree);
-                interfaceUtilisateur.execute(
-                        () -> finirSuppression(position, apres, locale, null));
+                        avant.get(retiree.livreur()), retiree);
+                interfaceUtilisateur.execute(() -> finirSuppression(position,
+                        retiree.livreur(), avant, locale, null));
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(
-                        () -> finirSuppression(position, apres, null, e));
+                interfaceUtilisateur.execute(() -> finirSuppression(position,
+                        retiree.livreur(), avant, null, e));
             }
         });
     }
 
     /**
-     * Fin du recalcul local, sur le thread de l'interface : range la tournée
-     * recalculée dans le cache (sauf en cas d'échec), puis exécute la
-     * suppression. La tournée doit être dans le cache <b>avant</b> la commande,
-     * car {@link #executer} réaffiche l'état du programme en la lisant ; en cas
-     * d'échec, la tournée est simplement retirée de l'écran et l'utilisateur en
-     * est informé.
+     * Fin du recalcul local, sur le thread de l'interface : exécute la
+     * suppression avec, comme tournées d'après, celles d'avant dont la tournée
+     * du livreur est remplacée par la tournée recalculée ; annuler remet celles
+     * d'avant. En cas d'échec, la suppression est exécutée sans tournées (elles
+     * sont retirées de l'écran) et l'utilisateur en est informé.
      *
      * @param position rang de la demande à supprimer
-     * @param apres demandes restantes, qui servent de clé dans le cache
-     * @param locale tournée recalculée, ou {@code null} en cas d'échec
+     * @param livreur numéro du livreur de la demande supprimée
+     * @param avant tournées d'avant la suppression
+     * @param locale tournée recalculée du livreur, ou {@code null} en cas
+     *        d'échec
      * @param echec cause de l'échec, ou {@code null}
      */
-    private void finirSuppression(int position, List<Demande> apres,
-            Tournee locale, RuntimeException echec) {
+    private void finirSuppression(int position, int livreur,
+            Map<Integer, Tournee> avant, Tournee locale,
+            RuntimeException echec) {
         ecran.afficherAttente(false);
+        Commande suppression = new CommandeSupprimerDemande(programme,
+                position);
         if (locale != null) {
-            tourneesCalculees.put(apres, new TourneeEnCache(locale, false));
+            Map<Integer, Tournee> apres = new TreeMap<>(avant);
+            apres.put(livreur, locale);
+            suppression.memoriserTourneesAvant(avant);
+            suppression.memoriserTourneesApres(
+                    Collections.unmodifiableMap(apres));
         }
-        executer(new CommandeSupprimerDemande(programme, position));
-        if (echec != null) {
+        executer(suppression);
+        if (locale != null) {
+            afficherConsigneOrdreNonOptimise(livreur);
+        } else {
             signalerEchecRecalculLocal(echec);
         }
     }
 
     /**
+     * Prévient que la tournée d'un livreur ne vient plus du voyageur de
+     * commerce (recalcul local ou ordre changé à la main). Le livreur n'est
+     * nommé que s'il y en a plusieurs.
+     *
+     * @param livreur numéro du livreur dont la tournée a changé
+     */
+    private void afficherConsigneOrdreNonOptimise(int livreur) {
+        ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
+                ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
+                : CONSIGNE_ORDRE_GARDE);
+    }
+
+    /**
      * Distingue les échecs du recalcul local au lieu de les ignorer : le cas
-     * attendu (arrêts de la demande ambigus ou introuvables dans la tournée)
-     * est expliqué par une consigne ; une tournée impossible (retour après
-     * 13 h, adresse inaccessible) et une erreur inattendue sont signalées à
-     * l'utilisateur et journalisées.
+     * attendu (arrêts de la demande introuvables dans la tournée) est expliqué
+     * par une consigne ; une adresse inaccessible et une erreur inattendue sont
+     * signalées à l'utilisateur et journalisées.
      */
     private void signalerEchecRecalculLocal(RuntimeException echec) {
         if (echec instanceof IllegalArgumentException) {
@@ -424,80 +426,82 @@ public final class MainController {
     }
 
     /**
-     * Change l'ordre d'un arrêt de la tournée affichée (« Monter » ou
+     * Change l'ordre d'un arrêt de la tournée d'un livreur (« Monter » ou
      * « Descendre ») par une commande annulable. Comme pour la suppression
      * d'une demande, le nouvel ordre est calculé localement
      * ({@link Plan#calculerTourneeOrdreChange}) hors du thread de l'interface,
      * avec l'attente affichée et toutes les actions bloquées
      * ({@link EtatCalculEnCours}). Le résultat est traité sur le thread de
-     * l'interface ({@link #finirChangementOrdre}). La tournée affichée est dans
-     * le cache.
+     * l'interface ({@link #finirChangementOrdre}). Les tournées des autres
+     * livreurs ne changent pas.
      *
-     * @param rang rang de l'arrêt sélectionné dans la tournée
+     * @param livreur numéro du livreur de l'arrêt sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
      * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
      *        descendre
      */
-    void changerOrdreTournee(int rang, int decalage) {
-        List<Demande> demandes = List.copyOf(programme.obtenirDemandes());
-        TourneeEnCache avant = tourneesCalculees.get(demandes);
+    void changerOrdreTournee(int livreur, int rang, int decalage) {
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
                 Tournee apres = planCalcule.calculerTourneeOrdreChange(
-                        avant.tournee(), demandes, rang, decalage);
+                        avant.get(livreur), rang, decalage);
                 interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        demandes, avant, apres, rang + decalage, null));
+                        livreur, avant, apres, rang + decalage, null));
             } catch (RuntimeException e) {
                 interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        demandes, avant, null, rang + decalage, e));
+                        livreur, avant, null, rang + decalage, e));
             }
         });
     }
 
     /**
      * Fin du changement d'ordre, sur le thread de l'interface. S'il est refusé
-     * (contrainte d'ordre, retour après 13 h, arrêt qui ne peut pas bouger),
-     * l'écran affiche la raison et rien n'est modifié, pas même l'historique.
-     * Sinon la commande range la nouvelle tournée dans le cache, à la place de
-     * l'ancienne, et l'arrêt déplacé reste sélectionné.
+     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou retour à
+     * l'entrepôt rendu impossible après 13 h), l'écran affiche la raison et
+     * rien n'est modifié, pas même l'historique. Sinon la commande range, à la
+     * place des tournées d'avant, les mêmes avec la nouvelle tournée du
+     * livreur, et l'arrêt déplacé reste sélectionné.
      *
-     * @param demandes demandes de la tournée, clé dans le cache
-     * @param avant entrée du cache avant le changement
-     * @param apres tournée avec le nouvel ordre, ou {@code null} en cas de
-     *        refus
+     * <p>Un changement qui ne fait que garder une tournée déjà en retard est
+     * accepté : seul un changement qui rend possible une tournée impossible est
+     * refusé.
+     *
+     * @param livreur numéro du livreur de la tournée
+     * @param avant tournées d'avant le changement
+     * @param apres tournée du livreur avec le nouvel ordre, ou {@code null} en
+     *        cas de refus
      * @param nouveauRang rang de l'arrêt déplacé dans la nouvelle tournée
      * @param echec cause du refus, ou {@code null}
      */
-    private void finirChangementOrdre(List<Demande> demandes,
-            TourneeEnCache avant, Tournee apres, int nouveauRang,
+    private void finirChangementOrdre(int livreur,
+            Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
             RuntimeException echec) {
         ecran.afficherAttente(false);
-        if (echec != null) {
+        RuntimeException refus = echec;
+        if (refus == null && !apres.estPossible()
+                && avant.get(livreur).estPossible()) {
+            refus = new IllegalStateException("Changement d'ordre refusé : le "
+                    + "retour à l'entrepôt serait à "
+                    + apres.obtenirHeureRetour() + ", après "
+                    + Plan.HEURE_LIMITE_RETOUR + ".");
+        }
+        if (refus != null) {
             changerEtat(new EtatTourneeCalculee());
-            signalerRefusOrdre(echec);
+            signalerRefusOrdre(refus);
             return;
         }
-        TourneeEnCache nouvelle = new TourneeEnCache(apres, false);
-        executer(new CommandeChangerOrdre(
-                () -> remplacerSiAffichee(demandes, avant, nouvelle),
-                () -> remplacerSiAffichee(demandes, nouvelle, avant)));
-        // executer réaffiche la tournée, ce qui efface la sélection de la
+        Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+        tournees.put(livreur, apres);
+        executer(new CommandeChangerOrdre(programme, avant,
+                Collections.unmodifiableMap(tournees)));
+        afficherConsigneOrdreNonOptimise(livreur);
+        // executer réaffiche les tournées, ce qui efface la sélection de la
         // liste : on la remet sur l'arrêt déplacé pour pouvoir le redéplacer.
-        ecran.selectionnerArretTournee(nouveauRang);
-    }
-
-    /**
-     * Remplace l'entrée du cache de ces demandes, mais seulement si c'est
-     * encore {@code attendue}. Si un nouveau calcul a rangé une autre tournée
-     * entre-temps, annuler ou rétablir le changement d'ordre ne l'écrase pas.
-     */
-    private void remplacerSiAffichee(List<Demande> demandes,
-            TourneeEnCache attendue, TourneeEnCache nouvelle) {
-        if (tourneesCalculees.get(demandes) == attendue) {
-            tourneesCalculees.put(demandes, nouvelle);
-        }
+        ecran.selectionnerArretTournee(livreur, nouveauRang);
     }
 
     /**
@@ -519,12 +523,10 @@ public final class MainController {
     }
 
     /**
-     * Oublie l'historique, le cache et la consigne : le plan ou les demandes
-     * changent.
+     * Oublie l'historique et la consigne : le plan ou les demandes changent.
      */
     private void oublierModifications() {
         historique.vider();
-        tourneesCalculees.clear();
         ecran.afficherConsigne("");
     }
 }

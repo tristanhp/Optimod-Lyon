@@ -2,6 +2,9 @@ package fr.insa.optimod.controller;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Historique des commandes exécutées, pour annuler et rétablir (design pattern
@@ -51,6 +54,23 @@ final class ListeDeCommandes {
         if (peutRefaire()) {
             commandes.get(nombreAppliquees).executer();
             nombreAppliquees++;
+        }
+    }
+
+    /**
+     * Transmet des tournées calculées après coup (« Calculer ») aux commandes
+     * voisines de l'état actuel : la dernière commande appliquée les remettra
+     * en rétablissant, la prochaine à rétablir en annulant.
+     *
+     * @param tournees tournées calculées pour l'état actuel
+     */
+    void memoriserTournees(Map<Integer, Tournee> tournees) {
+        if (peutAnnuler()) {
+            commandes.get(nombreAppliquees - 1)
+                    .memoriserTourneesApres(tournees);
+        }
+        if (peutRefaire()) {
+            commandes.get(nombreAppliquees).memoriserTourneesAvant(tournees);
         }
     }
 

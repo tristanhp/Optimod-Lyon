@@ -12,11 +12,13 @@ package "model" {
     +obtenirNoeuds() : Collection<Noeud>
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
-    +calculerTournee(programme : ProgrammeLivraisons) : Tournee
+    +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
-    +calculerTourneeOrdreChange(tournee, demandes, rang, decalage) : Tournee
-    -calculerPlusCourtsChemins(adresses) : Chemin[][]
-    -calculerOrdreDePassage(chemins) : List<Integer>
+    +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
+    -ordresMemorises : Map<List<Sommet>, List<Integer>>
+    -calculerTournee(entrepot, heureDepart, demandes, limiteTemps) : Tournee
+    -calculerPlusCourtsChemins(sommets) : Chemin[][]
+    -calculerOrdreDePassage(chemins, limiteTemps) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
     ~plusCourtChemin(source : Noeud, cible : Noeud) : Chemin
   }
@@ -51,22 +53,40 @@ package "model" {
     +obtenirDemandes() : List<Demande>
     +ajouterDemande(position : int, demande : Demande)
     +retirerDemande(position : int) : Demande
+    +remplacerDemande(position : int, demande : Demande)
+    +obtenirNombreLivreurs() : int
+    +definirNombreLivreurs(nombre : int)
+    +obtenirTournees() : Map<Integer, Tournee>
+    +definirTournees(tournees : Map<Integer, Tournee>)
+    +definirTournee(livreur : int, tournee : Tournee)
+    +effacerTournees()
   }
   class "ProgrammeLivraisons.Demande" as Demande <<record>> {
     collecte : Noeud
     livraison : Noeud
     dureeCollecte : int
     dureeLivraison : int
+    livreur : int
+    +avecLivreur(autreLivreur : int) : Demande
   }
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
     +obtenirHeureRetour() : LocalTime
+    +estPossible() : boolean
   }
   class "Tournee.Arret" as Arret <<record>> {
     noeud : Noeud
     arrivee : LocalTime
     depart : LocalTime
+    type : TypeArret
+    demande : Demande
+    +estApresHeureLimite() : boolean
+  }
+  enum "Tournee.TypeArret" as TypeArret {
+    ENTREPOT
+    COLLECTE
+    LIVRAISON
   }
 }
 
@@ -83,9 +103,9 @@ package "controller" {
     +obtenirProgramme() : ProgrammeLivraisons
     ~changerEtat(nouvelEtat : Etat)
     ~executer(commande : Commande)
+    ~rangerTournees(tournees : Map<Integer, Tournee>)
     ~supprimerDemandeEnGardantLOrdre(position : int)
-    ~changerOrdreTournee(rang : int, decalage : int)
-    -tourneesCalculees : Map<List<Demande>, TourneeEnCache>
+    ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
   }
   interface MapScreen
   interface Etat
@@ -99,8 +119,12 @@ package "controller" {
   interface Commande {
     +executer()
     +annuler()
+    +memoriserTourneesAvant(tournees : Map<Integer, Tournee>)
+    +memoriserTourneesApres(tournees : Map<Integer, Tournee>)
   }
-  class ListeDeCommandes
+  class ListeDeCommandes {
+    ~memoriserTournees(tournees : Map<Integer, Tournee>)
+  }
   class CommandeAjouterDemande
   class CommandeSupprimerDemande
   class CommandeChangerOrdre
@@ -116,7 +140,7 @@ Plan *--> "*" Noeud
 Plan *--> "*" Troncon
 Troncon --> "2" Noeud
 Chemin o--> "*" Troncon
-Plan ..> ProgrammeLivraisons : calculerTournee
+Plan ..> ProgrammeLivraisons : calculerTournees
 Plan ..> Tournee : crée et recalcule
 Plan ..> TSP3 : ordre de passage
 TSP3 --|> TemplateTSP
@@ -125,8 +149,11 @@ ProgrammeLivraisons --|> Observable
 Observable o--> "*" Observateur
 ProgrammeLivraisons *--> "*" Demande
 ProgrammeLivraisons --> "1" Noeud : entrepot
+ProgrammeLivraisons o--> "*" Tournee : une par livreur
 Demande --> "2" Noeud
 Tournee *--> "*" Arret
+Arret --> "1" TypeArret
+Arret --> "0..1" Demande
 Tournee o--> "*" Chemin
 
 MainController --> "1" MapScreen : ecran

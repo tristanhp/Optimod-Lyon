@@ -12,8 +12,9 @@ correcteur) comprenne **pourquoi** le projet est organisé ainsi.
 | [0001](0001-organisation-des-tests-unitaires.md) | Organisation des tests unitaires | Acceptée |
 | [0002](0002-design-pattern-state-controleur.md) | Design pattern State dans le contrôleur | Acceptée |
 | [0003](0003-design-pattern-observer-modele-vue.md) | Design pattern Observer entre le modèle et la vue | Acceptée |
-| [0004](0004-design-pattern-command-annulation.md) | Design pattern Command pour annuler les modifications | Acceptée |
-| [0005](0005-nettoyage-du-code-et-glossaire.md) | Nettoyage du code et vocabulaire du glossaire | Acceptée |
+| [0004](0004-design-pattern-command-annulation.md) | Design pattern Command pour annuler les modifications | Acceptée (point 3 remplacé par 0006) |
+| [0005](0005-nettoyage-du-code-et-glossaire.md) | Nettoyage du code et vocabulaire du glossaire | Acceptée (point 3 remplacé par 0006) |
+| [0006](0006-plusieurs-livreurs.md) | Plusieurs livreurs, une tournée par livreur | Proposée |
 
 ## Ajouter un ADR
 
