@@ -15,6 +15,7 @@ import fr.insa.optimod.model.Observable;
 import fr.insa.optimod.model.Observateur;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -247,6 +248,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     @Override
     public void afficherConsigne(String texte) {
         consigne.setText(texte);
+    }
+
+    @Override
+    public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        carte.afficherPointsProvisoires(collecte, livraison);
     }
 
     @Override

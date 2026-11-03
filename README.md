@@ -144,7 +144,10 @@ de même taille.
      collecte, puis sur le point de livraison ; saisir les deux durées
      entières strictement positives en minutes (5 par défaut) et choisir le
      livreur (seul le livreur 1 est disponible actuellement) ;
-     recliquer sur le bouton annule l'ajout ;
+     le carré de collecte apparaît dès le premier clic, puis le rond de
+     livraison au second, avant validation du dialogue. Recliquer sur le
+     bouton, utiliser *Annuler* (Ctrl+Z) avant le second clic ou annuler un
+     dialogue efface ces points provisoires sans modifier le programme ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
      cliquer sur le bouton sous la liste ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être

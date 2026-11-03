@@ -43,6 +43,11 @@ final class EtatAjoutLivraison implements Etat {
     }
 
     @Override
+    public void annuler(MainController controleur) {
+        controleur.retrouverEtatProgramme();
+    }
+
+    @Override
     public void cliquerNoeud(MainController controleur, long idNoeud) {
         if (idNoeud == idCollecte) {
             controleur.afficherConsigne("La livraison doit avoir lieu ailleurs "
@@ -54,6 +59,7 @@ final class EtatAjoutLivraison implements Etat {
         if (collecte == null || livraison == null) {
             return; // clic hors du plan : ignoré
         }
+        controleur.afficherPointsProvisoires(collecte, livraison);
         controleur.saisirDemande().ifPresentOrElse(saisie -> {
             try {
                 int dureeCollecte = MapScreen.SaisieDemande.convertirDuree(
@@ -74,6 +80,6 @@ final class EtatAjoutLivraison implements Etat {
 
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
-        return EnumSet.of(Action.AJOUTER_DEMANDE);
+        return EnumSet.of(Action.AJOUTER_DEMANDE, Action.ANNULER);
     }
 }

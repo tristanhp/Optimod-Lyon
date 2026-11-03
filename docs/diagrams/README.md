@@ -42,7 +42,10 @@ stateDiagram-v2
     EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
     EtatTourneeCalculee --> EtatCalculEnCours : calculer
     EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
-    EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
+    EtatAjoutCollecte --> EtatAjoutLivraison : clic valide / aperçu collecte
+    EtatAjoutLivraison --> EtatAjoutLivraison : second clic / aperçu livraison
+    EtatAjoutCollecte --> EtatProgrammeCharge : annuler / effacer aperçu
+    EtatAjoutLivraison --> EtatProgrammeCharge : annuler / effacer aperçu
     EtatAjoutLivraison --> EtatProgrammeCharge : cliquerNoeud / CommandeAjouterDemande
     EtatAjoutLivraison --> EtatCalculEnCours : saisie valide et tournée calculée / insertion
     EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande et cache

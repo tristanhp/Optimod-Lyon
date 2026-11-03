@@ -13,8 +13,8 @@ EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : (sous-classe)
 EtatTourneeCalculee : Sauvegarder
 EtatRestauration : boutons : aucun
-EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
-EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
+EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
+EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : idCollecte : long
 
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
@@ -34,15 +34,16 @@ cache --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
-EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
+EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud [valide] / afficher collecte provisoire
 EtatAjoutLivraison --> cache : saisie valide [sans tournée] / commande
 EtatAjoutLivraison --> EtatCalculEnCours : durées et position validées [tournée en cache] / insertion
 EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande et cache
 EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conservé, alerte
-EtatAjoutLivraison --> cache : dialogue annulé
+EtatAjoutLivraison --> cache : dialogue annulé / effacer points provisoires
+EtatAjoutLivraison --> EtatAjoutLivraison : second clic / afficher livraison provisoire
 EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
-EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
-EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
+EtatAjoutCollecte --> cache : ajouterDemande ou annuler / effacer aperçu
+EtatAjoutLivraison --> cache : ajouterDemande ou annuler / effacer aperçu
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]

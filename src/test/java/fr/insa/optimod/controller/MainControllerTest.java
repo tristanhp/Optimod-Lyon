@@ -60,6 +60,15 @@ public class MainControllerTest {
                 new SaisieDemande("5", "5", 1));
         private List<Tournee.Arret> horsPlage = List.of();
         private Optional<Integer> positionInsertion = Optional.of(1);
+        private Noeud collecteProvisoire;
+        private Noeud livraisonProvisoire;
+        private Runnable pendantSaisie = () -> { };
+
+        @Override
+        public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+            collecteProvisoire = collecte;
+            livraisonProvisoire = livraison;
+        }
 
         @Override
         public Optional<Integer> choisirPositionInsertion(Tournee tournee) {
@@ -68,6 +77,7 @@ public class MainControllerTest {
 
         @Override
         public Optional<SaisieDemande> saisirDemande() {
+            pendantSaisie.run();
             return saisie;
         }
 
@@ -629,7 +639,8 @@ public class MainControllerTest {
         ecran.actionAjouter.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutCollecte);
         assertEquals(EtatAjoutCollecte.CONSIGNE, ecran.consigne);
-        assertEquals(EnumSet.of(Action.AJOUTER_DEMANDE), ecran.actions);
+        assertEquals(EnumSet.of(Action.AJOUTER_DEMANDE, Action.ANNULER),
+                ecran.actions);
 
         ecran.actionClicNoeud.accept(NOEUD_A);
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
@@ -647,6 +658,91 @@ public class MainControllerTest {
 
         ecran.actionAnnuler.run();
         assertEquals(2, demandes().size());
+    }
+
+    /** Le premier clic affiche la collecte sans modifier le programme. */
+    @Test
+    public void collecteVisibleDesLePremierClic() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(ecran.actions.contains(Action.ANNULER));
+    }
+
+    /** Annuler le premier point efface l'aperçu et conserve la tournée. */
+    @Test
+    public void annulerCollecteProvisoireConserveTournee() throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournee,
+                Runnable::run, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee avant = ecran.tournee;
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertSame(avant, ecran.tournee);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Les deux points sont visibles pendant le dialogue puis effacés. */
+    @Test
+    public void livraisonVisibleAvantValidationPuisAnnulation()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.empty();
+        ecran.pendantSaisie = () -> {
+            assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+            assertEquals(NOEUD_B, ecran.livraisonProvisoire.identifiant());
+            assertEquals(2, demandes().size());
+        };
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /** Une validation remplace l'aperçu par une demande annulable. */
+    @Test
+    public void validerRemplacePointsProvisoiresPuisAnnulerEtRetablir()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(3, demandes().size());
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        ecran.actionRefaire.run();
+        assertEquals(3, demandes().size());
+        assertNull(ecran.collecteProvisoire);
+    }
+
+    /** Un clic hors du plan ne crée pas de point provisoire. */
+    @Test
+    public void clicInconnuIgnorePendantAjout() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(Long.MIN_VALUE);
+        assertTrue(controleur.obtenirEtat() instanceof EtatAjoutCollecte);
+        assertNull(ecran.collecteProvisoire);
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(Long.MIN_VALUE);
+        assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+        assertNull(ecran.livraisonProvisoire);
+        assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
     }
 
     /** Les deux durées saisies sont converties en secondes et annulables. */
@@ -691,7 +787,12 @@ public class MainControllerTest {
             assertEquals(2, demandes().size());
             assertFalse(controleur.peutAnnuler());
             assertTrue(ecran.consigne.contains("strictement positive"));
+            assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+            assertEquals(NOEUD_B, ecran.livraisonProvisoire.identifiant());
         }
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
     }
 
     /** L'ajout après calcul conserve la tournée et ne relance pas le TSP. */
@@ -747,6 +848,8 @@ public class MainControllerTest {
         assertTrue(arrierePlan.isEmpty());
         assertFalse(controleur.peutAnnuler());
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
     }
 
     /** Le retard hors plage est signalé et annulable sans refuser l'ajout. */
@@ -791,6 +894,8 @@ public class MainControllerTest {
         assertFalse(controleur.peutAnnuler());
         assertNotNull(ecran.erreurCalcul);
         assertFalse(ecran.attente);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
     }
 
     /** La liste des dépassements est transmise à l'écran. */
@@ -826,6 +931,12 @@ public class MainControllerTest {
         assertEquals("", ecran.consigne);
         assertEquals(2, demandes().size());
         assertEquals(MODIFIABLE, ecran.actions);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(NOEUD_B, ecran.collecteProvisoire.identifiant());
+        assertNull(ecran.livraisonProvisoire);
     }
 
     @Test

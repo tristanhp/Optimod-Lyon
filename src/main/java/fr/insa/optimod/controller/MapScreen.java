@@ -10,6 +10,7 @@ import java.util.function.LongConsumer;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
 
 /**
  * Ce que le contrôleur attend de l'écran de la carte. Séparer cette interface
@@ -51,6 +52,13 @@ public interface MapScreen {
      * @return saisie des durées et du livreur, ou vide après annulation
      */
     Optional<SaisieDemande> saisirDemande();
+
+    /**
+     * Affiche les points choisis avant validation de la demande.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison);
 
     /**
      * Fait choisir l'intervalle où insérer collecte puis livraison.

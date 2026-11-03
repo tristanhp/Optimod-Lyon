@@ -99,6 +99,7 @@ package "controller" {
   }
   interface MapScreen {
     +saisirDemande() : Optional<SaisieDemande>
+    +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
     +choisirPositionInsertion(tournee) : Optional<Integer>
     +signalerArretsHorsPlage(arrets)
   }

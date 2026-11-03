@@ -16,6 +16,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.SauvegardeTournee;
 
 /**
@@ -318,6 +319,15 @@ public final class MainController {
     }
 
     /**
+     * Affiche l'aperçu de la demande sans modifier le programme.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        ecran.afficherPointsProvisoires(collecte, livraison);
+    }
+
+    /**
      * Exécute une modification des demandes et l'ajoute à l'historique.
      *
      * @param commande modification à exécuter
@@ -362,6 +372,7 @@ public final class MainController {
      * ({@link EtatProgrammeCharge}).
      */
     void retrouverEtatProgramme() {
+        ecran.afficherPointsProvisoires(null, null);
         ecran.afficherConsigne("");
         Tournee tournee = tourneesCalculees.get(
                 List.copyOf(programme.obtenirDemandes()));
