@@ -45,7 +45,7 @@ public class TSP3Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP3 renvoie le cout de la meilleur solution. */

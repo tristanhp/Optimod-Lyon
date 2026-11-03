@@ -61,22 +61,22 @@ public class TSPTest {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp2 = new TSP2();
-        tsp2.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp3 = new TSP3();
-        tsp3.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp3.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp4 = new TSP4();
-        tsp4.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp4.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp5 = new TSP5();
-        tsp5.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp5.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
         tsp6 = new TSP6();
-        tsp6.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp6.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
 
     }
 

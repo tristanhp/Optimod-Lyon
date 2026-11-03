@@ -214,14 +214,12 @@ public final class Plan {
     private Chemin[][] calculerPlusCourtsChemins(List<Noeud> adresses) {
         int nombre = adresses.size();
         Chemin[][] chemins = new Chemin[nombre][nombre];
-        long tpsDebut = System.currentTimeMillis();
         for (int i = 0; i < nombre; i++) {
             for (int j = 0; j < nombre; j++) {
                 chemins[i][j] = i == j ? new Chemin(0, List.of())
                         : plusCourtChemin(adresses.get(i), adresses.get(j));
             }
         }
-        System.out.println("[DEBUG] Temps A* : " + (System.currentTimeMillis() - tpsDebut) + "ms");
         return chemins;
     }
 
@@ -255,23 +253,18 @@ public final class Plan {
         }
         TSP tsp = new TSP5();
         ResultatCalculTSP res = tsp.chercherSolution(LIMITE_TEMPS_TSP_MS,
-                new GrapheDepandance(nombre, couts, collecteAvantLivraison), 5 * 15000); // 5h * 15 000m/h distance max
-                                                                                         // possible a faire en 5h avec
-                                                                                         // le velo. Sert de borne max
-                                                                                         // pour eviter de calculer de
-                                                                                         // tournee definitivement trop
-                                                                                         // longue
+                new GrapheDepandance(nombre, couts, collecteAvantLivraison));
         switch (res) {
             case PAS_DE_SOLUTION:
                 throw new IllegalStateException("Au moins un sommet du graphe est inaccessible.");
             case CALCUL_TROP_LONG_SANS_RESULTAT:
                 throw new IllegalStateException("Aucune tournée possible trouvée dans la limite de "
                         + LIMITE_TEMPS_TSP_MS / 1000 + " s.");
+            case CALCUL_TROP_LONG:
+                throw new IllegalStateException("Solution non prouvée optimale due à une durée de calcul trop élevé.");
             default:
                 break;
         }
-        System.out.println("[DEBUG] : TSP5=" + tsp.obtenirDureeCalcul() + "ms");
-        System.out.println("[DEBUG] : Cout TSP5=" + tsp.obtenirCoutSolution());
         List<Integer> ordre = new ArrayList<>();
         for (int rang = 0; rang < nombre; rang++) {
             Integer sommet = tsp.obtenirSommetSolution(rang);

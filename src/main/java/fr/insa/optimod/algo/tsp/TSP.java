@@ -26,7 +26,7 @@ public interface TSP {
      *                   <code> ResultatCalculTSP.COUT_TROP_ELEVE </code> est
      *                   renvoye. -1 pour ne pas en definir
      */
-    public ResultatCalculTSP chercherSolution(int tpsLimite, GrapheDepandance g, int coutLimite);
+    public ResultatCalculTSP chercherSolution(int tpsLimite, GrapheDepandance g);
 
     /**
      * @param i (int)

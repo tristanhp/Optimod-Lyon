@@ -43,7 +43,7 @@ public class TSP2Test {
         grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
 
         tsp2 = new TSP2();
-        tsp2.chercherSolution(10000, grapheDepandance, -1); // Graphe à 10 sommet et temps limite =1s
+        tsp2.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =1s
     }
 
     /** TSP2 renvoie le cout de la meilleur solution. */
