@@ -40,9 +40,12 @@ public final class MainController {
     private static final Logger JOURNAL =
             Logger.getLogger(MainController.class.getName());
 
-    /** Consigne affichée quand la tournée vient d'un recalcul local. */
-    static final String CONSIGNE_ORDRE_GARDE = "Ordre des autres arrêts "
-            + "gardé : cliquez sur Calculer pour chercher un meilleur ordre.";
+    /**
+     * Consigne affichée quand la tournée ne vient pas du voyageur de commerce :
+     * recalcul local après une suppression, ou ordre changé à la main.
+     */
+    static final String CONSIGNE_ORDRE_GARDE = "Ordre non optimisé : cliquez "
+            + "sur Calculer pour chercher un meilleur ordre.";
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournée retirée : les "
@@ -52,12 +55,12 @@ public final class MainController {
     /**
      * Tournée gardée en cache, avec la façon dont elle a été obtenue : seule
      * une tournée du voyageur de commerce est le meilleur ordre connu ; une
-     * tournée issue d'un recalcul local garde l'ordre d'avant et peut s'en
-     * éloigner.
+     * tournée issue d'un recalcul local ou d'un changement d'ordre à la main
+     * garde l'ordre d'avant et peut s'en éloigner.
      *
      * @param tournee tournée calculée
      * @param calculComplet vrai si elle vient du voyageur de commerce, faux si
-     *        elle vient d'un recalcul local
+     *        elle vient d'un recalcul local ou d'un changement d'ordre
      */
     private record TourneeEnCache(Tournee tournee, boolean calculComplet) {
     }
@@ -138,6 +141,10 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
+        ecran.definirActionMonterArret(
+                rang -> etat.changerOrdre(this, rang, -1));
+        ecran.definirActionDescendreArret(
+                rang -> etat.changerOrdre(this, rang, 1));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         changerEtat(new EtatInitial());
@@ -411,6 +418,101 @@ public final class MainController {
         } else {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue du recalcul local",
                     echec);
+            ecran.afficherErreurCalcul(echec.getMessage() != null
+                    ? echec.getMessage() : echec.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Change l'ordre d'un arrêt de la tournée affichée (« Monter » ou
+     * « Descendre ») par une commande annulable. Comme pour la suppression
+     * d'une demande, le nouvel ordre est calculé localement
+     * ({@link Plan#calculerTourneeOrdreChange}) hors du thread de l'interface,
+     * avec l'attente affichée et toutes les actions bloquées
+     * ({@link EtatCalculEnCours}). Le résultat est traité sur le thread de
+     * l'interface ({@link #finirChangementOrdre}). La tournée affichée est dans
+     * le cache.
+     *
+     * @param rang rang de l'arrêt sélectionné dans la tournée
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    void changerOrdreTournee(int rang, int decalage) {
+        List<Demande> demandes = List.copyOf(programme.obtenirDemandes());
+        TourneeEnCache avant = tourneesCalculees.get(demandes);
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee apres = planCalcule.calculerTourneeOrdreChange(
+                        avant.tournee(), demandes, rang, decalage);
+                interfaceUtilisateur.execute(() -> finirChangementOrdre(
+                        demandes, avant, apres, rang + decalage, null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirChangementOrdre(
+                        demandes, avant, null, rang + decalage, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du changement d'ordre, sur le thread de l'interface. S'il est refusé
+     * (contrainte d'ordre, retour après 13 h, arrêt qui ne peut pas bouger),
+     * l'écran affiche la raison et rien n'est modifié, pas même l'historique.
+     * Sinon la commande range la nouvelle tournée dans le cache, à la place de
+     * l'ancienne, et l'arrêt déplacé reste sélectionné.
+     *
+     * @param demandes demandes de la tournée, clé dans le cache
+     * @param avant entrée du cache avant le changement
+     * @param apres tournée avec le nouvel ordre, ou {@code null} en cas de
+     *        refus
+     * @param nouveauRang rang de l'arrêt déplacé dans la nouvelle tournée
+     * @param echec cause du refus, ou {@code null}
+     */
+    private void finirChangementOrdre(List<Demande> demandes,
+            TourneeEnCache avant, Tournee apres, int nouveauRang,
+            RuntimeException echec) {
+        ecran.afficherAttente(false);
+        if (echec != null) {
+            changerEtat(new EtatTourneeCalculee());
+            signalerRefusOrdre(echec);
+            return;
+        }
+        TourneeEnCache nouvelle = new TourneeEnCache(apres, false);
+        executer(new CommandeChangerOrdre(
+                () -> remplacerSiAffichee(demandes, avant, nouvelle),
+                () -> remplacerSiAffichee(demandes, nouvelle, avant)));
+        // executer réaffiche la tournée, ce qui efface la sélection de la
+        // liste : on la remet sur l'arrêt déplacé pour pouvoir le redéplacer.
+        ecran.selectionnerArretTournee(nouveauRang);
+    }
+
+    /**
+     * Remplace l'entrée du cache de ces demandes, mais seulement si c'est
+     * encore {@code attendue}. Si un nouveau calcul a rangé une autre tournée
+     * entre-temps, annuler ou rétablir le changement d'ordre ne l'écrase pas.
+     */
+    private void remplacerSiAffichee(List<Demande> demandes,
+            TourneeEnCache attendue, TourneeEnCache nouvelle) {
+        if (tourneesCalculees.get(demandes) == attendue) {
+            tourneesCalculees.put(demandes, nouvelle);
+        }
+    }
+
+    /**
+     * Distingue les refus du changement d'ordre : une raison attendue
+     * (contrainte d'ordre, entrepôt, premier ou dernier arrêt, retour après
+     * 13 h) est expliquée à l'utilisateur ; une erreur inattendue est signalée
+     * et journalisée, au lieu de laisser les actions bloquées.
+     */
+    private void signalerRefusOrdre(RuntimeException echec) {
+        if (echec instanceof IllegalArgumentException
+                || echec instanceof IllegalStateException) {
+            ecran.afficherRefusOrdre(echec.getMessage());
+        } else {
+            JOURNAL.log(Level.SEVERE, "Erreur inattendue du changement "
+                    + "d'ordre", echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
                     ? echec.getMessage() : echec.getClass().getSimpleName());
         }

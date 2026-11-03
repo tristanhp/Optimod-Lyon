@@ -28,6 +28,8 @@ public interface MapScreen {
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */
         SUPPRIMER_DEMANDE,
+        /** Boutons « Monter » et « Descendre » (arrêt sélectionné). */
+        CHANGER_ORDRE,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -113,6 +115,24 @@ public interface MapScreen {
     void definirActionSupprimerDemande(IntConsumer action);
 
     /**
+     * Définit l'action du bouton « Monter » (faire passer plus tôt l'arrêt
+     * sélectionné dans la liste de la tournée).
+     *
+     * @param action reçoit le rang de l'arrêt sélectionné (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionMonterArret(IntConsumer action);
+
+    /**
+     * Définit l'action du bouton « Descendre » (faire passer plus tard l'arrêt
+     * sélectionné dans la liste de la tournée).
+     *
+     * @param action reçoit le rang de l'arrêt sélectionné (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionDescendreArret(IntConsumer action);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter
@@ -157,6 +177,24 @@ public interface MapScreen {
      * @param tournee arrêts de la tournée avec leurs heures de passage
      */
     void afficherTournee(Tournee tournee);
+
+    /**
+     * Sélectionne un arrêt dans la liste de la tournée. Après un changement
+     * d'ordre, la liste est refaite et la sélection perdue : le contrôleur
+     * resélectionne l'arrêt déplacé, à sa nouvelle place.
+     *
+     * @param rang rang de l'arrêt dans la tournée (0 est le départ de
+     *        l'entrepôt)
+     */
+    void selectionnerArretTournee(int rang);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement d'ordre est refusé ; la
+     * tournée affichée n'a pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusOrdre(String detail);
 
     /**
      * Signale que le calcul a échoué.

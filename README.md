@@ -32,7 +32,8 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Calculer la meilleure tournée (départ à l'heure du fichier, 15 km/h, retour avant 13 h) | fait |
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
-| Déplacer un point, changer l'ordre des arrêts, plusieurs livreurs | à faire |
+| Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
+| Déplacer un point, plusieurs livreurs | à faire |
 | Sauvegarder et restaurer les tournées | à faire |
 
 ## Installer le projet
@@ -114,6 +115,14 @@ de même taille.
      les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s).
      Une consigne rappelle que cet ordre n'est pas optimisé : *Calculer* en
      cherche un meilleur ;
+   - *Monter* / *Descendre* : sélectionner un arrêt dans la liste de la
+     tournée (à droite), puis cliquer sur le bouton sous la liste. L'arrêt
+     échange sa place avec son voisin et les heures de passage sont recalculées
+     tout de suite ; l'arrêt reste sélectionné, on peut donc le déplacer de
+     plusieurs rangs en recliquant. L'entrepôt (départ et retour) ne se déplace
+     pas. Si le point de livraison d'une demande passerait avant son point de
+     collecte (contrainte d'ordre), ou si le retour à l'entrepôt dépasserait
+     13 h, une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -201,7 +210,8 @@ tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres
 arrêts est gardé, les trajets des jonctions créées (A*) sont les seuls
 recalculés, les autres trajets sont repris de la tournée actuelle, et les
 heures de passage sont refaites. La suppression d'une demande passe par
-`Plan.calculerTourneeSansDemande`. « Recalcul local » est un terme technique,
+`Plan.calculerTourneeSansDemande` et le changement d'ordre d'un arrêt par
+`Plan.calculerTourneeOrdreChange`. « Recalcul local » est un terme technique,
 pas du vocabulaire métier.
 
 ## Structure du dépôt
