@@ -17,7 +17,7 @@ public class GrapheDepandance implements Graphe {
 
     /**
      * Le constructeur de GrapheDepandance
-     * 
+     *
      * @param nbSommets  le nombre de sommet du graphe
      * @param cout       la matrice de cout du graphe
      * @param depandance la liste de depandance du graphe
