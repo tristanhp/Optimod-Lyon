@@ -417,15 +417,7 @@ public final class Plan {
                     ancien.finPlage()));
         }
         Tournee apres = new Tournee(arrets, candidate.chemins());
-        // Les heures sont des LocalTime : une tournée qui dépasse minuit
-        // reviendrait « tôt le lendemain », il faut la repérer à part.
-        long ecoule = sommets.stream().mapToLong(Sommet::duree).sum();
-        for (Chemin chemin : candidate.chemins()) {
-            ecoule += secondesDeTrajet(chemin.longueur());
-        }
-        boolean passeMinuit = anciens.get(0).depart().toSecondOfDay() + ecoule
-                >= 24 * 3600;
-        if (passeMinuit || (!apres.estPossible() && tournee.estPossible())) {
+        if (!apres.estPossible() && tournee.estPossible()) {
             throw new IllegalStateException("Insertion refusée : le retour à "
                     + "l'entrepôt serait à " + apres.obtenirHeureRetour()
                     + ", après " + HEURE_LIMITE_RETOUR + ".");
