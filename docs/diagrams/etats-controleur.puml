@@ -23,18 +23,20 @@ EtatTourneeCalculee --> EtatCalculEnCours : calculer
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
-state "Choix de l'état selon les tournées du programme" as cache <<choice>>
-EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
-EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
-cache --> EtatTourneeCalculee : [tournées rangées dans le programme]
-cache --> EtatProgrammeCharge : [sinon]
+state "Choix de l'état selon les tournées du programme" as choix <<choice>>
+EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
+EtatTourneeCalculee --> choix : annuler / refaire
+EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
+EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
+choix --> EtatTourneeCalculee : [tournées rangées dans le programme]
+choix --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
 EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
-EtatAjoutLivraison --> cache : cliquerNoeud [autre noeud] / CommandeAjouterDemande
-EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
-EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
+EtatAjoutLivraison --> choix : cliquerNoeud [autre noeud] / CommandeAjouterDemande
+EtatAjoutCollecte --> choix : ajouterDemande (annule l'ajout)
+EtatAjoutLivraison --> choix : ajouterDemande (annule l'ajout)
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]

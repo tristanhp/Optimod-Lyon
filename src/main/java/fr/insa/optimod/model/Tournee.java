@@ -60,6 +60,17 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
                         + "collecte et de livraison ont une demande.");
             }
         }
+
+        /**
+         * Indique si le livreur arrive à cet arrêt après
+         * {@link Plan#HEURE_LIMITE_RETOUR}, pour l'afficher en rouge. À
+         * l'heure limite pile, l'arrêt est encore à l'heure.
+         *
+         * @return vrai si l'heure d'arrivée dépasse l'heure limite
+         */
+        public boolean estApresHeureLimite() {
+            return arrivee.isAfter(Plan.HEURE_LIMITE_RETOUR);
+        }
     }
 
     /**
@@ -99,6 +110,6 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      * @return vrai si le retour à l'entrepôt respecte l'heure limite
      */
     public boolean estPossible() {
-        return !obtenirHeureRetour().isAfter(Plan.HEURE_LIMITE_RETOUR);
+        return !arrets.get(arrets.size() - 1).estApresHeureLimite();
     }
 }

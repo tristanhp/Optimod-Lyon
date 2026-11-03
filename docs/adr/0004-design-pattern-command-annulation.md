@@ -57,8 +57,11 @@ Issue Linear : TIG-92.
   changement.
 - `Demande` n'a pas d'`equals` : la clé du cache compare les demandes par
   identité, ce qui est voulu (une commande rejouée réutilise les mêmes objets).
+  *(Lié au point 3, remplacé par l'ADR 0006 ; `Demande` est depuis un
+  `record`, comparé par valeur.)*
 - Une demande ajoutée à la main a des durées de collecte et de livraison de
   5 minutes (`EtatAjoutLivraison.DUREE_PAR_DEFAUT`) ; les saisir sera une
   évolution.
 - Le cache grandit avec le nombre de listes calculées dans une session ; il est
-  vidé à chaque import, ce qui suffit pour l'usage prévu.
+  vidé à chaque import, ce qui suffit pour l'usage prévu. *(Lié au point 3,
+  remplacé par l'ADR 0006.)*

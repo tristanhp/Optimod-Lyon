@@ -13,6 +13,8 @@ package "model" {
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
     +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
+    +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
+    -ordresMemorises : Map<List<Sommet>, List<Integer>>
     -calculerTournee(entrepot, heureDepart, demandes, limiteTemps) : Tournee
     -calculerPlusCourtsChemins(sommets) : Chemin[][]
     -calculerOrdreDePassage(chemins, limiteTemps) : List<Integer>
@@ -78,6 +80,7 @@ package "model" {
     depart : LocalTime
     type : TypeArret
     demande : Demande
+    +estApresHeureLimite() : boolean
   }
   enum "Tournee.TypeArret" as TypeArret {
     ENTREPOT
@@ -100,6 +103,7 @@ package "controller" {
     ~changerEtat(nouvelEtat : Etat)
     ~executer(commande : Commande)
     ~rangerTournees(tournees : Map<Integer, Tournee>)
+    ~supprimerDemandeEnGardantLOrdre(position : int)
   }
   interface MapScreen
   interface Etat
@@ -134,7 +138,7 @@ Plan *--> "*" Troncon
 Troncon --> "2" Noeud
 Chemin o--> "*" Troncon
 Plan ..> ProgrammeLivraisons : calculerTournees
-Plan ..> Tournee : crée
+Plan ..> Tournee : crée et recalcule
 Plan ..> TSP3 : ordre de passage
 TSP3 --|> TemplateTSP
 TemplateTSP ..> GrapheDepandance

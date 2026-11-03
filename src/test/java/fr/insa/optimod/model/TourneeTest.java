@@ -61,6 +61,38 @@ public class TourneeTest {
         assertFalse(tourneeRevenantA(LocalTime.of(13, 0, 1)).estPossible());
     }
 
+    /** Un arrêt à 13 h pile est à l'heure, une seconde plus tard non. */
+    @Test
+    public void arretApresHeureLimiteAu13hPres() {
+        LocalTime treize = Plan.HEURE_LIMITE_RETOUR;
+        assertFalse(new Arret(A, treize, treize, TypeArret.COLLECTE, DEMANDE)
+                .estApresHeureLimite());
+        assertTrue(new Arret(A, treize.plusSeconds(1), treize.plusSeconds(1),
+                TypeArret.COLLECTE, DEMANDE).estApresHeureLimite());
+    }
+
+    /**
+     * Seuls les arrêts atteints après 13 h sont marqués : ici la livraison à
+     * 13:10 et le retour à 13:30, pas la collecte à 12:50 ni le départ.
+     */
+    @Test
+    public void seulsLesArretsTardifsSontMarques() {
+        LocalTime depart = LocalTime.of(8, 0);
+        Tournee tournee = new Tournee(List.of(
+                new Arret(ENTREPOT, depart, depart, TypeArret.ENTREPOT, null),
+                new Arret(A, LocalTime.of(12, 50), LocalTime.of(12, 55),
+                        TypeArret.COLLECTE, DEMANDE),
+                new Arret(B, LocalTime.of(13, 10), LocalTime.of(13, 15),
+                        TypeArret.LIVRAISON, DEMANDE),
+                new Arret(ENTREPOT, LocalTime.of(13, 30),
+                        LocalTime.of(13, 30), TypeArret.ENTREPOT, null)),
+                List.of());
+        List<Boolean> marques = tournee.arrets().stream()
+                .map(Arret::estApresHeureLimite).toList();
+        assertEquals(List.of(false, false, true, true), marques);
+        assertFalse(tournee.estPossible());
+    }
+
     /** L'entrepôt n'a pas de demande, une collecte ou une livraison si. */
     @Test(expected = IllegalArgumentException.class)
     public void entrepotAvecDemandeRefuse() {

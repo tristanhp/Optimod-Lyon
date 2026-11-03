@@ -105,13 +105,18 @@ de même taille.
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
    inaccessible, un message l'explique ; si un livreur revient après 13 h,
-   sa tournée est affichée et un message signale le retard.
+   sa tournée est affichée quand même, sans message d'erreur (les arrêts en
+   retard seront mis en rouge : TIG-71).
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison (durées sur place : 5 min) ;
      recliquer sur le bouton annule l'ajout ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
-     cliquer sur le bouton sous la liste ;
+     cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
+     mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls
+     les trajets et les heures sont recalculés (pas de nouveau calcul de 10 s).
+     Une consigne rappelle que cet ordre n'est pas optimisé : *Calculer* en
+     cherche un meilleur ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -197,6 +202,14 @@ et évaluation (`TSP3`), puis heures de passage
 ([ADR 0005](docs/adr/0005-nettoyage-du-code-et-glossaire.md),
 [ADR 0006](docs/adr/0006-plusieurs-livreurs.md)). Les tournées sont rangées
 dans le `ProgrammeLivraisons`, que la vue observe.
+
+Le voyageur de commerce ne sert qu'au bouton *Calculer*. Quand on modifie une
+tournée déjà calculée, on fait un **recalcul local** : l'ordre des autres
+arrêts est gardé, les trajets des jonctions créées (A*) sont les seuls
+recalculés, les autres trajets sont repris de la tournée actuelle, et les
+heures de passage sont refaites. La suppression d'une demande passe par
+`Plan.calculerTourneeSansDemande`. « Recalcul local » est un terme technique,
+pas du vocabulaire métier.
 
 ## Structure du dépôt
 

@@ -44,9 +44,12 @@ avant le code et relu dans la PR.
    l'entrepôt). La limite de 10 s est partagée à parts égales entre les
    livreurs qui ont des demandes.
 6. **Retour après 13 h** : la tournée est renvoyée, et
-   `Tournee.estPossible()` est faux. Le contrôleur la range et signale le
-   livreur concerné. Une adresse inaccessible ou un calcul sans solution
-   restent une `IllegalStateException`.
+   `Tournee.estPossible()` est faux. Chaque arrêt sait s'il est atteint après
+   13 h (`Arret.estApresHeureLimite()`), pour que la vue l'affiche en rouge.
+   Le contrôleur range la tournée sans fenêtre d'erreur : « Calculer »
+   n'échoue pas à cause de 13 h, et le signal est le rouge des arrêts. Une
+   adresse inaccessible ou un calcul sans solution restent une
+   `IllegalStateException`.
 7. **Annuler et rétablir** : une commande qui modifie les demandes garde les
    tournées d'avant et d'après. `annuler()` remet celles d'avant ; rétablir
    remet celles d'après, sans recalcul. Quand l'utilisateur calcule après une
@@ -56,6 +59,16 @@ avant le code et relu dans la PR.
 8. **Écran** : `MapScreen.afficherTournee` et `effacerTournee` sont retirées ;
    `MainView` relit les tournées du programme à chaque notification. Avec
    plusieurs livreurs, la liste porte un titre par livreur.
+9. **Mémoire de l'ordre de passage** : relancer le voyageur de commerce coûte
+   jusqu'à 10 s, donc `Plan` garde l'ordre qu'il a trouvé pour chaque livreur.
+   La clé est la liste des sommets du livreur (adresses, durées, types et
+   demandes) ; la valeur est l'ordre de passage. Seul « Calculer »
+   (`calculerTournees`) la consulte : le recalcul local ne la lit ni ne
+   l'écrit, et garde l'ordre affiché. Un ordre n'y est rangé qu'une fois la
+   tournée obtenue. Elle vit autant que le `Plan`, donc repart de zéro à chaque
+   import, et la table est concurrente puisque le calcul tourne hors du thread
+   de l'interface. Ce n'est pas un cache d'affichage : la vue lit toujours les
+   tournées du programme.
 
 ## Alternatives envisagées
 
@@ -71,17 +84,35 @@ avant le code et relu dans la PR.
 - **10 s par livreur** : le temps de « Calculer » grandirait avec le nombre
   de livreurs.
 - **Garder le cache indexé par les demandes** : incompatible avec le recalcul
-  local, où deux tournées différentes peuvent servir les mêmes demandes.
+  local, où deux tournées différentes peuvent servir les mêmes demandes. Il
+  aurait aussi ressorti un ordre du voyageur de commerce par-dessus un ordre
+  choisi par l'utilisateur (changer l'ordre, changer de livreur). La mémoire
+  du point 9 évite cela : elle ne garde pas de tournée, seulement le résultat
+  du voyageur de commerce, qui ne dépend que des sommets du livreur.
 
 ## Conséquences
 
 - Avec un livreur, le comportement est le même qu'avant, sauf le retour après
-  13 h, désormais affiché et signalé (test `retourApres13hSignale`).
+  13 h, désormais affiché sans message d'erreur (test
+  `retourApres13hSignale`).
 - Les commandes futures (changer de livreur, déplacer, réordonner, rejeter)
-  implémentent `memoriserTourneesAvant` et `memoriserTourneesApres` ; le
-  recalcul local (TIG-101) range sa tournée avec `definirTournee`.
+  implémentent `memoriserTourneesAvant` et `memoriserTourneesApres`.
+- Le recalcul local (TIG-101) ne touche que la tournée du livreur de la
+  demande supprimée. `MainController` le lance hors du thread de l'interface
+  (`EtatCalculEnCours`), puis exécute `CommandeSupprimerDemande` avec, comme
+  tournées d'après, celles d'avant dont la tournée de ce livreur est remplacée :
+  Annuler et Rétablir remettent les deux sans calcul. Si le recalcul échoue,
+  les tournées sont retirées et l'utilisateur est prévenu.
 - Les arrêts portent leur demande : le recalcul local retrouve les arrêts
-  d'une demande sans ambiguïté.
+  d'une demande sans ambiguïté, même quand deux demandes ont le même point de
+  collecte et la même durée.
+- Le recalcul local renvoie la tournée même si elle finit après 13 h, comme le
+  calcul complet : c'est `Tournee.estPossible()` qui la signale.
+- Deux « Calculer » de suite sur les mêmes demandes d'un livreur ne relancent
+  pas le voyageur de commerce : la seconde tournée reprend l'ordre de la
+  première, au lieu d'un nouveau résultat indépendant.
+- La mémoire de l'ordre de passage n'est pas bornée : elle grandit avec le
+  nombre de listes de demandes calculées entre deux imports de plan.
 - Chaque modification du programme peut notifier plusieurs fois la vue
   (tournées puis demandes) ; l'ordre des appels garde un état cohérent à
   chaque notification.

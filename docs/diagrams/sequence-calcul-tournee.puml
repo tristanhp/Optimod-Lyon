@@ -20,11 +20,18 @@ group Thread d'arrière-plan
   loop pour chaque livreur
     P -> P : calculerPlusCourtsChemins(sommets)
     note right of P : A* entre chaque couple d'adresses du livreur\n(entrepôt, collectes, livraisons)
-    P -> T : chercherSolution(10 s / livreurs occupés, GrapheDepandance)
-    note right of T : séparation et évaluation,\ncollecte avant livraison
-    T --> P : ordre de passage
+    alt Ordre déjà en mémoire pour ces sommets
+      P -> P : ordresMemorises.get(sommets)
+    else Premier calcul de ces sommets
+      P -> T : chercherSolution(10 s / livreurs occupés, GrapheDepandance)
+      note right of T : séparation et évaluation,\ncollecte avant livraison
+      T --> P : ordre de passage
+    end
     P -> P : calculerHeuresDePassage(...)
     note right of P : 15 km/h, durées sur place ;\nchaque arrêt garde son type et sa demande
+    opt Ordre trouvé par le TSP et tournée obtenue
+      P -> P : ordresMemorises.put(sommets, ordre)
+    end
   end
   P --> C : une Tournee par livreur (ou IllegalStateException)
 end
@@ -36,9 +43,7 @@ group Thread de l'interface
     V --> U : arrêts et heures de passage, par livreur
     C -> C : historique.memoriserTournees(tournees)
     C -> C : changerEtat(new EtatTourneeCalculee())
-    opt Un livreur revient après 13:00
-      C -> V : afficherErreurCalcul(« Livreur k : retour à … »)
-    end
+    note right of C : un retour après 13:00 n'est pas une erreur :\nla tournée est affichée, les arrêts en retard\nsont repérés par Arret.estApresHeureLimite()
   else Adresse inaccessible ou aucun ordre trouvé
     C -> C : changerEtat(new EtatProgrammeCharge())
     C -> V : afficherErreurCalcul(message)

@@ -2,15 +2,19 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
 
@@ -30,8 +34,37 @@ import fr.insa.optimod.model.Plan;
  * par des commandes annulables ({@link Commande}, design pattern Command),
  * qui gardent les tournées d'avant et d'après : annuler ou rétablir une
  * modification remet les tournées correspondantes sans les recalculer.
+ *
+ * <p>Supprimer une demande quand les tournées sont calculées ne relance pas le
+ * voyageur de commerce : seule la tournée du livreur de la demande est
+ * recalculée localement, en gardant l'ordre de ses autres arrêts
+ * ({@link #supprimerDemandeEnGardantLOrdre}).
  */
 public final class MainController {
+
+    /** Journal des échecs du recalcul local, pour les retrouver après coup. */
+    private static final Logger JOURNAL =
+            Logger.getLogger(MainController.class.getName());
+
+    /**
+     * Consigne affichée quand la tournée vient d'un recalcul local et qu'il n'y
+     * a qu'un livreur. Elle ne conseille pas « Calculer », qui remplacerait
+     * aussi les ordres choisis à la main.
+     */
+    static final String CONSIGNE_ORDRE_GARDE = "Ordre des autres arrêts "
+            + "gardé : il n'est peut-être plus le plus court.";
+
+    /**
+     * Même consigne avec plusieurs livreurs : {@code %d} est le livreur dont la
+     * tournée vient d'être recalculée, les autres tournées ne changent pas.
+     */
+    static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre des "
+            + "autres arrêts gardé, il n'est peut-être plus le plus court.";
+
+    /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
+    static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
+            + "arrêts de la demande n'ont pas pu être identifiés. Cliquez sur "
+            + "Calculer pour recalculer les tournées.";
 
     /** Issue de la lecture d'un fichier choisi par l'utilisateur. */
     enum Lecture {
@@ -191,6 +224,7 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         ProgrammeLivraisons programmeCalcule = programme;
+        ecran.afficherConsigne(""); // efface la consigne d'un recalcul local
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
@@ -221,27 +255,6 @@ public final class MainController {
     void rangerTournees(Map<Integer, Tournee> tournees) {
         programme.definirTournees(tournees);
         historique.memoriserTournees(programme.obtenirTournees());
-    }
-
-    /**
-     * Signale les livreurs dont la tournée revient à l'entrepôt après
-     * {@link Plan#HEURE_LIMITE_RETOUR} ; ne fait rien si toutes sont
-     * possibles.
-     *
-     * @param tournees tournées par numéro de livreur
-     */
-    void signalerTourneesImpossibles(Map<Integer, Tournee> tournees) {
-        List<String> retards = new ArrayList<>();
-        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
-            if (!entree.getValue().estPossible()) {
-                retards.add("Livreur " + entree.getKey() + " : retour à "
-                        + entree.getValue().obtenirHeureRetour() + ", après "
-                        + Plan.HEURE_LIMITE_RETOUR + ".");
-            }
-        }
-        if (!retards.isEmpty()) {
-            ecran.afficherErreurCalcul(String.join("\n", retards));
-        }
     }
 
     /** @param detail explication de l'échec du calcul */
@@ -300,8 +313,106 @@ public final class MainController {
         }
     }
 
-    /** Oublie l'historique : le plan ou les demandes changent. */
+    /**
+     * Supprime une demande quand les tournées sont calculées, en gardant
+     * l'ordre des autres arrêts du livreur et sans relancer le voyageur de
+     * commerce. La tournée de ce livreur est recalculée localement
+     * ({@link Plan#calculerTourneeSansDemande}) hors du thread de l'interface,
+     * avec l'attente affichée et toutes les actions bloquées comme pendant le
+     * calcul complet ({@link EtatCalculEnCours}) ; les tournées des autres
+     * livreurs ne changent pas. Le résultat est ensuite traité sur le thread
+     * de l'interface ({@link #finirSuppression}).
+     *
+     * @param position rang dans le programme de la demande à supprimer ; une
+     *        position invalide est ignorée
+     */
+    void supprimerDemandeEnGardantLOrdre(int position) {
+        List<Demande> demandes = programme.obtenirDemandes();
+        if (position < 0 || position >= demandes.size()) {
+            return;
+        }
+        Demande retiree = demandes.get(position);
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee locale = planCalcule.calculerTourneeSansDemande(
+                        avant.get(retiree.livreur()), retiree);
+                interfaceUtilisateur.execute(() -> finirSuppression(position,
+                        retiree.livreur(), avant, locale, null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirSuppression(position,
+                        retiree.livreur(), avant, null, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du recalcul local, sur le thread de l'interface : exécute la
+     * suppression avec, comme tournées d'après, celles d'avant dont la tournée
+     * du livreur est remplacée par la tournée recalculée ; annuler remet celles
+     * d'avant. En cas d'échec, la suppression est exécutée sans tournées (elles
+     * sont retirées de l'écran) et l'utilisateur en est informé.
+     *
+     * @param position rang de la demande à supprimer
+     * @param livreur numéro du livreur de la demande supprimée
+     * @param avant tournées d'avant la suppression
+     * @param locale tournée recalculée du livreur, ou {@code null} en cas
+     *        d'échec
+     * @param echec cause de l'échec, ou {@code null}
+     */
+    private void finirSuppression(int position, int livreur,
+            Map<Integer, Tournee> avant, Tournee locale,
+            RuntimeException echec) {
+        ecran.afficherAttente(false);
+        Commande suppression = new CommandeSupprimerDemande(programme,
+                position);
+        if (locale != null) {
+            Map<Integer, Tournee> apres = new TreeMap<>(avant);
+            apres.put(livreur, locale);
+            suppression.memoriserTourneesAvant(avant);
+            suppression.memoriserTourneesApres(
+                    Collections.unmodifiableMap(apres));
+        }
+        executer(suppression);
+        if (locale != null) {
+            ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
+                    ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
+                    : CONSIGNE_ORDRE_GARDE);
+        } else {
+            signalerEchecRecalculLocal(echec);
+        }
+    }
+
+    /**
+     * Distingue les échecs du recalcul local au lieu de les ignorer : le cas
+     * attendu (arrêts de la demande introuvables dans la tournée) est expliqué
+     * par une consigne ; une adresse inaccessible et une erreur inattendue sont
+     * signalées à l'utilisateur et journalisées.
+     */
+    private void signalerEchecRecalculLocal(RuntimeException echec) {
+        if (echec instanceof IllegalArgumentException) {
+            JOURNAL.log(Level.INFO, "Recalcul local impossible : {0}",
+                    echec.getMessage());
+            ecran.afficherConsigne(CONSIGNE_ORDRE_NON_GARDE);
+        } else if (echec instanceof IllegalStateException) {
+            JOURNAL.log(Level.WARNING, "Recalcul local impossible", echec);
+            ecran.afficherErreurCalcul(echec.getMessage());
+        } else {
+            JOURNAL.log(Level.SEVERE, "Erreur inattendue du recalcul local",
+                    echec);
+            ecran.afficherErreurCalcul(echec.getMessage() != null
+                    ? echec.getMessage() : echec.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * Oublie l'historique et la consigne : le plan ou les demandes changent.
+     */
     private void oublierModifications() {
         historique.vider();
+        ecran.afficherConsigne("");
     }
 }
