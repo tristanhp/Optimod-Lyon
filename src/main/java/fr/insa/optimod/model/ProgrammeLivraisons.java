@@ -285,14 +285,16 @@ public final class ProgrammeLivraisons extends Observable {
      *
      * @param position rang de la demande à remplacer
      * @param demande nouvelle demande
+     * @return la demande remplacée
      * @throws IndexOutOfBoundsException si la position est hors de la liste
      * @throws IllegalArgumentException si le livreur de la demande n'existe
      *         pas
      */
-    public void remplacerDemande(int position, Demande demande) {
+    public Demande remplacerDemande(int position, Demande demande) {
         verifierLivreur(demande);
-        demandes.set(position, demande);
+        Demande remplacee = demandes.set(position, demande);
         notifierObservateurs();
+        return remplacee;
     }
 
     private void verifierLivreur(Demande demande) {

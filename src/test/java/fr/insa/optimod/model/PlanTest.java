@@ -1276,4 +1276,101 @@ public class PlanTest {
                 Plan.HEURE_LIMITE_RETOUR));
         assertFalse(apres.estPossible());
     }
+
+    /**
+     * Déplacer un point garde l'ordre, les types et les durées sur place : la
+     * tournée est celle d'un recalcul sur les nouvelles adresses, les deux
+     * arrêts de la demande portent la demande déplacée, et seuls les deux
+     * trajets autour de l'arrêt déplacé sont calculés, les autres sont repris
+     * de la tournée actuelle (même objet).
+     */
+    @Test
+    public void deplacerUnPointRecalculeLesDeuxTrajetsAutourDeLArret()
+            throws Exception {
+        Plan plan = lirePlanFourni("moyenPlan");
+        ProgrammeLivraisons programme = lireProgrammeFourni(plan,
+                "demandeMoyen5");
+        Tournee tournee = premiereTournee(plan, programme);
+        List<Noeud> adresses = tournee.arrets().stream()
+                .map(Tournee.Arret::noeud).toList();
+        Noeud nouveau = plan.obtenirNoeuds().stream()
+                .filter(noeud -> !adresses.contains(noeud)).findFirst()
+                .orElseThrow();
+        Set<Chemin> anciens = Collections.newSetFromMap(
+                new IdentityHashMap<>());
+        anciens.addAll(tournee.chemins());
+        for (int rang = 1; rang < adresses.size() - 1; rang++) {
+            Tournee deplacee = plan.calculerTourneeAvecPointDeplace(tournee,
+                    rang, nouveau);
+            Tournee.Arret arret = deplacee.arrets().get(rang);
+            Demande demande = arret.demande();
+            assertEquals(nouveau, arret.type() == TypeArret.COLLECTE
+                    ? demande.collecte() : demande.livraison());
+            List<ArretPrevu> attendus = new ArrayList<>();
+            for (int i = 0; i < adresses.size(); i++) {
+                Tournee.Arret courant = tournee.arrets().get(i);
+                ArretPrevu prevu = new ArretPrevu(courant);
+                boolean memeDemande = courant.demande() != null
+                        && courant.demande().equals(
+                                tournee.arrets().get(rang).demande());
+                attendus.add(new ArretPrevu(
+                        i == rang ? nouveau : prevu.noeud(), prevu.duree(),
+                        prevu.type(),
+                        memeDemande ? demande : prevu.demande()));
+            }
+            assertEquals(tourneeDansLOrdre(plan, programme.obtenirHeureDepart(),
+                    attendus), deplacee);
+            assertEquals(2, deplacee.chemins().stream()
+                    .filter(chemin -> !anciens.contains(chemin)).count());
+        }
+    }
+
+    /**
+     * L'entrepôt ne se déplace pas, et deux demandes identiques ne permettent
+     * pas d'identifier le point à déplacer.
+     */
+    @Test
+    public void deplacerUnPointRefuseEntrepotOuDemandesIdentiques()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = tourneeDeDeuxDemandes(plan, LocalTime.of(8, 0));
+        int dernier = tournee.arrets().size() - 1;
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.calculerTourneeAvecPointDeplace(tournee, 0,
+                        plan.obtenirNoeud(2)));
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.calculerTourneeAvecPointDeplace(tournee, dernier,
+                        plan.obtenirNoeud(2)));
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Demande identique = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 120);
+        Tournee jumelles = tourneeDansLOrdre(plan, LocalTime.of(8, 0), List.of(
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null),
+                new ArretPrevu(plan.obtenirNoeud(3), 60, TypeArret.COLLECTE,
+                        identique),
+                new ArretPrevu(plan.obtenirNoeud(3), 60, TypeArret.COLLECTE,
+                        identique),
+                new ArretPrevu(plan.obtenirNoeud(2), 120, TypeArret.LIVRAISON,
+                        identique),
+                new ArretPrevu(plan.obtenirNoeud(2), 120, TypeArret.LIVRAISON,
+                        identique),
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null)));
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.calculerTourneeAvecPointDeplace(jumelles, 1,
+                        entrepot));
+    }
+
+    /**
+     * Un déplacement qui fait rentrer après 13 h est renvoyé comme les autres
+     * tournées impossibles : c'est à l'appelant de le refuser.
+     */
+    @Test
+    public void deplacerUnPointPeutRendreLaTourneeImpossible()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = tourneeDeDeuxDemandes(plan, LocalTime.of(12, 59, 59));
+        Tournee deplacee = plan.calculerTourneeAvecPointDeplace(tournee, 1,
+                plan.obtenirNoeud(2));
+        assertFalse(deplacee.estPossible());
+    }
 }

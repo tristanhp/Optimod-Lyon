@@ -36,7 +36,8 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
 | Saisir les durées et insérer une demande sans relancer le TSP | fait |
 | Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
-| Régler le nombre de livreurs, déplacer un point | à faire |
+| Déplacer un point de collecte ou de livraison | fait |
+| Régler le nombre de livreurs | à faire |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
 ## Installer le projet
@@ -167,6 +168,13 @@ de même taille.
      d'une demande passerait avant son point de collecte (contrainte d'ordre),
      ou si le changement ferait dépasser 13 h à une tournée qui rentrait à
      l'heure, une fenêtre explique le refus et rien ne change ;
+   - *Déplacer* : sélectionner un point de collecte ou de livraison dans la
+     liste des tournées, cliquer sur *Déplacer*, puis sur sa nouvelle adresse
+     sur la carte (un second clic sur *Déplacer* annule). L'ordre des arrêts ne
+     change pas : seuls les deux trajets autour du point sont recalculés, et
+     seule la tournée de son livreur change. Si la tournée devient impossible
+     (adresse inaccessible, ou retour après 13 h pour une tournée qui rentrait
+     à l'heure), une fenêtre explique le refus et rien ne change ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.

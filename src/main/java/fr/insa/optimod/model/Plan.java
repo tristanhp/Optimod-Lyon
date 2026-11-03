@@ -610,6 +610,18 @@ public final class Plan {
      */
     private Tournee recalculerDansLOrdre(Tournee tournee,
             List<Integer> rangsGardes) {
+        return recalculerDansLOrdre(tournee, rangsGardes, -1);
+    }
+
+    /**
+     * Comme {@link #recalculerDansLOrdre(Tournee, List)}, mais les trajets qui
+     * arrivent à l'arrêt de rang {@code rangDeplace} ou en partent sont
+     * toujours recalculés par A* : cet arrêt a changé d'adresse.
+     *
+     * @param rangDeplace rang de l'arrêt déplacé, ou -1 si aucun
+     */
+    private Tournee recalculerDansLOrdre(Tournee tournee,
+            List<Integer> rangsGardes, int rangDeplace) {
         List<Tournee.Arret> arrets = tournee.arrets();
         // Le retour à l'entrepôt (dernier rang gardé) n'est pas un sommet :
         // l'étape des heures de passage l'ajoute elle-même, comme dans
@@ -631,7 +643,9 @@ public final class Plan {
             int rangSuivant = rangsGardes.get(sommet + 1);
             // Les deux arrêts se suivaient déjà : on reprend leur trajet. Sinon
             // c'est une jonction créée par la suppression : A*.
-            Chemin chemin = rangSuivant == rang + 1
+            boolean trajetInchange = rangSuivant == rang + 1
+                    && rang != rangDeplace && rangSuivant != rangDeplace;
+            Chemin chemin = trajetInchange
                     ? tournee.chemins().get(rang)
                     : plusCourtChemin(arrets.get(rang).noeud(),
                             arrets.get(rangSuivant).noeud());
@@ -713,6 +727,70 @@ public final class Plan {
         }
         Collections.swap(rangs, rang, voisin);
         return recalculerDansLOrdre(tournee, rangs);
+    }
+
+    /**
+     * Déplace un point de collecte ou de livraison d'une tournée déjà
+     * calculée : l'arrêt change d'adresse, <b>l'ordre de passage ne change
+     * pas</b> et le voyageur de commerce n'est pas relancé. A* ne tourne que
+     * sur les deux trajets autour de l'arrêt déplacé, les autres sont repris
+     * de la tournée actuelle, puis les heures de passage sont refaites. Les
+     * deux arrêts de la demande reçoivent la demande déplacée.
+     *
+     * <p>Comme le calcul complet, la méthode renvoie la tournée même si elle
+     * finit après {@link #HEURE_LIMITE_RETOUR} : c'est à l'appelant de la
+     * refuser avec {@link Tournee#estPossible()}.
+     *
+     * @param tournee tournée actuelle d'un livreur
+     * @param rang rang, dans cette tournée, de l'arrêt à déplacer (0 est le
+     *        départ de l'entrepôt, le dernier rang le retour à l'entrepôt)
+     * @param nouveauNoeud nouvelle adresse du point
+     * @return la nouvelle tournée, avec ses heures de passage
+     * @throws IllegalArgumentException si l'arrêt est l'entrepôt, ou si la
+     *         demande n'est pas identifiable (deux demandes identiques)
+     * @throws IllegalStateException si un trajet est inaccessible
+     */
+    public Tournee calculerTourneeAvecPointDeplace(Tournee tournee, int rang,
+            Noeud nouveauNoeud) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        if (rang < 1 || rang >= arrets.size() - 1) {
+            throw new IllegalArgumentException("Le départ et le retour à "
+                    + "l'entrepôt ne peuvent pas être déplacés : choisissez "
+                    + "un point de collecte ou de livraison.");
+        }
+        Tournee.Arret arret = arrets.get(rang);
+        Demande ancienne = arret.demande();
+        long arretsDeLaDemande = arrets.stream()
+                .filter(autre -> ancienne.equals(autre.demande())).count();
+        if (arretsDeLaDemande != 2) {
+            throw new IllegalArgumentException("Ce point ne peut pas être "
+                    + "identifié : plusieurs demandes ont les mêmes adresses "
+                    + "et les mêmes durées.");
+        }
+        Demande deplacee = arret.type() == TypeArret.COLLECTE
+                ? new Demande(nouveauNoeud, ancienne.livraison(),
+                        ancienne.dureeCollecte(), ancienne.dureeLivraison(),
+                        ancienne.livreur())
+                : new Demande(ancienne.collecte(), nouveauNoeud,
+                        ancienne.dureeCollecte(), ancienne.dureeLivraison(),
+                        ancienne.livreur());
+        // Même tournée et mêmes heures (seules les durées sur place en sont
+        // lues), mais l'arrêt a son nouveau nœud et les deux arrêts de la
+        // demande portent la demande déplacée.
+        List<Tournee.Arret> arretsDeplaces = new ArrayList<>(arrets);
+        List<Integer> rangs = new ArrayList<>();
+        for (int i = 0; i < arrets.size(); i++) {
+            rangs.add(i);
+            Tournee.Arret courant = arrets.get(i);
+            if (ancienne.equals(courant.demande())) {
+                arretsDeplaces.set(i, new Tournee.Arret(
+                        i == rang ? nouveauNoeud : courant.noeud(),
+                        courant.arrivee(), courant.depart(), courant.type(),
+                        deplacee));
+            }
+        }
+        return recalculerDansLOrdre(
+                new Tournee(arretsDeplaces, tournee.chemins()), rangs, rang);
     }
 
     /**

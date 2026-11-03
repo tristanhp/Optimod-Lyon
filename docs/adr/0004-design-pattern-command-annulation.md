@@ -29,6 +29,10 @@ Issue Linear : TIG-92.
    tournées d'avant et d'après du programme, comme les autres.)*
    Le recalcul de l'ordre tourne hors du thread JavaFX et reprend les chemins
    de `Tournee.chemins()` (A* seulement autour des deux arrêts échangés).
+   `CommandeDeplacerPoint` remplace une demande par la même dont un point a
+   changé de nœud ; elle garde les tournées d'avant et d'après du programme
+   (calculées avant la commande, seule la tournée du livreur change) :
+   annuler remet l'ancienne demande et les tournées d'avant, sans recalcul.
 2. `ListeDeCommandes` garde l'historique : `executer`, `annuler`, `refaire`,
    `vider`. Exécuter une nouvelle commande oublie les commandes annulées.
    L'historique est vidé quand un plan ou des demandes sont importés.

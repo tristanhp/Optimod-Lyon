@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -66,6 +67,15 @@ public final class MainController {
      */
     static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre non "
             + "optimisé, il n'est peut-être plus le plus court.";
+
+    /** Consigne quand aucun point de collecte ou de livraison est choisi. */
+    static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
+            + "liste de la tournée, le point de collecte ou de livraison à "
+            + "déplacer.";
+
+    /** Début de consigne quand la nouvelle adresse est déjà celle du couple. */
+    static final String CONSIGNE_MEME_ADRESSE = "La collecte et la livraison "
+            + "d'une demande doivent être à des adresses différentes. ";
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
@@ -150,6 +160,8 @@ public final class MainController {
                 etat.changerOrdre(this, livreur, rang, -1));
         ecran.definirActionDescendreArret((livreur, rang) ->
                 etat.changerOrdre(this, livreur, rang, 1));
+        ecran.definirActionDeplacerPoint((livreur, rang) ->
+                etat.deplacerPoint(this, livreur, rang));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
@@ -620,7 +632,8 @@ public final class MainController {
         }
         if (refus != null) {
             changerEtat(new EtatTourneeCalculee());
-            signalerRefusOrdre(refus);
+            signalerRefus(refus, ecran::afficherRefusOrdre,
+                    "du changement d'ordre");
             return;
         }
         Map<Integer, Tournee> tournees = new TreeMap<>(avant);
@@ -634,21 +647,137 @@ public final class MainController {
     }
 
     /**
-     * Distingue les refus du changement d'ordre : une raison attendue
-     * (contrainte d'ordre, entrepôt, premier ou dernier arrêt, retour après
-     * 13 h) est expliquée à l'utilisateur ; une erreur inattendue est signalée
-     * et journalisée, au lieu de laisser les actions bloquées.
+     * Distingue les refus d'une modification de la tournée : une raison
+     * attendue (par exemple contrainte d'ordre, retour après 13 h) est
+     * expliquée à l'utilisateur ; une erreur inattendue est signalée et
+     * journalisée, au lieu de laisser les actions bloquées.
+     *
+     * @param echec cause du refus
+     * @param afficher affiche la raison attendue
+     * @param modification ce qui était demandé, pour le journal
      */
-    private void signalerRefusOrdre(RuntimeException echec) {
+    private void signalerRefus(RuntimeException echec,
+            Consumer<String> afficher, String modification) {
         if (echec instanceof IllegalArgumentException
                 || echec instanceof IllegalStateException) {
-            ecran.afficherRefusOrdre(echec.getMessage());
+            afficher.accept(echec.getMessage());
         } else {
-            JOURNAL.log(Level.SEVERE, "Erreur inattendue du changement "
-                    + "d'ordre", echec);
+            JOURNAL.log(Level.SEVERE, "Erreur inattendue lors "
+                    + modification, echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
                     ? echec.getMessage() : echec.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Commence le déplacement du point de collecte ou de livraison sélectionné
+     * dans la liste des tournées : l'écran attend alors un clic sur sa
+     * nouvelle adresse ({@link EtatDeplacementPoint}). Sans arrêt sélectionné,
+     * ou si l'arrêt est le départ ou le retour à l'entrepôt, une consigne
+     * l'explique.
+     *
+     * @param livreur numéro du livreur de l'arrêt sélectionné, ou {@code -1}
+     *        si aucun arrêt n'est sélectionné
+     * @param rang rang de l'arrêt dans la tournée de ce livreur, ou
+     *        {@code -1} si aucun arrêt n'est sélectionné
+     */
+    void choisirPointADeplacer(int livreur, int rang) {
+        Tournee tournee = programme.obtenirTournees().get(livreur);
+        if (tournee == null || rang < 1 || rang >= tournee.arrets().size() - 1) {
+            ecran.afficherConsigne(CONSIGNE_AUCUN_POINT);
+        } else {
+            changerEtat(new EtatDeplacementPoint(livreur, rang));
+            ecran.afficherConsigne(EtatDeplacementPoint.CONSIGNE);
+        }
+    }
+
+    /**
+     * Déplace un point de la tournée d'un livreur vers le nœud cliqué, par une
+     * commande annulable. La tournée du livreur est recalculée localement
+     * ({@link Plan#calculerTourneeAvecPointDeplace}) hors du thread de
+     * l'interface, actions bloquées ({@link EtatCalculEnCours}) ; l'ordre de
+     * passage est gardé et les tournées des autres livreurs ne changent pas.
+     * Le résultat est traité sur le thread de l'interface
+     * ({@link #finirDeplacement}).
+     *
+     * @param livreur numéro du livreur de l'arrêt à déplacer
+     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     * @param idNoeud nœud cliqué, nouvelle adresse du point
+     */
+    void deplacerPoint(int livreur, int rang, long idNoeud) {
+        Noeud nouveau = plan.obtenirNoeud(idNoeud);
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
+        Tournee actuelle = avant.get(livreur);
+        if (nouveau == null || actuelle == null) {
+            return; // clic hors du plan : ignoré
+        }
+        Demande demande = actuelle.arrets().get(rang).demande();
+        if (nouveau.equals(demande.collecte())
+                || nouveau.equals(demande.livraison())) {
+            ecran.afficherConsigne(CONSIGNE_MEME_ADRESSE
+                    + EtatDeplacementPoint.CONSIGNE);
+            return;
+        }
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee apres = planCalcule.calculerTourneeAvecPointDeplace(
+                        actuelle, rang, nouveau);
+                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
+                        rang, demande, avant, apres, null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
+                        rang, demande, avant, null, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du déplacement, sur le thread de l'interface. S'il est refusé
+     * (adresse inaccessible, ou retour à l'entrepôt rendu impossible après
+     * 13 h), l'écran affiche la raison et rien n'est modifié, pas même
+     * l'historique. Sinon la commande remplace la demande par celle dont le
+     * point a changé de nœud, range à la place des tournées d'avant les mêmes
+     * avec la nouvelle tournée du livreur, et l'arrêt déplacé reste
+     * sélectionné.
+     *
+     * @param livreur numéro du livreur de la tournée
+     * @param rang rang de l'arrêt déplacé dans la tournée de ce livreur
+     * @param ancienne demande dont un point est déplacé
+     * @param avant tournées d'avant le déplacement
+     * @param apres tournée du livreur avec le point déplacé, ou {@code null}
+     *        en cas de refus
+     * @param echec cause du refus, ou {@code null}
+     */
+    private void finirDeplacement(int livreur, int rang, Demande ancienne,
+            Map<Integer, Tournee> avant, Tournee apres,
+            RuntimeException echec) {
+        ecran.afficherAttente(false);
+        RuntimeException refus = echec;
+        if (refus == null && !apres.estPossible()
+                && avant.get(livreur).estPossible()) {
+            refus = new IllegalStateException("Déplacement refusé : le retour "
+                    + "à l'entrepôt serait à " + apres.obtenirHeureRetour()
+                    + ", après " + Plan.HEURE_LIMITE_RETOUR + ".");
+        }
+        if (refus != null) {
+            retrouverEtatProgramme();
+            signalerRefus(refus, ecran::afficherRefusDeplacement,
+                    "du déplacement d'un point");
+            return;
+        }
+        Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+        tournees.put(livreur, apres);
+        executer(new CommandeDeplacerPoint(programme,
+                programme.obtenirDemandes().indexOf(ancienne),
+                apres.arrets().get(rang).demande(), avant,
+                Collections.unmodifiableMap(tournees)));
+        afficherConsigneOrdreNonOptimise(livreur);
+        // executer réaffiche les tournées, ce qui efface la sélection de la
+        // liste : on la remet sur l'arrêt déplacé.
+        ecran.selectionnerArretTournee(livreur, rang);
     }
 
     /**

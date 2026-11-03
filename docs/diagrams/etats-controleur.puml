@@ -10,11 +10,14 @@ EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatProgrammeCharge : Restaurer
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
-EtatTourneeCalculee : + Monter, Descendre, Sauvegarder (sous-classe)
+EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
 EtatRestauration : boutons : aucun
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : idCollecte : long
+EtatDeplacementPoint : boutons : Déplacer (= annuler le déplacement)
+EtatDeplacementPoint : livreur : int
+EtatDeplacementPoint : rang : int
 
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
@@ -47,6 +50,12 @@ EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conserv
 EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
 EtatAjoutCollecte --> choix : ajouterDemande ou annuler / effacer aperçu
 EtatAjoutLivraison --> choix : ajouterDemande, annuler ou dialogue annulé / effacer aperçu
+
+EtatTourneeCalculee --> EtatDeplacementPoint : deplacerPoint [arrêt choisi]
+EtatDeplacementPoint --> EtatCalculEnCours : cliquerNoeud [autre adresse]
+EtatCalculEnCours --> choix : fin du déplacement / CommandeDeplacerPoint
+EtatCalculEnCours --> choix : fin du déplacement [refusé]
+EtatDeplacementPoint --> choix : deplacerPoint (annule le déplacement)
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]
