@@ -1,16 +1,37 @@
 package fr.insa.optimod.algo.tsp;
 
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map.Entry;
 
+/**
+ * GrapheDepandance
+ * Un graphe avec un systeme de depandance. Des sommets sont depandant d'autre
+ * pour le calcul du TSP
+ */
 public class GrapheDepandance implements Graphe {
     private int nbSommets;
     private int[][] cout;
     private HashMap<Integer, Integer> depandance;
+    private HashMap<Integer, Integer> depandanceInverser;
 
+    /**
+     * Le constructeur de GrapheDepandance
+     *
+     * @param nbSommets  le nombre de sommet du graphe
+     * @param cout       la matrice de cout du graphe
+     * @param depandance la liste de depandance du graphe
+     */
     public GrapheDepandance(int nbSommets, int[][] cout, HashMap<Integer, Integer> depandance) {
         this.nbSommets = nbSommets;
         this.cout = cout.clone();
         this.depandance = new HashMap<>(depandance);
+        this.depandanceInverser = new HashMap<Integer, Integer>();
+        Iterator<Entry<Integer, Integer>> it = depandance.entrySet().iterator();
+        while (it.hasNext()) {
+            Entry<Integer, Integer> temp = it.next();
+            this.depandanceInverser.put(temp.getValue(), temp.getKey());
+        }
     }
 
     @Override
@@ -35,11 +56,21 @@ public class GrapheDepandance implements Graphe {
     /**
      * Retourne la depandance d'un sommet
      *
-     * @param indice
+     * @param indice l'indice du sommet
      * @return la depandance si indice a une depandance, -1 sinon
      */
     public int getDepandance(int indice) {
         return (this.depandance.getOrDefault(indice, -1));
+    }
+
+    /**
+     * Retourne le sommet qui depent du sommet en entre
+     *
+     * @param indice l'indice du sommet
+     * @return le sommet si indice est une depandance, -1 sinon
+     */
+    public int obtenirSousDepandance(int indice) {
+        return (this.depandanceInverser.getOrDefault(indice, -1));
     }
 
 }
