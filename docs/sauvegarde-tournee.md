@@ -1,9 +1,10 @@
 # Sauvegarde d'une tournée — version 1
 
 Cette version correspond au modèle actuel à **un livreur**. Les tickets
-TIG-47 et TIG-56 demandent un format multi-livreurs qui devra être adapté
-après intégration de TIG-95. Les plages annoncées et les demandes rejetées
-ne sont pas encore représentées par ce modèle et ne sont pas sauvegardées.
+TIG-47 et TIG-56 sont indiqués comme annulés par le PO dans leur description
+Linear du 2 novembre ; l'implémentation existante reste disponible.
+Le format multi-livreurs dépend de TIG-95. Les demandes rejetées ne sont pas
+encore représentées. Les plages annoncées sont sauvegardées par arrêt.
 Un fichier annonçant plusieurs livreurs est refusé, sans perte silencieuse.
 
 ```xml
@@ -13,7 +14,8 @@ Un fichier annonçant plusieurs livreurs est refusé, sans perte silencieuse.
     <demande collecte="3" livraison="2"
              dureeCollecte="120" dureeLivraison="240"/>
     <arret noeud="1" duree="0"/>
-    <arret noeud="3" duree="120"/>
+    <arret noeud="3" duree="120"
+           debutPlage="07:00:24" finPlage="09:00:24"/>
     <arret noeud="2" duree="240"/>
     <arret noeud="1" duree="0"/>
 </sauvegardeTournee>
@@ -24,6 +26,12 @@ indépendants, chacun est conservé. Le plan est référencé par chemin absolu
 lors de l'écriture ; un chemin relatif est aussi accepté en lecture et se
 résout par rapport au dossier de la sauvegarde. Le plan n'est pas recopié.
 Une tournée sans demande contient seulement l'arrêt de départ de l'entrepôt.
+
+Les attributs `debutPlage` et `finPlage` conservent les engagements annoncés,
+indépendamment des heures recalculées. Ils sont écrits ensemble pour chaque
+arrêt. Les fichiers version 1 antérieurs, sans ces attributs, restent lisibles :
+la plage est alors fixée à l'arrivée recalculée ± 1 heure. Une seule borne
+présente ou une heure invalide entraîne un refus du fichier.
 
 Les chemins et les heures sont recalculés par A* dans `Plan`, uniquement entre
 arrêts consécutifs, sans TSP. Les règles actuelles du modèle s'appliquent,

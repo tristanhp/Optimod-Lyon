@@ -35,7 +35,12 @@ cache --> EtatProgrammeCharge : [sinon]
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
 EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
-EtatAjoutLivraison --> cache : cliquerNoeud [autre noeud] / CommandeAjouterDemande
+EtatAjoutLivraison --> cache : saisie valide [sans tournée] / commande
+EtatAjoutLivraison --> EtatCalculEnCours : durées et position validées [tournée en cache] / insertion
+EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande et cache
+EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conservé, alerte
+EtatAjoutLivraison --> cache : dialogue annulé
+EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
 EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
 EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
 

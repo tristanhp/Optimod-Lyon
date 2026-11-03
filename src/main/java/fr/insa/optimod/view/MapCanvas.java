@@ -1,6 +1,8 @@
 package fr.insa.optimod.view;
 
 import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -9,6 +11,8 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Troncon;
+import fr.insa.optimod.model.Tournee;
+import javafx.scene.control.Tooltip;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
@@ -60,7 +64,11 @@ final class MapCanvas extends Pane {
         Color.web("#c2185b"), Color.web("#5f6368")
     };
 
-    /** @return couleur de la demande d'indice donné, la même sur la carte et dans la liste */
+    /**
+     * Renvoie la couleur commune à la carte et à la liste pour une demande.
+     * @param indice rang de la demande
+     * @return couleur de la demande
+     */
     static Color couleurDemande(int indice) {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
     }
@@ -71,6 +79,12 @@ final class MapCanvas extends Pane {
 
     /** Surface de dessin. */
     private final Canvas canevas = new Canvas();
+
+    /** Arrêts affichables dans le popup de survol. */
+    private List<Tournee.Arret> arrets = List.of();
+
+    /** Popup des heures et plages annoncées au nœud survolé. */
+    private final Tooltip detailsArret = new Tooltip();
 
     /** Plan affiché, ou {@code null}. */
     private Plan plan;
@@ -104,6 +118,7 @@ final class MapCanvas extends Pane {
     /** Crée une carte vide. */
     MapCanvas() {
         getChildren().add(canevas);
+        Tooltip.install(this, detailsArret);
         setOnScroll(evenement -> {
             if (evenement.getDeltaY() != 0) {
                 zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1 / FACTEUR_MOLETTE,
@@ -135,9 +150,33 @@ final class MapCanvas extends Pane {
                 }
             }
         });
-        setOnMouseMoved(evenement -> signalerSurvol(
-                trouverDemande(evenement.getX(), evenement.getY())));
-        setOnMouseExited(evenement -> signalerSurvol(-1));
+        setOnMouseMoved(evenement -> {
+            signalerSurvol(trouverDemande(evenement.getX(), evenement.getY()));
+            Noeud noeud = trouverNoeud(evenement.getX(), evenement.getY());
+            DateTimeFormatter heure = DateTimeFormatter.ofPattern("HH:mm");
+            String texte = arrets.stream()
+                    .filter(arret -> arret.noeud().equals(noeud))
+                    .map(arret -> "Arrivée " + heure.format(arret.arrivee())
+                            + " — plage " + heure.format(arret.debutPlage())
+                            + " – " + heure.format(arret.finPlage())
+                            + (arret.estHorsPlage() ? " (hors plage)" : ""))
+                    .collect(Collectors.joining("\n"));
+            detailsArret.setText(texte);
+            if (texte.isEmpty()) {
+                detailsArret.hide();
+            }
+        });
+        setOnMouseExited(evenement -> {
+            signalerSurvol(-1);
+            detailsArret.hide();
+        });
+    }
+
+    /** @param passages arrêts à présenter au survol, vide pour les effacer */
+    void afficherArrets(List<Tournee.Arret> passages) {
+        arrets = List.copyOf(passages);
+        detailsArret.hide();
+        detailsArret.setText("");
     }
 
     /**

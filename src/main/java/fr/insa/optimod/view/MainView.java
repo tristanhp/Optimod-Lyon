@@ -18,6 +18,12 @@ import fr.insa.optimod.model.Plan;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ChoiceDialog;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -55,7 +61,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterDemandes = new Button("Importer les demandes");
+    private final Button boutonImporterDemandes =
+            new Button("Importer les demandes");
     private final Label message = new Label();
 
     private final Button boutonCalculer = new Button("Calculer");
@@ -80,7 +87,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final MapCanvas carte = new MapCanvas();
 
     /** Liste textuelle de la tournée. */
-    private final ListView<String> listeTournee = new ListView<>();
+    private final ListView<Tournee.Arret> listeTournee = new ListView<>();
 
     /** Liste textuelle des demandes importées. */
     private final ListView<String> listeDemandes = new ListView<>();
@@ -111,6 +118,30 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         listeTournee.setPrefWidth(LARGEUR_TOURNEE);
         listeTournee.setVisible(false);
         listeTournee.setManaged(false);
+        listeTournee.setCellFactory(liste -> new ListCell<>() {
+            @Override
+            protected void updateItem(Tournee.Arret arret, boolean vide) {
+                super.updateItem(arret, vide);
+                if (vide || arret == null) {
+                    setText(null);
+                    setStyle("");
+                    return;
+                }
+                long decalage = arret.obtenirDecalageSecondes();
+                String signe = decalage >= 0 ? "+" : "−";
+                long secondes = Math.abs(decalage);
+                setText(HEURE.format(arret.arrivee()) + " → "
+                        + HEURE.format(arret.depart()) + "   nœud "
+                        + arret.noeud().identifiant() + "\nPlage : "
+                        + HEURE.format(arret.debutPlage()) + " – "
+                        + HEURE.format(arret.finPlage()) + "\nDécalage : "
+                        + signe + secondes / 60 + " min "
+                        + secondes % 60 + " s"
+                        + (arret.estHorsPlage() ? " — Hors plage" : ""));
+                setStyle(arret.estHorsPlage()
+                        ? "-fx-text-fill: #c62828;" : "");
+            }
+        });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
         listeDemandes.setCellFactory(liste -> new ListCell<>() {
             @Override
@@ -219,6 +250,66 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public Optional<SaisieDemande> saisirDemande() {
+        Dialog<SaisieDemande> dialogue = new Dialog<>();
+        dialogue.setTitle("Ajouter une demande");
+        dialogue.initOwner(getScene().getWindow());
+        TextField collecte = new TextField("5");
+        TextField livraison = new TextField("5");
+        ComboBox<Integer> livreurs = new ComboBox<>();
+        livreurs.getItems().add(1);
+        livreurs.setValue(1);
+        Label erreur = new Label();
+        dialogue.getDialogPane().setContent(new VBox(8,
+                new Label("Durée de collecte (minutes)"), collecte,
+                new Label("Durée de livraison (minutes)"), livraison,
+                new Label("Livreur"), livreurs, erreur));
+        dialogue.getDialogPane().getButtonTypes().addAll(
+                ButtonType.OK, ButtonType.CANCEL);
+        dialogue.getDialogPane().lookupButton(ButtonType.OK)
+                .addEventFilter(ActionEvent.ACTION, evenement -> {
+                    try {
+                        SaisieDemande.convertirDuree(collecte.getText());
+                        SaisieDemande.convertirDuree(livraison.getText());
+                    } catch (IllegalArgumentException exception) {
+                        erreur.setText(exception.getMessage());
+                        evenement.consume();
+                    }
+                });
+        dialogue.setResultConverter(bouton -> bouton == ButtonType.OK
+                ? new SaisieDemande(collecte.getText(), livraison.getText(),
+                        livreurs.getValue()) : null);
+        return dialogue.showAndWait();
+    }
+
+    @Override
+    public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
+        message.setText(arrets.isEmpty() ? "" : arrets.size()
+                + " arrêt(s) hors plage annoncée. Annuler reste possible.");
+    }
+
+    @Override
+    public Optional<Integer> choisirPositionInsertion(Tournee tournee) {
+        List<String> choix = new java.util.ArrayList<>();
+        int nombre = Math.max(1, tournee.arrets().size() - 1);
+        for (int rang = 0; rang < nombre; rang++) {
+            Tournee.Arret avant = tournee.arrets().get(rang);
+            Tournee.Arret apres = tournee.arrets().get(
+                    Math.min(rang + 1, tournee.arrets().size() - 1));
+            choix.add((rang + 1) + " : après l'arrêt " + rang + " (nœud "
+                    + avant.noeud().identifiant() + ", "
+                    + HEURE.format(avant.depart()) + "), avant le nœud "
+                    + apres.noeud().identifiant());
+        }
+        ChoiceDialog<String> dialogue = new ChoiceDialog<>(choix.get(0), choix);
+        dialogue.setTitle("Position de la demande");
+        dialogue.setHeaderText("Insérer la collecte puis la livraison");
+        dialogue.setContentText("Entre quels arrêts ?");
+        dialogue.initOwner(getScene().getWindow());
+        return dialogue.showAndWait().map(valeur -> choix.indexOf(valeur) + 1);
+    }
+
+    @Override
     public void effacerTournee() {
         effacerListeTournee();
     }
@@ -284,12 +375,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void afficherTournee(Tournee tournee) {
-        listeTournee.getItems().clear();
-        for (Tournee.Arret arret : tournee.arrets()) {
-            listeTournee.getItems().add(HEURE.format(arret.arrivee()) + " → "
-                    + HEURE.format(arret.depart()) + "   nœud "
-                    + arret.noeud().identifiant());
-        }
+        carte.afficherArrets(tournee.arrets());
+        listeTournee.getItems().setAll(tournee.arrets());
         listeTournee.setVisible(true);
         listeTournee.setManaged(true);
     }
@@ -384,6 +471,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     private void effacerListeTournee() {
+        carte.afficherArrets(List.of());
         listeTournee.getItems().clear();
         listeTournee.setVisible(false);
         listeTournee.setManaged(false);

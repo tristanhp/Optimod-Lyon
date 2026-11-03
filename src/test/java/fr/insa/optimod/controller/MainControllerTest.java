@@ -56,6 +56,25 @@ public class MainControllerTest {
         private boolean attente;
         private Tournee tournee;
         private String erreurCalcul;
+        private Optional<SaisieDemande> saisie = Optional.of(
+                new SaisieDemande("5", "5", 1));
+        private List<Tournee.Arret> horsPlage = List.of();
+        private Optional<Integer> positionInsertion = Optional.of(1);
+
+        @Override
+        public Optional<Integer> choisirPositionInsertion(Tournee tournee) {
+            return positionInsertion;
+        }
+
+        @Override
+        public Optional<SaisieDemande> saisirDemande() {
+            return saisie;
+        }
+
+        @Override
+        public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
+            horsPlage = List.copyOf(arrets);
+        }
 
         @Override
         public void definirActionSauvegarder(Runnable action) {
@@ -621,13 +640,169 @@ public class MainControllerTest {
         Demande ajoutee = demandes().get(2);
         assertEquals(NOEUD_A, ajoutee.collecte().identifiant());
         assertEquals(NOEUD_B, ajoutee.livraison().identifiant());
-        assertEquals(EtatAjoutLivraison.DUREE_PAR_DEFAUT,
+        assertEquals(300,
                 ajoutee.dureeCollecte());
         assertEquals("", ecran.consigne);
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
 
         ecran.actionAnnuler.run();
         assertEquals(2, demandes().size());
+    }
+
+    /** Les deux durées saisies sont converties en secondes et annulables. */
+    @Test
+    public void dureesSaisiesEtRetablissement() throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("2", "7", 1));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(120, demandes().get(2).dureeCollecte());
+        assertEquals(420, demandes().get(2).dureeLivraison());
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        ecran.actionRefaire.run();
+        assertEquals(420, demandes().get(2).dureeLivraison());
+    }
+
+    /** Une annulation de dialogue ne crée aucune commande. */
+    @Test
+    public void annulationSaisieSansModification() throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.empty();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+    }
+
+    /** Les saisies invalides sont refusées sans toucher à l'historique. */
+    @Test
+    public void saisiesInvalidesRefusees() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        for (String valeur : List.of("", "abc", "0", "-1", "2147483647")) {
+            ecran.saisie = Optional.of(new MapScreen.SaisieDemande(
+                    valeur, "5", 1));
+            ecran.actionClicNoeud.accept(NOEUD_B);
+            assertEquals(2, demandes().size());
+            assertFalse(controleur.peutAnnuler());
+            assertTrue(ecran.consigne.contains("strictement positive"));
+        }
+    }
+
+    /** L'ajout après calcul conserve la tournée et ne relance pas le TSP. */
+    @Test
+    public void insertionLocaleAnnulableSansTsp() throws Exception {
+        int[] appels = {0};
+        controleur = new MainController(ecran, (plan, programme) -> {
+            appels[0]++;
+            return plan.calculerTournee(programme);
+        }, arrierePlan::add, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        arrierePlan.remove().run();
+        Tournee avant = ecran.tournee;
+        ecran.positionInsertion = Optional.of(avant.arrets().size() - 1);
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(2, demandes().size());
+        assertTrue(ecran.actions.isEmpty());
+        arrierePlan.remove().run();
+        Tournee apres = ecran.tournee;
+        assertEquals(3, demandes().size());
+        assertEquals(avant.arrets().size() + 2, apres.arrets().size());
+        int position = avant.arrets().size() - 1;
+        assertEquals(NOEUD_A,
+                apres.arrets().get(position).noeud().identifiant());
+        assertEquals(NOEUD_B,
+                apres.arrets().get(position + 1).noeud().identifiant());
+        assertEquals(1, appels[0]);
+        ecran.actionAnnuler.run();
+        assertSame(avant, ecran.tournee);
+        ecran.actionRefaire.run();
+        assertSame(apres, ecran.tournee);
+        assertEquals(1, appels[0]);
+    }
+
+    /** Annuler le choix de position ne crée ni demande ni calcul. */
+    @Test
+    public void annulerPositionConserveTournee() throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournee,
+                arrierePlan::add, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        arrierePlan.remove().run();
+        Tournee avant = ecran.tournee;
+        ecran.positionInsertion = Optional.empty();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertSame(avant, ecran.tournee);
+        assertEquals(2, demandes().size());
+        assertTrue(arrierePlan.isEmpty());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Le retard hors plage est signalé et annulable sans refuser l'ajout. */
+    @Test
+    public void insertionManuelleSignaleRetardAnnulable() throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournee,
+                arrierePlan::add, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        arrierePlan.remove().run();
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("70", "5", 1));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        arrierePlan.remove().run();
+        assertEquals(3, demandes().size());
+        assertFalse(ecran.horsPlage.isEmpty());
+        assertTrue(ecran.horsPlage.stream().allMatch(arret ->
+                arret.obtenirDecalageSecondes() > 3600));
+        ecran.actionAnnuler.run();
+        assertTrue(ecran.horsPlage.isEmpty());
+        ecran.actionRefaire.run();
+        assertFalse(ecran.horsPlage.isEmpty());
+    }
+
+    /** Un ajout impossible ne touche ni au programme ni à l'historique. */
+    @Test
+    public void insertionImpossibleConserveEtat() throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournee,
+                arrierePlan::add, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        arrierePlan.remove().run();
+        Tournee avant = ecran.tournee;
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("300", "5", 1));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        arrierePlan.remove().run();
+        assertSame(avant, ecran.tournee);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertNotNull(ecran.erreurCalcul);
+        assertFalse(ecran.attente);
+    }
+
+    /** La liste des dépassements est transmise à l'écran. */
+    @Test
+    public void signalementHorsPlage() {
+        Tournee.Arret arret = new Tournee.Arret(new Noeud(1, 0, 0),
+                LocalTime.of(11, 0), LocalTime.of(11, 5),
+                LocalTime.of(8, 0), LocalTime.of(10, 0));
+        controleur.afficherTournee(new Tournee(List.of(arret), List.of()));
+        assertEquals(List.of(arret), ecran.horsPlage);
+        controleur.afficherTournee(TOURNEE);
+        assertTrue(ecran.horsPlage.isEmpty());
     }
 
     @Test

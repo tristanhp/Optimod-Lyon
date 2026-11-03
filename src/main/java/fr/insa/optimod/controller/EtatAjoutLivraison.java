@@ -18,16 +18,13 @@ final class EtatAjoutLivraison implements Etat {
     static final String CONSIGNE = "Cliquez sur le point de livraison "
             + "(« Ajouter une demande » pour annuler).";
 
-    /**
-     * Durée de collecte et de livraison d'une demande ajoutée à la main, en
-     * secondes.
-     */
-    static final int DUREE_PAR_DEFAUT = 5 * 60;
-
     /** Noeud de collecte choisi à l'étape précédente. */
     private final long idCollecte;
 
-    /** @param idCollecte noeud de collecte choisi */
+    /**
+     * Mémorise le point de collecte choisi.
+     * @param idCollecte noeud de collecte choisi
+     */
     EtatAjoutLivraison(long idCollecte) {
         this.idCollecte = idCollecte;
     }
@@ -57,9 +54,22 @@ final class EtatAjoutLivraison implements Etat {
         if (collecte == null || livraison == null) {
             return; // clic hors du plan : ignoré
         }
-        controleur.executer(new CommandeAjouterDemande(
-                controleur.obtenirProgramme(), new Demande(collecte, livraison,
-                        DUREE_PAR_DEFAUT, DUREE_PAR_DEFAUT)));
+        controleur.saisirDemande().ifPresentOrElse(saisie -> {
+            try {
+                int dureeCollecte = MapScreen.SaisieDemande.convertirDuree(
+                        saisie.dureeCollecte());
+                int dureeLivraison = MapScreen.SaisieDemande.convertirDuree(
+                        saisie.dureeLivraison());
+                if (saisie.livreur() != 1) {
+                    throw new IllegalArgumentException(
+                            "Seul le livreur 1 est disponible.");
+                }
+                controleur.ajouterDemande(new Demande(collecte, livraison,
+                        dureeCollecte, dureeLivraison));
+            } catch (IllegalArgumentException erreur) {
+                controleur.afficherConsigne(erreur.getMessage());
+            }
+        }, controleur::retrouverEtatProgramme);
     }
 
     @Override

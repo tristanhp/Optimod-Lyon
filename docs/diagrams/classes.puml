@@ -14,6 +14,7 @@ package "model" {
     +obtenirTroncons() : List<Troncon>
     +calculerTournee(programme : ProgrammeLivraisons) : Tournee
     +recalculerTournee(heureDepart, adresses, durees) : Tournee
+    +insererDemande(tournee, demande, position) : Tournee
     -calculerPlusCourtsChemins(adresses) : Chemin[][]
     -calculerOrdreDePassage(chemins) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
@@ -74,6 +75,10 @@ package "model" {
     noeud : Noeud
     arrivee : LocalTime
     depart : LocalTime
+    debutPlage : LocalTime
+    finPlage : LocalTime
+    +estHorsPlage() : boolean
+    +obtenirDecalageSecondes() : long
   }
 }
 
@@ -92,7 +97,16 @@ package "controller" {
     ~executer(commande : Commande)
     -tourneesCalculees : Map<List<Demande>, Tournee>
   }
-  interface MapScreen
+  interface MapScreen {
+    +saisirDemande() : Optional<SaisieDemande>
+    +choisirPositionInsertion(tournee) : Optional<Integer>
+    +signalerArretsHorsPlage(arrets)
+  }
+  class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
+    dureeCollecte : String
+    dureeLivraison : String
+    livreur : int
+  }
   interface Etat
   class EtatInitial
   class EtatPlanCharge

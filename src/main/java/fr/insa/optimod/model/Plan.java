@@ -155,7 +155,10 @@ public final class Plan {
         return noeud;
     }
 
-    /** @return nœuds du plan (non modifiable) */
+    /**
+     * Renvoie nœuds du plan (non modifiable).
+     * @return nœuds du plan (non modifiable)
+     */
     public Collection<Noeud> obtenirNoeuds() {
         return Collections.unmodifiableCollection(noeuds.values());
     }
@@ -170,7 +173,10 @@ public final class Plan {
         return noeuds.get(identifiant);
     }
 
-    /** @return tronçons du plan (non modifiable) */
+    /**
+     * Renvoie tronçons du plan (non modifiable).
+     * @return tronçons du plan (non modifiable)
+     */
     public List<Troncon> obtenirTroncons() {
         return Collections.unmodifiableList(troncons);
     }
@@ -238,6 +244,72 @@ public final class Plan {
         }
         return calculerHeuresDePassage(heureDepart, sommets,
                 durees.subList(0, nombre), chemins, ordre);
+    }
+
+    /**
+     * Insère collecte puis livraison à la position choisie par l'utilisateur.
+     * Seuls les trois nouveaux chemins entre les arrêts voisins sont calculés.
+     * Les autres chemins et les plages annoncées restent inchangés.
+     *
+     * @param tournee tournée de départ, jamais modifiée
+     * @param demande demande à insérer
+     * @param position rang de collecte, entre 1 et le rang du retour inclus
+     * @return nouvelle tournée sans recherche de position ni appel au TSP
+     * @throws IllegalArgumentException si la position est invalide
+     * @throws IllegalStateException si un nouveau chemin est inaccessible ou
+     *         si le retour dépasse 13 h
+     */
+    public Tournee insererDemande(Tournee tournee, Demande demande,
+            int position) {
+        List<Tournee.Arret> anciens = new ArrayList<>(tournee.arrets());
+        if (anciens.size() == 1) {
+            anciens.add(anciens.get(0));
+        }
+        if (position < 1 || position >= anciens.size()) {
+            throw new IllegalArgumentException(
+                    "Position d'insertion invalide.");
+        }
+        LocalTime depart = anciens.get(0).depart();
+        List<Noeud> adresses = new ArrayList<>(anciens.stream()
+                .map(Tournee.Arret::noeud).toList());
+        List<Integer> durees = new ArrayList<>(anciens.stream()
+                .map(arret -> (int) arret.arrivee().until(arret.depart(),
+                        ChronoUnit.SECONDS)).toList());
+        adresses.add(position, demande.collecte());
+        adresses.add(position + 1, demande.livraison());
+        durees.add(position, demande.dureeCollecte());
+        durees.add(position + 1, demande.dureeLivraison());
+        List<Chemin> trajets = new ArrayList<>(tournee.chemins());
+        if (trajets.isEmpty()) {
+            trajets.add(new Chemin(0, List.of()));
+        }
+        trajets.remove(position - 1);
+        trajets.addAll(position - 1, List.of(
+                plusCourtChemin(anciens.get(position - 1).noeud(),
+                        demande.collecte()),
+                plusCourtChemin(demande.collecte(), demande.livraison()),
+                plusCourtChemin(demande.livraison(),
+                        anciens.get(position).noeud())));
+        int nombre = adresses.size() - 1;
+        Chemin[][] chemins = new Chemin[nombre][nombre];
+        List<Integer> ordre = new ArrayList<>();
+        for (int rang = 0; rang < nombre; rang++) {
+            ordre.add(rang);
+            chemins[rang][(rang + 1) % nombre] = trajets.get(rang);
+        }
+        Tournee candidate = calculerHeuresDePassage(depart,
+                adresses.subList(0, nombre), durees.subList(0, nombre),
+                chemins, ordre);
+        List<Tournee.Arret> arrets = new ArrayList<>(candidate.arrets());
+        for (int rang = 0; rang < anciens.size(); rang++) {
+            int nouveauRang = rang < position ? rang : rang + 2;
+            Tournee.Arret nouveau = arrets.get(nouveauRang);
+            Tournee.Arret ancien = anciens.get(rang);
+            arrets.set(nouveauRang, new Tournee.Arret(nouveau.noeud(),
+                    nouveau.arrivee(), nouveau.depart(), ancien.debutPlage(),
+                    ancien.finPlage()));
+        }
+        return new Tournee(arrets, candidate.chemins());
     }
 
     /**

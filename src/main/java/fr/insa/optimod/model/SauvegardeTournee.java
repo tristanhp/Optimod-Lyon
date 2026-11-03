@@ -76,6 +76,9 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                     xml.writeAttribute("duree", Long.toString(
                             arret.arrivee().until(arret.depart(),
                                     ChronoUnit.SECONDS)));
+                    xml.writeAttribute("debutPlage",
+                            arret.debutPlage().toString());
+                    xml.writeAttribute("finPlage", arret.finPlage().toString());
                 }
                 xml.writeEndElement();
                 xml.writeEndDocument();
@@ -142,8 +145,22 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                 throw new SAXException("Les arrêts ne respectent pas les "
                         + "demandes et leur contrainte d'ordre.");
             }
+            Tournee tournee = plan.recalculerTournee(depart, adresses, durees);
+            List<Tournee.Arret> passages = new ArrayList<>();
+            for (int i = 0; i < arrets.getLength(); i++) {
+                Element element = (Element) arrets.item(i);
+                Tournee.Arret arret = tournee.arrets().get(i);
+                if (element.hasAttribute("debutPlage")
+                        || element.hasAttribute("finPlage")) {
+                    arret = new Tournee.Arret(arret.noeud(), arret.arrivee(),
+                            arret.depart(), LocalTime.parse(attribut(element,
+                                    "debutPlage")), LocalTime.parse(attribut(
+                                            element, "finPlage")));
+                }
+                passages.add(arret);
+            }
             return new SauvegardeTournee(plan, fichierPlan, programme,
-                    plan.recalculerTournee(depart, adresses, durees));
+                    new Tournee(passages, tournee.chemins()));
         } catch (IOException | DateTimeException | IllegalArgumentException
                 | IllegalStateException erreur) {
             throw new SAXException("Impossible de restaurer la tournée : "

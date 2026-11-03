@@ -32,6 +32,8 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Calculer la meilleure tournée (départ à l'heure du fichier, 15 km/h, retour avant 13 h) | fait |
 | Afficher les heures de passage de chaque arrêt | fait |
 | Ajouter ou supprimer une demande, annuler / rétablir | fait |
+| Saisir les durées et insérer une demande sans relancer le TSP | fait (un livreur) |
+| Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
 | Déplacer un point, changer l'ordre des arrêts, plusieurs livreurs | à faire |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait |
 
@@ -139,13 +141,29 @@ de même taille.
    message l'explique.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
-     collecte, puis sur le point de livraison (durées sur place : 5 min) ;
+     collecte, puis sur le point de livraison ; saisir les deux durées
+     entières strictement positives en minutes (5 par défaut) et choisir le
+     livreur (seul le livreur 1 est disponible actuellement) ;
      recliquer sur le bouton annule l'ajout ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
      cliquer sur le bouton sous la liste ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
+
+Après les clics sur la carte et la saisie des durées, choisir entre quels
+arrêts insérer la demande. La collecte puis la livraison sont insérées
+consécutivement à cette position, sans modifier l'ordre des anciens arrêts
+et sans relancer le TSP. Seuls les trois trajets reliant les voisins à la
+nouvelle demande sont recalculés. Annuler ce choix ne modifie rien.
+Un ajout impossible avant 13 h est refusé sans modifier le programme.
+Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
+L'insertion conserve les plages des anciens arrêts ; la liste signale les
+dépassements en rouge et affiche le décalage en minutes et secondes.
+Annuler reste disponible. Le bouton Calculer fixe de
+nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
+calcul volontaire. Survoler un arrêt affiche son heure et sa plage annoncée.
+Le support multi-livreurs reste à intégrer.
 
 Un fichier invalide (XML mal formé, adresse absente du plan, durée négative…)
 ouvre une fenêtre qui explique l'erreur ; rien n'est perdu.
@@ -173,6 +191,7 @@ Termes principaux et leur traduction dans le code :
 | Durée sur place | Temps passé à récupérer ou déposer, en secondes | `dureeCollecte`, `dureeLivraison` |
 | Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h | `Tournee` |
 | Arrêt, heure de passage | Un point de la tournée et ses heures d'arrivée et de départ | `Tournee.Arret` |
+| Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
 | Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournee` |
 | Tournée possible | Tournée qui respecte toutes les règles | sinon `IllegalStateException` |
 | Contrainte d'ordre | Le colis est récupéré avant d'être livré | `GrapheDepandance` |

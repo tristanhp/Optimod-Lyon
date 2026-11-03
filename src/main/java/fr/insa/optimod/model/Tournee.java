@@ -20,8 +20,43 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      * @param noeud adresse de l'arrêt
      * @param arrivee heure d'arrivée
      * @param depart heure de départ (arrivée plus durée sur place)
+     * @param debutPlage début de la plage annoncée, inclus
+     * @param finPlage fin de la plage annoncée, incluse
      */
-    public record Arret(Noeud noeud, LocalTime arrivee, LocalTime depart) {
+    public record Arret(Noeud noeud, LocalTime arrivee, LocalTime depart,
+            LocalTime debutPlage, LocalTime finPlage) {
+
+        /**
+         * Fixe une plage annoncée d'une heure de part et d'autre de l'arrivée.
+         * @param noeud adresse
+         * @param arrivee heure d'arrivée
+         * @param depart heure de départ
+         */
+        public Arret(Noeud noeud, LocalTime arrivee, LocalTime depart) {
+            this(noeud, arrivee, depart, arrivee.minusHours(1),
+                    arrivee.plusHours(1));
+        }
+
+        /**
+         * Renvoie vrai si l'arrivée sort de la plage annoncée.
+         * @return vrai si l'arrivée sort de la plage annoncée
+         */
+        public boolean estHorsPlage() {
+            if (debutPlage.isAfter(finPlage)) {
+                return arrivee.isBefore(debutPlage)
+                        && arrivee.isAfter(finPlage);
+            }
+            return arrivee.isBefore(debutPlage) || arrivee.isAfter(finPlage);
+        }
+
+        /**
+         * Mesure le décalage depuis l'arrivée initialement annoncée.
+         * @return secondes de décalage, positives pour un retard
+         */
+        public long obtenirDecalageSecondes() {
+            return java.time.Duration.between(debutPlage.plusHours(1), arrivee)
+                    .getSeconds();
+        }
     }
 
     /**
@@ -35,7 +70,10 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
         chemins = List.copyOf(chemins);
     }
 
-    /** @return heure de retour à l'entrepôt (arrivée au dernier arrêt) */
+    /**
+     * Renvoie heure de retour à l'entrepôt (arrivée au dernier arrêt).
+     * @return heure de retour à l'entrepôt (arrivée au dernier arrêt)
+     */
     public LocalTime obtenirHeureRetour() {
         return arrets.get(arrets.size() - 1).arrivee();
     }

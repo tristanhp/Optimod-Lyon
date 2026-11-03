@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 
@@ -121,17 +122,26 @@ public final class MainController {
         changerEtat(new EtatInitial());
     }
 
-    /** @return plan chargé, ou {@code null} si aucun plan n'est chargé */
+    /**
+     * Renvoie plan chargé, ou {@code null} si aucun plan n'est chargé.
+     * @return plan chargé, ou {@code null} si aucun plan n'est chargé
+     */
     public Plan obtenirPlan() {
         return plan;
     }
 
-    /** @return programme de livraisons chargé, ou {@code null} */
+    /**
+     * Renvoie programme de livraisons chargé, ou {@code null}.
+     * @return programme de livraisons chargé, ou {@code null}
+     */
     public ProgrammeLivraisons obtenirProgramme() {
         return programme;
     }
 
-    /** @return état courant (pour les tests) */
+    /**
+     * Renvoie état courant (pour les tests).
+     * @return état courant (pour les tests)
+     */
     Etat obtenirEtat() {
         return etat;
     }
@@ -229,17 +239,80 @@ public final class MainController {
         ecran.afficherAttente(false);
     }
 
-    /** @param tournee tournée calculée à afficher */
+    /**
+     * Affiche la tournée et signale les dépassements de plage.
+     * @param tournee tournée calculée à afficher
+     */
     void afficherTournee(Tournee tournee) {
         ecran.afficherTournee(tournee);
+        ecran.signalerArretsHorsPlage(tournee.arrets().stream()
+                .filter(Tournee.Arret::estHorsPlage).toList());
     }
 
-    /** @param detail explication de l'échec du calcul */
+    /**
+     * Renvoie saisie ou absence si l'utilisateur annule.
+     * @return saisie ou absence si l'utilisateur annule
+     */
+    Optional<MapScreen.SaisieDemande> saisirDemande() {
+        return ecran.saisirDemande();
+    }
+
+    /**
+     * Prépare l'insertion hors du thread graphique avant toute modification.
+     * @param demande demande validée
+     */
+    void ajouterDemande(Demande demande) {
+        Tournee avant = tourneesCalculees.get(
+                List.copyOf(programme.obtenirDemandes()));
+        Commande commande = new CommandeAjouterDemande(programme, demande);
+        if (avant == null) {
+            executer(commande);
+            return;
+        }
+        Integer position = ecran.choisirPositionInsertion(avant).orElse(null);
+        if (position == null) {
+            retrouverEtatProgramme();
+            return;
+        }
+        if (position < 1 || position >= Math.max(2, avant.arrets().size())) {
+            throw new IllegalArgumentException(
+                    "Position d'insertion invalide.");
+        }
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee apres = plan.insererDemande(avant, demande, position);
+                interfaceUtilisateur.execute(() -> {
+                    List<Demande> demandes = new java.util.ArrayList<>(
+                            programme.obtenirDemandes());
+                    demandes.add(demande);
+                    tourneesCalculees.put(List.copyOf(demandes), apres);
+                    ecran.afficherAttente(false);
+                    executer(commande);
+                });
+            } catch (IllegalStateException erreur) {
+                interfaceUtilisateur.execute(() -> {
+                    ecran.afficherAttente(false);
+                    retrouverEtatProgramme();
+                    ecran.afficherErreurCalcul(erreur.getMessage());
+                });
+            }
+        });
+    }
+
+    /**
+     * Affiche l'explication d'un calcul impossible.
+     * @param detail explication de l'échec du calcul
+     */
     void afficherErreurCalcul(String detail) {
         ecran.afficherErreurCalcul(detail);
     }
 
-    /** @param consigne consigne à afficher, vide pour l'effacer */
+    /**
+     * Affiche une consigne de saisie.
+     * @param consigne consigne à afficher, vide pour l'effacer
+     */
     void afficherConsigne(String consigne) {
         ecran.afficherConsigne(consigne);
     }
@@ -266,12 +339,18 @@ public final class MainController {
         retrouverEtatProgramme();
     }
 
-    /** @return vrai s'il reste une modification à annuler */
+    /**
+     * Renvoie vrai s'il reste une modification à annuler.
+     * @return vrai s'il reste une modification à annuler
+     */
     boolean peutAnnuler() {
         return historique.peutAnnuler();
     }
 
-    /** @return vrai s'il reste une modification annulée à rétablir */
+    /**
+     * Renvoie vrai s'il reste une modification annulée à rétablir.
+     * @return vrai s'il reste une modification annulée à rétablir
+     */
     boolean peutRefaire() {
         return historique.peutRefaire();
     }
@@ -288,10 +367,11 @@ public final class MainController {
                 List.copyOf(programme.obtenirDemandes()));
         if (tournee != null) {
             changerEtat(new EtatTourneeCalculee());
-            ecran.afficherTournee(tournee);
+            afficherTournee(tournee);
         } else {
             changerEtat(new EtatProgrammeCharge());
             ecran.effacerTournee();
+            ecran.signalerArretsHorsPlage(List.of());
         }
     }
 
@@ -329,7 +409,7 @@ public final class MainController {
                         ecran.afficherPlan(plan);
                         ecran.afficherProgramme(programme);
                         ecran.afficherConsigne("");
-                        ecran.afficherTournee(sauvegarde.tournee());
+                        afficherTournee(sauvegarde.tournee());
                         ecran.afficherAttente(false);
                         changerEtat(new EtatTourneeCalculee());
                     });

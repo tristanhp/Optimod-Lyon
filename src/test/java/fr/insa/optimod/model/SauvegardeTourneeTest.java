@@ -70,6 +70,32 @@ public class SauvegardeTourneeTest {
         }
     }
 
+    /** Les plages annoncées sont conservées même après changement d'horaire. */
+    @Test
+    public void allerRetourConservePlagesAnnoncees() throws Exception {
+        Path fichierPlan = dossier.newFile("plan.xml").toPath();
+        Files.writeString(fichierPlan, PlansPourTests.PETIT_RESEAU);
+        Plan plan = new Plan(fichierPlan.toString());
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0),
+                List.of(new Demande(plan.obtenirNoeud(3),
+                        plan.obtenirNoeud(2), 120, 240)));
+        Tournee avant = plan.calculerTournee(programme);
+        List<Tournee.Arret> arrets = avant.arrets().stream().map(arret ->
+                new Tournee.Arret(arret.noeud(), arret.arrivee(),
+                        arret.depart(),
+                        LocalTime.of(6, 0), LocalTime.of(7, 0))).toList();
+        Tournee annoncee = new Tournee(arrets, avant.chemins());
+        Path fichier = dossier.newFile("plages.xml").toPath();
+        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme,
+                annoncee);
+        assertEquals(annoncee, SauvegardeTournee.restaurer(fichier).tournee());
+        String contenu = Files.readString(fichier);
+        Files.writeString(fichier, contenu.replace(" finPlage=\"07:00\"", ""));
+        assertThrows(SAXException.class,
+                () -> SauvegardeTournee.restaurer(fichier));
+    }
+
     /** Un document étranger n'est pas une sauvegarde. */
     @Test
     public void fichierInvalideRefuse() throws Exception {
