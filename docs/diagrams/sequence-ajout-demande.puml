@@ -1,0 +1,35 @@
+@startuml sequence-ajout-demande
+title TIG-68 : aperçu immédiat et validation d'une demande
+actor Utilisateur
+participant MainView
+participant EtatAjoutCollecte
+participant EtatAjoutLivraison
+participant MainController
+participant MapCanvas
+participant ListeDeCommandes
+participant ProgrammeLivraisons
+Utilisateur -> MainView : premier clic (collecte)
+MainView -> EtatAjoutCollecte : cliquerNoeud
+EtatAjoutCollecte -> MainController : afficherPointsProvisoires(collecte, null)
+MainController -> MainView : afficherPointsProvisoires
+MainView -> MapCanvas : dessiner la collecte immédiatement
+note right : Aucune modification du programme.
+Utilisateur -> MainView : second clic (livraison)
+MainView -> EtatAjoutLivraison : cliquerNoeud
+EtatAjoutLivraison -> MainController : afficherPointsProvisoires(collecte, livraison)
+MainController -> MainView : afficherPointsProvisoires
+MainView -> MapCanvas : dessiner les deux points
+EtatAjoutLivraison -> MainController : saisirDemande
+MainController -> MainView : saisirDemande
+alt saisie valide
+  MainView --> MainController : durées et livreur 1
+  EtatAjoutLivraison -> MainController : executer(CommandeAjouterDemande)
+  MainController -> ListeDeCommandes : executer
+  ListeDeCommandes -> ProgrammeLivraisons : ajouterDemande
+  ProgrammeLivraisons -> MainView : notifierObservateurs
+else annulation du dialogue, du bouton Ajouter ou Ctrl+Z
+  MainController -> MainController : retrouverEtatProgramme
+end
+MainController -> MainView : afficherPointsProvisoires(null, null)
+MainView -> MapCanvas : effacer l'aperçu
+@enduml

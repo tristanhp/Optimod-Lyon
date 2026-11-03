@@ -78,6 +78,21 @@ final class MapCanvas extends Pane {
     /** Demandes affichées, ou {@code null}. */
     private ProgrammeLivraisons programme;
 
+    /** Points de la demande en cours, indépendants du programme validé. */
+    private Noeud collecteProvisoire;
+    private Noeud livraisonProvisoire;
+
+    /**
+     * Redessine les points choisis avant validation de la demande.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        collecteProvisoire = collecte;
+        livraisonProvisoire = livraison;
+        dessinerCarte();
+    }
+
     /** Zoom courant ; 1 affiche le plan entier. */
     private double zoom = 1;
 
@@ -256,6 +271,8 @@ final class MapCanvas extends Pane {
      * @param nouveauPlan plan à dessiner
      */
     void afficherPlan(Plan nouveauPlan) {
+        collecteProvisoire = null;
+        livraisonProvisoire = null;
         plan = nouveauPlan;
         programme = null;
         demandeEnEvidence = -1;
@@ -278,6 +295,8 @@ final class MapCanvas extends Pane {
 
     /** Efface la carte. */
     void effacerCarte() {
+        collecteProvisoire = null;
+        livraisonProvisoire = null;
         plan = null;
         programme = null;
         demandeEnEvidence = -1;
@@ -323,6 +342,28 @@ final class MapCanvas extends Pane {
         }
         if (programme != null) {
             dessinerDemandes(contexteGraphique);
+        }
+        dessinerPointsProvisoires(contexteGraphique);
+    }
+
+    /** Dessine l'aperçu au-dessus des points déjà validés. */
+    private void dessinerPointsProvisoires(GraphicsContext contexte) {
+        int indice = programme == null ? 0 : programme.obtenirDemandes().size();
+        contexte.setFill(couleurDemande(indice));
+        contexte.setStroke(COULEUR_CONTOUR_EVIDENCE);
+        contexte.setLineWidth(2);
+        double taille = TAILLE_MARQUEUR * TAILLE_EN_EVIDENCE;
+        if (collecteProvisoire != null) {
+            double x = ecranX(collecteProvisoire.longitude()) - taille;
+            double y = ecranY(collecteProvisoire.latitude()) - taille;
+            contexte.fillRect(x, y, 2 * taille, 2 * taille);
+            contexte.strokeRect(x, y, 2 * taille, 2 * taille);
+        }
+        if (livraisonProvisoire != null) {
+            double x = ecranX(livraisonProvisoire.longitude()) - taille;
+            double y = ecranY(livraisonProvisoire.latitude()) - taille;
+            contexte.fillOval(x, y, 2 * taille, 2 * taille);
+            contexte.strokeOval(x, y, 2 * taille, 2 * taille);
         }
     }
 

@@ -94,6 +94,13 @@ Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 demandes (`demandePetit1.xml` … `demandeGrand9.xml`), chacun prévu pour le plan
 de même taille.
 
+Pour tester une charge excessive, importer `petitPlan.xml`, puis
+`demande_trop_importante.xml`. Ses deux demandes représentent 6 h sur place
+(durées XML en secondes), hors trajets, pour un départ à 8 h : un seul
+livreur ne peut donc pas rentrer avant 13 h. Pour la recette multi-livreurs
+avec TIG-95, répartir une demande par livreur : chacune tient séparément
+avant 13 h. Le support multi-livreurs n'est pas encore intégré à `main`.
+
 1. **Importer le plan** : choisir un fichier de plan. La carte s'affiche
    (tronçons en gris, nœuds en points sombres). Molette pour zoomer,
    glisser pour se déplacer, double-clic pour revenir à la vue d'ensemble.
@@ -107,8 +114,12 @@ de même taille.
    message l'explique.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
-     collecte, puis sur le point de livraison (durées sur place : 5 min) ;
-     recliquer sur le bouton annule l'ajout ;
+     collecte (carré affiché immédiatement), puis sur le point de livraison
+     (rond affiché avant le dialogue). Saisir les deux durées entières
+     strictement positives en minutes (5 par défaut) ; le livreur 1 est le
+     seul disponible tant que TIG-95 n'est pas intégré. Recliquer sur le
+     bouton, utiliser *Annuler* (Ctrl+Z) ou annuler le dialogue efface les
+     points provisoires sans modifier le programme ;
    - *Supprimer la demande* : sélectionner une demande dans la liste, puis
      cliquer sur le bouton sous la liste. Si la tournée est affichée, elle est
      mise à jour tout de suite : l'ordre des autres arrêts est gardé et seuls

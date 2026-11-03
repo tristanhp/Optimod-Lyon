@@ -29,13 +29,23 @@ final class EtatAjoutCollecte implements Etat {
     }
 
     @Override
+    public void annuler(MainController controleur) {
+        controleur.retrouverEtatProgramme();
+    }
+
+    @Override
     public void cliquerNoeud(MainController controleur, long idNoeud) {
+        if (controleur.obtenirPlan().obtenirNoeud(idNoeud) == null) {
+            return;
+        }
+        controleur.afficherPointsProvisoires(
+                controleur.obtenirPlan().obtenirNoeud(idNoeud), null);
         controleur.changerEtat(new EtatAjoutLivraison(idNoeud));
         controleur.afficherConsigne(EtatAjoutLivraison.CONSIGNE);
     }
 
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
-        return EnumSet.of(Action.AJOUTER_DEMANDE);
+        return EnumSet.of(Action.AJOUTER_DEMANDE, Action.ANNULER);
     }
 }

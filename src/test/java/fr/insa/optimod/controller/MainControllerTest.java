@@ -58,6 +58,24 @@ public class MainControllerTest {
         private boolean attente;
         private Tournee tournee;
         private String erreurCalcul;
+        private Optional<SaisieDemande> saisie = Optional.of(
+                new SaisieDemande("5", "5", 1));
+        private Noeud collecteProvisoire;
+        private Noeud livraisonProvisoire;
+        private Runnable pendantSaisie = () -> { };
+
+        @Override
+        public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+            collecteProvisoire = collecte;
+            livraisonProvisoire = livraison;
+        }
+
+        @Override
+        public Optional<SaisieDemande> saisirDemande() {
+            pendantSaisie.run();
+            return saisie;
+        }
+
         private String refusOrdre;
         private int arretSelectionne = -1;
 
@@ -574,6 +592,177 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
+    /** Le premier clic affiche la collecte sans modifier le programme. */
+    @Test
+    public void collecteVisibleDesLePremierClic() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(ecran.actions.contains(Action.ANNULER));
+    }
+
+    /** Annuler le premier point efface l'aperçu et conserve la tournée. */
+    @Test
+    public void annulerCollecteProvisoireConserveTournee() throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournee,
+                Runnable::run, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee avant = ecran.tournee;
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertSame(avant, ecran.tournee);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Les deux points sont visibles pendant le dialogue puis effacés. */
+    @Test
+    public void livraisonVisibleAvantValidationPuisAnnulation()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.empty();
+        ecran.pendantSaisie = () -> {
+            assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+            assertEquals(NOEUD_B, ecran.livraisonProvisoire.identifiant());
+            assertEquals(2, demandes().size());
+        };
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /** Une validation remplace l'aperçu par une demande annulable. */
+    @Test
+    public void validerRemplacePointsProvisoiresPuisAnnulerEtRetablir()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+        assertEquals(3, demandes().size());
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        ecran.actionRefaire.run();
+        assertEquals(3, demandes().size());
+        assertNull(ecran.collecteProvisoire);
+    }
+
+    /** Un clic hors du plan ne crée pas de point provisoire. */
+    @Test
+    public void clicInconnuIgnorePendantAjout() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(Long.MIN_VALUE);
+        assertTrue(controleur.obtenirEtat() instanceof EtatAjoutCollecte);
+        assertNull(ecran.collecteProvisoire);
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(Long.MIN_VALUE);
+        assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+        assertNull(ecran.livraisonProvisoire);
+        assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
+    }
+
+    /** Les deux durées saisies sont converties en secondes et annulables. */
+    @Test
+    public void dureesSaisiesEtRetablissement() throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("2", "7", 1));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(120, demandes().get(2).dureeCollecte());
+        assertEquals(420, demandes().get(2).dureeLivraison());
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        ecran.actionRefaire.run();
+        assertEquals(420, demandes().get(2).dureeLivraison());
+    }
+
+    /** Une annulation de dialogue ne crée aucune commande. */
+    @Test
+    public void annulationSaisieSansModification() throws Exception {
+        chargerDeuxDemandes();
+        ecran.saisie = Optional.empty();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(2, demandes().size());
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+    }
+
+    /** Les saisies invalides sont refusées sans toucher à l'historique. */
+    @Test
+    public void saisiesInvalidesRefusees() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        for (String valeur : List.of("", "abc", "0", "-1", "2147483647")) {
+            ecran.saisie = Optional.of(new MapScreen.SaisieDemande(
+                    valeur, "5", 1));
+            ecran.actionClicNoeud.accept(NOEUD_B);
+            assertEquals(2, demandes().size());
+            assertFalse(controleur.peutAnnuler());
+            assertTrue(ecran.consigne.contains("strictement positive"));
+            assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
+            assertEquals(NOEUD_B, ecran.livraisonProvisoire.identifiant());
+        }
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+    }
+
+    /** Une durée de livraison invalide ou un livreur inconnu est refusé. */
+    @Test
+    public void livraisonInvalideEtLivreurInconnuRefuses() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        for (MapScreen.SaisieDemande saisie : List.of(
+                new MapScreen.SaisieDemande("5", "0", 1),
+                new MapScreen.SaisieDemande("5", "abc", 1),
+                new MapScreen.SaisieDemande("5", "5", 2))) {
+            ecran.saisie = Optional.of(saisie);
+            ecran.actionClicNoeud.accept(NOEUD_B);
+            assertEquals(2, demandes().size());
+            assertFalse(controleur.peutAnnuler());
+            assertFalse(ecran.consigne.isBlank());
+        }
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+    }
+
+    /** Annuler l'aperçu ne défait pas la commande précédente. */
+    @Test
+    public void annulerApercuConserveHistorique() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionAnnuler.run();
+        assertEquals(1, demandes().size());
+        assertTrue(controleur.peutAnnuler());
+        assertNull(ecran.collecteProvisoire);
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+    }
+
     // --- Modification des demandes (design pattern Command) ---
 
     @Test
@@ -694,7 +883,8 @@ public class MainControllerTest {
         ecran.actionAjouter.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutCollecte);
         assertEquals(EtatAjoutCollecte.CONSIGNE, ecran.consigne);
-        assertEquals(EnumSet.of(Action.AJOUTER_DEMANDE), ecran.actions);
+        assertEquals(EnumSet.of(Action.AJOUTER_DEMANDE, Action.ANNULER),
+                ecran.actions);
 
         ecran.actionClicNoeud.accept(NOEUD_A);
         assertTrue(controleur.obtenirEtat() instanceof EtatAjoutLivraison);
@@ -705,7 +895,7 @@ public class MainControllerTest {
         Demande ajoutee = demandes().get(2);
         assertEquals(NOEUD_A, ajoutee.collecte().identifiant());
         assertEquals(NOEUD_B, ajoutee.livraison().identifiant());
-        assertEquals(EtatAjoutLivraison.DUREE_PAR_DEFAUT,
+        assertEquals(300,
                 ajoutee.dureeCollecte());
         assertEquals("", ecran.consigne);
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);

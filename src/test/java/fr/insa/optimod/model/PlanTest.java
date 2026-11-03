@@ -33,6 +33,45 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
  */
 public class PlanTest {
 
+    /** Le programme fourni exige au moins six heures avec un seul livreur. */
+    @Test
+    public void demandeTropImportanteDepasse13h() throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream(
+                        "/data/demande_trop_importante.xml"), plan);
+        assertEquals(LocalTime.of(8, 0), programme.obtenirHeureDepart());
+        assertEquals(2, programme.obtenirDemandes().size());
+        assertEquals(21600, programme.obtenirDemandes().stream()
+                .mapToInt(demande -> demande.dureeCollecte()
+                        + demande.dureeLivraison()).sum());
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournee(programme));
+        assertTrue(erreur.getMessage().contains("13:00"));
+    }
+
+    /** Une demande par livreur permet deux retours avant 13 h. */
+    @Test
+    public void demandeTropImportanteRepartissableEntreDeuxLivreurs()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream(
+                        "/data/demande_trop_importante.xml"), plan);
+        for (Demande demande : programme.obtenirDemandes()) {
+            ProgrammeLivraisons partie = new ProgrammeLivraisons(
+                    programme.obtenirEntrepot(),
+                    programme.obtenirHeureDepart(), List.of(demande));
+            Tournee tournee = plan.calculerTournee(partie);
+            assertFalse(tournee.obtenirHeureRetour().isAfter(
+                    Plan.HEURE_LIMITE_RETOUR));
+            assertEquals(4, tournee.arrets().size());
+        }
+    }
+
     private static final double PRECISION = 1e-9;
 
     private static final String PETIT_PLAN = """

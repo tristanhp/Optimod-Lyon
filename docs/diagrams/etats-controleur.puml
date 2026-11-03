@@ -10,8 +10,8 @@ EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : + Monter, Descendre (sous-classe)
-EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
-EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
+EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
+EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : idCollecte : long
 
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
@@ -37,10 +37,12 @@ cache --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
-EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
-EtatAjoutLivraison --> cache : cliquerNoeud [autre noeud] / CommandeAjouterDemande
-EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
-EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
+EtatAjoutCollecte --> EtatAjoutLivraison : clic valide / aperçu collecte
+EtatAjoutLivraison --> EtatAjoutLivraison : second clic / aperçu livraison, dialogue
+EtatAjoutLivraison --> cache : saisie valide / CommandeAjouterDemande, effacer aperçu
+EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
+EtatAjoutCollecte --> cache : ajouterDemande ou annuler / effacer aperçu
+EtatAjoutLivraison --> cache : ajouterDemande, annuler ou dialogue annulé / effacer aperçu
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]

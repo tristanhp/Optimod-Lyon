@@ -15,9 +15,15 @@ import fr.insa.optimod.model.Observable;
 import fr.insa.optimod.model.Observateur;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ComboBox;
+import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -250,6 +256,44 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     @Override
     public void definirActionClicNoeud(LongConsumer action) {
         carte.definirSurClicNoeud(action);
+    }
+
+    @Override
+    public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        carte.afficherPointsProvisoires(collecte, livraison);
+    }
+
+    @Override
+    public Optional<SaisieDemande> saisirDemande() {
+        Dialog<SaisieDemande> dialogue = new Dialog<>();
+        dialogue.setTitle("Ajouter une demande");
+        dialogue.initOwner(getScene().getWindow());
+        TextField collecte = new TextField("5");
+        TextField livraison = new TextField("5");
+        ComboBox<Integer> livreurs = new ComboBox<>();
+        livreurs.getItems().add(1);
+        livreurs.setValue(1);
+        Label erreur = new Label();
+        dialogue.getDialogPane().setContent(new VBox(8,
+                new Label("Durée de collecte (minutes)"), collecte,
+                new Label("Durée de livraison (minutes)"), livraison,
+                new Label("Livreur"), livreurs, erreur));
+        dialogue.getDialogPane().getButtonTypes().addAll(
+                ButtonType.OK, ButtonType.CANCEL);
+        dialogue.getDialogPane().lookupButton(ButtonType.OK)
+                .addEventFilter(ActionEvent.ACTION, evenement -> {
+                    try {
+                        SaisieDemande.convertirDuree(collecte.getText());
+                        SaisieDemande.convertirDuree(livraison.getText());
+                    } catch (IllegalArgumentException exception) {
+                        erreur.setText(exception.getMessage());
+                        evenement.consume();
+                    }
+                });
+        dialogue.setResultConverter(bouton -> bouton == ButtonType.OK
+                ? new SaisieDemande(collecte.getText(), livraison.getText(),
+                        livreurs.getValue()) : null);
+        return dialogue.showAndWait();
     }
 
     @Override

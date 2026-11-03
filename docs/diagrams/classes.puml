@@ -87,7 +87,15 @@ package "controller" {
     ~changerOrdreTournee(rang : int, decalage : int)
     -tourneesCalculees : Map<List<Demande>, TourneeEnCache>
   }
-  interface MapScreen
+  interface MapScreen {
+    +saisirDemande() : Optional<SaisieDemande>
+    +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
+  }
+  class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
+    dureeCollecte : String
+    dureeLivraison : String
+    livreur : int
+  }
   interface Etat
   class EtatInitial
   class EtatPlanCharge

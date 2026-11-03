@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -17,6 +18,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -269,6 +271,23 @@ public final class MainController {
         ecran.afficherErreurCalcul(detail);
     }
 
+    /**
+     * Renvoie la saisie des durées, ou vide après annulation.
+     * @return saisie de la demande
+     */
+    Optional<MapScreen.SaisieDemande> saisirDemande() {
+        return ecran.saisirDemande();
+    }
+
+    /**
+     * Affiche les points choisis sans modifier le programme.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        ecran.afficherPointsProvisoires(collecte, livraison);
+    }
+
     /** @param consigne consigne à afficher, vide pour l'effacer */
     void afficherConsigne(String consigne) {
         ecran.afficherConsigne(consigne);
@@ -313,6 +332,7 @@ public final class MainController {
      * ({@link EtatProgrammeCharge}).
      */
     void retrouverEtatProgramme() {
+        ecran.afficherPointsProvisoires(null, null);
         ecran.afficherConsigne("");
         TourneeEnCache enCache = tourneesCalculees.get(
                 List.copyOf(programme.obtenirDemandes()));
