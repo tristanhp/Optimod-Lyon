@@ -681,6 +681,25 @@ public class PlanTest {
     }
 
     /**
+     * Une tournée qui dépasse minuit est refusée : les heures sont des
+     * {@code LocalTime}, elle reviendrait sinon « tôt le lendemain » et
+     * paraîtrait à l'heure.
+     */
+    @Test
+    public void tourneeQuiDepasseMinuitRefusee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0),
+                List.of(new Demande(plan.obtenirNoeud(3),
+                        plan.obtenirNoeud(2), 24 * 3600, 60)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        assertTrue(erreur.getMessage().contains("minuit"));
+        assertEquals(0, plan.nombreOrdresMemorises());
+    }
+
+    /**
      * Le recalcul local ne lit ni n'écrit la mémoire : il garde l'ordre
      * affiché, même si le voyageur de commerce en a trouvé un autre.
      */

@@ -63,6 +63,9 @@ public final class Plan {
      */
     private static final int LIMITE_TEMPS_TSP_MS = 10_000;
 
+    /** Secondes dans une journée, au-delà desquelles une heure repart de 0. */
+    private static final int SECONDES_PAR_JOUR = 24 * 3600;
+
     /** Rayon moyen de la Terre, en mètres. */
     private static final double RAYON_TERRE = 6_371_000;
 
@@ -88,9 +91,21 @@ public final class Plan {
     }
 
     /**
-     * Ordres de passage déjà trouvés par le voyageur de commerce, car il est
-     * coûteux de le relancer : un par liste de sommets d'un livreur (adresses,
-     * durées, types et demandes). Seul le calcul complet les consulte, jamais
+     * Ordre de passage trouvé par le voyageur de commerce.
+     *
+     * @param sommets les sommets dans l'ordre de passage, en commençant par 0
+     * @param optimal vrai si l'ordre est prouvé optimal, faux si la limite de
+     *        temps a coupé la recherche
+     */
+    private record OrdreDePassage(List<Integer> sommets, boolean optimal) {
+    }
+
+    /**
+     * Ordres de passage optimaux déjà trouvés par le voyageur de commerce, car
+     * il est coûteux de le relancer : un par liste de sommets d'un livreur
+     * (adresses, durées, types et demandes). Un ordre trouvé à la limite de
+     * temps, non prouvé optimal, n'est pas gardé : un nouveau « Calculer »
+     * cherche de nouveau un meilleur ordre. Seul le calcul complet les consulte, jamais
      * une modification de l'utilisateur, qui garde l'ordre affiché. Le plan
      * étant relu à chaque import, la mémoire repart de zéro avec lui. Le calcul
      * tourne hors du thread de l'interface : la table est concurrente.
@@ -271,12 +286,14 @@ public final class Plan {
         Chemin[][] chemins = calculerPlusCourtsChemins(sommets);
         List<Integer> ordre = ordresMemorises.get(sommets);
         boolean dejaMemorise = ordre != null;
+        OrdreDePassage trouve = null;
         if (!dejaMemorise) {
-            ordre = List.copyOf(calculerOrdreDePassage(chemins, limiteTemps));
+            trouve = calculerOrdreDePassage(chemins, limiteTemps);
+            ordre = List.copyOf(trouve.sommets());
         }
         Tournee tournee = calculerHeuresDePassage(heureDepart, sommets,
                 chemins, ordre);
-        if (!dejaMemorise) {
+        if (!dejaMemorise && trouve.optimal()) {
             // Gardé seulement une fois la tournée obtenue : le voyageur de
             // commerce renvoie aussi un ordre par une adresse inaccessible.
             ordresMemorises.put(List.copyOf(sommets), ordre);
@@ -438,13 +455,13 @@ public final class Plan {
      * d'ordre), cherché pendant au plus {@code limiteTemps} millisecondes.
      *
      * @return les sommets dans l'ordre de passage, en commençant par 0, sans
-     *         le retour à l'entrepôt
+     *         le retour à l'entrepôt, et si cet ordre est prouvé optimal
      */
-    private static List<Integer> calculerOrdreDePassage(Chemin[][] chemins,
+    private static OrdreDePassage calculerOrdreDePassage(Chemin[][] chemins,
             int limiteTemps) {
         int nombre = chemins.length;
         if (nombre == 1) {
-            return List.of(0);
+            return new OrdreDePassage(List.of(0), true);
         }
         // Coût d'un arc inaccessible : assez grand pour ne jamais être choisi,
         // assez petit pour que la somme des coûts ne déborde pas.
@@ -486,7 +503,7 @@ public final class Plan {
             }
             ordre.add(sommet);
         }
-        return ordre;
+        return new OrdreDePassage(ordre, res == ResultatCalculTSP.RESULTAT_OK);
     }
 
     /**
@@ -503,6 +520,7 @@ public final class Plan {
         List<Tournee.Arret> arrets = new ArrayList<>();
         List<Chemin> trajets = new ArrayList<>();
         LocalTime depart = heureDepart;
+        long ecoule = 0;
         for (int rang = 0; rang < parcours.size(); rang++) {
             Sommet sommet = sommets.get(parcours.get(rang));
             long trajet = 0;
@@ -519,6 +537,12 @@ public final class Plan {
                 }
                 trajets.add(chemin);
                 trajet = secondesDeTrajet(chemin.longueur());
+            }
+            ecoule += trajet + sommet.duree();
+            if (heureDepart.toSecondOfDay() + ecoule >= SECONDES_PAR_JOUR) {
+                // Les heures sont des LocalTime : au-delà de minuit elles
+                // repartiraient de 0 et la tournée paraîtrait à l'heure.
+                throw new IllegalStateException("La tournée dépasse minuit.");
             }
             LocalTime arrivee = depart.plusSeconds(trajet);
             depart = arrivee.plusSeconds(sommet.duree());
