@@ -967,6 +967,42 @@ public class MainControllerTest {
         assertNull(ecran.livraisonProvisoire);
     }
 
+    /** Une durée de livraison invalide ou un livreur inconnu est refusé. */
+    @Test
+    public void livraisonInvalideEtLivreurInconnuRefuses() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        for (MapScreen.SaisieDemande saisie : List.of(
+                new MapScreen.SaisieDemande("5", "0", 1),
+                new MapScreen.SaisieDemande("5", "abc", 1),
+                new MapScreen.SaisieDemande("5", "5", 2))) {
+            ecran.saisie = Optional.of(saisie);
+            ecran.actionClicNoeud.accept(NOEUD_B);
+            assertEquals(2, demandes().size());
+            assertFalse(controleur.peutAnnuler());
+            assertFalse(ecran.consigne.isBlank());
+        }
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+    }
+
+    /** Annuler l'aperçu ne défait pas la commande précédente. */
+    @Test
+    public void annulerApercuConserveHistorique() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionAnnuler.run();
+        assertEquals(1, demandes().size());
+        assertTrue(controleur.peutAnnuler());
+        assertNull(ecran.collecteProvisoire);
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+    }
+
     /** L'ajout après calcul conserve la tournée et ne relance pas le TSP. */
     @Test
     public void insertionLocaleAnnulableSansTsp() throws Exception {
