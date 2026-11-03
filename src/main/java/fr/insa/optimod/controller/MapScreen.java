@@ -2,6 +2,7 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.IntConsumer;
@@ -9,12 +10,69 @@ import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Ce que le contrôleur attend de l'écran de la carte. Séparer cette interface
  * de la vue JavaFX permet de tester le contrôleur sans afficher de fenêtre.
  */
 public interface MapScreen {
+
+    /**
+     * Saisie des durées en minutes et du livreur choisi.
+     * @param dureeCollecte minutes de collecte saisies
+     * @param dureeLivraison minutes de livraison saisies
+     * @param livreur numéro du livreur
+     */
+    record SaisieDemande(String dureeCollecte, String dureeLivraison,
+            int livreur) {
+
+        /**
+         * Convertit une durée strictement positive en secondes entières.
+         * @param texte minutes saisies
+         * @return secondes
+         * @throws IllegalArgumentException si la saisie est invalide
+         */
+        public static int convertirDuree(String texte) {
+            try {
+                int minutes = Integer.parseInt(texte.trim());
+                if (minutes <= 0) {
+                    throw new NumberFormatException();
+                }
+                return Math.multiplyExact(minutes, 60);
+            } catch (NumberFormatException | ArithmeticException erreur) {
+                throw new IllegalArgumentException("Saisir une durée entière "
+                        + "strictement positive en minutes.", erreur);
+            }
+        }
+    }
+
+    /**
+     * Renvoie saisie des durées et du livreur, ou vide après annulation.
+     * @return saisie des durées et du livreur, ou vide après annulation
+     */
+    Optional<SaisieDemande> saisirDemande();
+
+    /**
+     * Affiche les points choisis avant validation de la demande.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison);
+
+    /**
+     * Fait choisir l'intervalle où insérer collecte puis livraison.
+     * @param tournee arrêts existants dans leur ordre de passage
+     * @return rang de collecte (à partir de 1), ou vide après annulation
+     */
+    Optional<Integer> choisirPositionInsertion(Tournee tournee);
+
+    /**
+     * Signale les arrêts hors de leur plage sans bloquer l'annulation.
+     * @param arrets arrêts concernés, vide pour retirer le signalement
+     */
+    void signalerArretsHorsPlage(List<Tournee.Arret> arrets);
 
     /** Actions de l'utilisateur que l'écran peut activer ou désactiver. */
     enum Action {
@@ -33,13 +91,23 @@ public interface MapScreen {
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
-        REFAIRE
+        REFAIRE,
+        /** Sauvegarder la tournée calculée. */
+        SAUVEGARDER,
+        /** Restaurer une sauvegarde XML. */
+        RESTAURER
     }
 
-    /** Définit l'action d'import des demandes. @param action action au clic */
+    /**
+     * Définit l'action d'import des demandes.
+     * @param action action au clic
+     */
     void definirActionImportProgramme(Runnable action);
 
-    /** @return fichier XML de demandes choisi, ou vide après annulation */
+    /**
+     * Renvoie fichier XML de demandes choisi, ou vide après annulation.
+     * @return fichier XML de demandes choisi, ou vide après annulation
+     */
     Optional<File> choisirFichierDemandes();
 
     /**
@@ -196,4 +264,28 @@ public interface MapScreen {
      * @param detail explication de l'erreur
      */
     void afficherErreurCalcul(String detail);
+
+    /**
+     * Définit l'action de sauvegarde de la tournée.
+     * @param action action de sauvegarde
+     */
+    void definirActionSauvegarder(Runnable action);
+
+    /**
+     * Définit l'action de restauration de la tournée.
+     * @param action action de restauration
+     */
+    void definirActionRestaurer(Runnable action);
+
+    /**
+     * Renvoie destination XML, ou vide après annulation.
+     * @return destination XML, ou vide après annulation
+     */
+    Optional<File> choisirFichierSauvegarde();
+
+    /**
+     * Renvoie sauvegarde XML, ou vide après annulation.
+     * @return sauvegarde XML, ou vide après annulation
+     */
+    Optional<File> choisirFichierRestauration();
 }

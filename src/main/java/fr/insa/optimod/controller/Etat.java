@@ -16,6 +16,14 @@ import fr.insa.optimod.model.Tournee;
  */
 interface Etat {
 
+    /** @param controleur contrôleur ; sauvegarde ignorée par défaut */
+    default void sauvegarder(MainController controleur) {
+    }
+
+    /** @param controleur contrôleur ; restauration ignorée par défaut */
+    default void restaurer(MainController controleur) {
+    }
+
     /**
      * Clic sur « Importer le plan » : un plan valide mène à
      * {@link EtatPlanCharge}, un plan invalide vide la page

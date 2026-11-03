@@ -1,5 +1,6 @@
 package fr.insa.optimod.model;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Objects;
@@ -35,9 +36,12 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      * @param depart heure de départ (arrivée plus durée sur place)
      * @param type entrepôt, point de collecte ou point de livraison
      * @param demande demande servie à cet arrêt, {@code null} à l'entrepôt
+     * @param debutPlage début de la plage annoncée, inclus
+     * @param finPlage fin de la plage annoncée, incluse
      */
     public record Arret(Noeud noeud, LocalTime arrivee, LocalTime depart,
-            TypeArret type, Demande demande) {
+            TypeArret type, Demande demande, LocalTime debutPlage,
+            LocalTime finPlage) {
 
         /**
          * Crée un arrêt.
@@ -47,6 +51,8 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
          * @param depart heure de départ
          * @param type entrepôt, point de collecte ou point de livraison
          * @param demande demande servie, {@code null} à l'entrepôt
+         * @param debutPlage début de la plage annoncée, inclus
+         * @param finPlage fin de la plage annoncée, incluse
          * @throws IllegalArgumentException si l'entrepôt a une demande, ou
          *         si une collecte ou une livraison n'en a pas
          */
@@ -55,10 +61,51 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
             Objects.requireNonNull(arrivee, "arrivee");
             Objects.requireNonNull(depart, "depart");
             Objects.requireNonNull(type, "type");
+            Objects.requireNonNull(debutPlage, "debutPlage");
+            Objects.requireNonNull(finPlage, "finPlage");
             if ((type == TypeArret.ENTREPOT) != (demande == null)) {
                 throw new IllegalArgumentException("Seuls les arrêts de "
                         + "collecte et de livraison ont une demande.");
             }
+        }
+
+        /**
+         * Crée un arrêt dont la plage annoncée est d'une heure de part et
+         * d'autre de l'heure d'arrivée.
+         *
+         * @param noeud adresse de l'arrêt
+         * @param arrivee heure d'arrivée
+         * @param depart heure de départ
+         * @param type entrepôt, point de collecte ou point de livraison
+         * @param demande demande servie, {@code null} à l'entrepôt
+         */
+        public Arret(Noeud noeud, LocalTime arrivee, LocalTime depart,
+                TypeArret type, Demande demande) {
+            this(noeud, arrivee, depart, type, demande,
+                    arrivee.minusHours(1), arrivee.plusHours(1));
+        }
+
+        /**
+         * Indique si l'arrivée sort de la plage annoncée.
+         *
+         * @return vrai si l'arrivée sort de la plage annoncée
+         */
+        public boolean estHorsPlage() {
+            if (debutPlage.isAfter(finPlage)) {
+                return arrivee.isBefore(debutPlage)
+                        && arrivee.isAfter(finPlage);
+            }
+            return arrivee.isBefore(debutPlage) || arrivee.isAfter(finPlage);
+        }
+
+        /**
+         * Mesure le décalage depuis l'arrivée initialement annoncée.
+         *
+         * @return secondes de décalage, positives pour un retard
+         */
+        public long obtenirDecalageSecondes() {
+            return Duration.between(debutPlage.plusHours(1), arrivee)
+                    .getSeconds();
         }
 
         /**

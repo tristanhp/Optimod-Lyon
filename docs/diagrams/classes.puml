@@ -13,6 +13,8 @@ package "model" {
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
     +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
+    +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
+    +insererDemande(tournee, demande, position) : Tournee
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     -ordresMemorises : Map<List<Sommet>, List<Integer>>
@@ -21,6 +23,14 @@ package "model" {
     -calculerOrdreDePassage(chemins, limiteTemps) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
     ~plusCourtChemin(source : Noeud, cible : Noeud) : Chemin
+  }
+  class SauvegardeTournee <<record>> {
+    plan : Plan
+    fichierPlan : Path
+    programme : ProgrammeLivraisons
+    tournee : Tournee
+    +{static} sauvegarder(fichier, fichierPlan, programme, tournee)
+    +{static} restaurer(fichier) : SauvegardeTournee
   }
   class Noeud <<record>> {
     identifiant : long
@@ -81,6 +91,10 @@ package "model" {
     depart : LocalTime
     type : TypeArret
     demande : Demande
+    debutPlage : LocalTime
+    finPlage : LocalTime
+    +estHorsPlage() : boolean
+    +obtenirDecalageSecondes() : long
     +estApresHeureLimite() : boolean
   }
   enum "Tournee.TypeArret" as TypeArret {
@@ -107,13 +121,24 @@ package "controller" {
     ~supprimerDemandeEnGardantLOrdre(position : int)
     ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
   }
-  interface MapScreen
+  interface MapScreen {
+    +saisirDemande() : Optional<SaisieDemande>
+    +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
+    +choisirPositionInsertion(tournee) : Optional<Integer>
+    +signalerArretsHorsPlage(arrets)
+  }
+  class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
+    dureeCollecte : String
+    dureeLivraison : String
+    livreur : int
+  }
   interface Etat
   class EtatInitial
   class EtatPlanCharge
   class EtatProgrammeCharge
   class EtatTourneeCalculee
   class EtatCalculEnCours
+  class EtatRestauration
   class EtatAjoutCollecte
   class EtatAjoutLivraison
   interface Commande {
@@ -166,6 +191,9 @@ EtatPlanCharge ..|> Etat
 EtatProgrammeCharge ..|> Etat
 EtatTourneeCalculee --|> EtatProgrammeCharge
 EtatCalculEnCours ..|> Etat
+EtatRestauration ..|> Etat
+MainController ..> SauvegardeTournee
+SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
 ListeDeCommandes o--> "*" Commande

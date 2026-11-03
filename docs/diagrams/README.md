@@ -16,6 +16,7 @@ machine).
 | Charger le plan | [sequence-chargement-plan.puml](sequence-chargement-plan.puml) | Séquence |
 | Charger le programme | [sequence-chargement-programme.puml](sequence-chargement-programme.puml) | Séquence |
 | Calculer la tournée | [sequence-calcul-tournee.puml](sequence-calcul-tournee.puml) | Séquence |
+| Ajouter après calcul | [sequence-ajout-demande.puml](sequence-ajout-demande.puml) | Saisie, insertion sans TSP, commande et erreurs |
 
 Règles : les diagrammes qui ne sont pas de séquence contiennent
 `!pragma layout smetana` (rendu identique partout, sans Graphviz) ; on met à
@@ -41,8 +42,14 @@ stateDiagram-v2
     EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
     EtatTourneeCalculee --> EtatCalculEnCours : calculer
     EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
-    EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
+    EtatAjoutCollecte --> EtatAjoutLivraison : clic valide / aperçu collecte
+    EtatAjoutLivraison --> EtatAjoutLivraison : second clic / aperçu livraison
+    EtatAjoutCollecte --> EtatProgrammeCharge : annuler / effacer aperçu
+    EtatAjoutLivraison --> EtatProgrammeCharge : annuler / effacer aperçu
     EtatAjoutLivraison --> EtatProgrammeCharge : cliquerNoeud / CommandeAjouterDemande
+    EtatAjoutLivraison --> EtatCalculEnCours : saisie valide et tournées calculées / insertion
+    EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / commande
+    EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / alerte, état conservé
     EtatTourneeCalculee --> EtatProgrammeCharge : supprimerDemande (tournées retirées)
     EtatProgrammeCharge --> EtatTourneeCalculee : annuler [tournées d'avant calculées]
 ```

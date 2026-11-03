@@ -461,6 +461,60 @@ public class PlanTest {
         }
     }
 
+    /** Le recalcul conserve un ordre imposé et ses durées, sans TSP. */
+    @Test
+    public void recalculConserveOrdreImpose() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        List<Noeud> adresses = List.of(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(2), plan.obtenirNoeud(3),
+                plan.obtenirNoeud(1));
+        Tournee tournee = tourneeImposee(plan, LocalTime.of(8, 0),
+                adresses, List.of(0, 120, 240, 0));
+        assertEquals(adresses,
+                tournee.arrets().stream().map(Tournee.Arret::noeud).toList());
+        assertEquals(LocalTime.of(8, 1), tournee.arrets().get(1).arrivee());
+        assertEquals(LocalTime.of(8, 3), tournee.arrets().get(1).depart());
+        assertEquals(3, tournee.chemins().size());
+    }
+
+    /** Le recalcul renvoie une tournée en retard, que l'appelant refuse. */
+    @Test
+    public void recalculApres13hImpossible() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = tourneeImposee(plan, LocalTime.of(12, 59),
+                List.of(plan.obtenirNoeud(1), plan.obtenirNoeud(2),
+                        plan.obtenirNoeud(3), plan.obtenirNoeud(1)),
+                List.of(0, 300, 300, 0));
+        assertFalse(tournee.estPossible());
+    }
+
+    /**
+     * Recalcule une tournée dans l'ordre imposé : les arrêts du milieu vont
+     * par paires (collecte puis livraison d'une même demande).
+     */
+    private static Tournee tourneeImposee(Plan plan, LocalTime heureDepart,
+            List<Noeud> adresses, List<Integer> durees) {
+        List<TypeArret> types = new ArrayList<>();
+        List<Demande> demandes = new ArrayList<>();
+        for (int rang = 0; rang < adresses.size(); rang++) {
+            boolean extremite = rang == 0 || rang == adresses.size() - 1;
+            boolean collecte = rang % 2 == 1;
+            types.add(extremite ? TypeArret.ENTREPOT
+                    : collecte ? TypeArret.COLLECTE
+                            : TypeArret.LIVRAISON);
+            if (extremite) {
+                demandes.add(null);
+            } else {
+                int debut = collecte ? rang : rang - 1;
+                demandes.add(new Demande(adresses.get(debut),
+                        adresses.get(debut + 1), durees.get(debut),
+                        durees.get(debut + 1)));
+            }
+        }
+        return plan.recalculerTournee(heureDepart, adresses, durees, types,
+                demandes);
+    }
+
     /** Rang du premier arrêt (hors départ) sur un nœud. */
     private static int rang(List<Tournee.Arret> arrets, Noeud noeud) {
         for (int rang = 1; rang < arrets.size(); rang++) {
@@ -470,6 +524,98 @@ public class PlanTest {
         }
         throw new AssertionError("Nœud absent de la tournée : " + noeud);
     }
+    /** La position choisie est respectée même si elle allonge le parcours. */
+    @Test
+    public void insertionRespectePositionChoisie() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Noeud collecte = plan.obtenirNoeud(3);
+        Noeud livraison = plan.obtenirNoeud(2);
+        Tournee avant = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(entrepot, collecte, livraison, entrepot),
+                List.of(0, 60, 60, 0));
+        Tournee apres = plan.insererDemande(avant,
+                new Demande(collecte, livraison, 60, 60), 3);
+        assertEquals(List.of(entrepot, collecte, livraison, collecte,
+                livraison, entrepot), apres.arrets().stream()
+                        .map(Tournee.Arret::noeud).toList());
+        assertEquals(LocalTime.of(8, 8, 24), apres.obtenirHeureRetour());
+        assertSame(avant.chemins().get(0), apres.chemins().get(0));
+        assertSame(avant.chemins().get(1), apres.chemins().get(1));
+        assertEquals(avant.arrets().get(1).debutPlage(),
+                apres.arrets().get(1).debutPlage());
+    }
+
+    /** L'insertion décale les arrêts suivants sans changer leurs plages. */
+    @Test
+    public void insertionDecaleEtSignaleLesArretsSuivants() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Noeud collecte = plan.obtenirNoeud(3);
+        Noeud livraison = plan.obtenirNoeud(2);
+        Tournee avant = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(entrepot, collecte, livraison, entrepot),
+                List.of(0, 60, 60, 0));
+        Tournee apres = plan.insererDemande(avant,
+                new Demande(collecte, livraison, 3600, 60), 1);
+        assertEquals(3792, apres.arrets().get(3).obtenirDecalageSecondes());
+        assertTrue(apres.arrets().get(3).estHorsPlage());
+        assertEquals(avant.arrets().get(1).debutPlage(),
+                apres.arrets().get(3).debutPlage());
+        assertEquals(avant.arrets().get(1).finPlage(),
+                apres.arrets().get(3).finPlage());
+        assertSame(avant.chemins().get(1), apres.chemins().get(3));
+        assertSame(avant.chemins().get(2), apres.chemins().get(4));
+        assertEquals(LocalTime.of(8, 0, 24), avant.arrets().get(1).arrivee());
+    }
+
+    /** Les positions hors des intervalles de la tournée sont refusées. */
+    @Test
+    public void positionInsertionInvalide() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(plan.obtenirNoeud(1)), List.of(0));
+        Demande demande = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 60);
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.insererDemande(avant, demande, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> plan.insererDemande(avant, demande, 2));
+        Tournee apres = plan.insererDemande(avant, demande, 1);
+        assertEquals(4, apres.arrets().size());
+    }
+
+    /** Une insertion impossible laisse la tournée d'origine intacte. */
+    @Test(expected = IllegalStateException.class)
+    public void insertionImpossible() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Tournee avant = tourneeImposee(plan, LocalTime.of(12, 59),
+                List.of(entrepot), List.of(0));
+        plan.insererDemande(avant, new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 60), 1);
+    }
+
+    /** Une durée d'une journée ne doit pas être ramenée à zéro à minuit. */
+    @Test(expected = IllegalStateException.class)
+    public void dureeJourneeEntiereRefusee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(plan.obtenirNoeud(1)), List.of(0));
+        plan.insererDemande(avant, new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 24 * 3600, 60), 1);
+    }
+
+    /** Une adresse inaccessible ne peut être insérée. */
+    @Test(expected = IllegalStateException.class)
+    public void insertionInaccessible() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(plan.obtenirNoeud(1)), List.of(0));
+        plan.insererDemande(avant, new Demande(plan.obtenirNoeud(4),
+                plan.obtenirNoeud(2), 60, 60), 1);
+    }
+
 
 
     // --- Mémoire de l'ordre de passage du voyageur de commerce ---

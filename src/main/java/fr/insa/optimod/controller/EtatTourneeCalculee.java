@@ -10,9 +10,14 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * recalculer, importer, modifier les demandes, annuler ou rétablir. Ajouter
  * une demande retire les tournées ; en supprimer une met à jour celle de son
  * livreur (recalcul local). On peut en plus changer l'ordre des arrêts d'un
- * livreur (« Monter », « Descendre »).
+ * livreur (« Monter », « Descendre ») et sauvegarder les tournées.
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
+
+    @Override
+    public void sauvegarder(MainController controleur) {
+        controleur.sauvegarderTournee();
+    }
 
     /**
      * Supprime une demande en gardant l'ordre de passage des autres arrêts du
@@ -43,6 +48,7 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         // besoin de le copier.
         Set<Action> actions = super.actionsPermises(controleur);
         actions.add(Action.CHANGER_ORDRE);
+        actions.add(Action.SAUVEGARDER);
         return actions;
     }
 }

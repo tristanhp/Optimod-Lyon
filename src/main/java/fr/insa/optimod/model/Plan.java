@@ -198,7 +198,10 @@ public final class Plan {
         return noeud;
     }
 
-    /** @return nœuds du plan (non modifiable) */
+    /**
+     * Renvoie nœuds du plan (non modifiable).
+     * @return nœuds du plan (non modifiable)
+     */
     public Collection<Noeud> obtenirNoeuds() {
         return Collections.unmodifiableCollection(noeuds.values());
     }
@@ -213,7 +216,10 @@ public final class Plan {
         return noeuds.get(identifiant);
     }
 
-    /** @return tronçons du plan (non modifiable) */
+    /**
+     * Renvoie tronçons du plan (non modifiable).
+     * @return tronçons du plan (non modifiable)
+     */
     public List<Troncon> obtenirTroncons() {
         return Collections.unmodifiableList(troncons);
     }
@@ -303,6 +309,120 @@ public final class Plan {
      */
     int nombreOrdresMemorises() {
         return ordresMemorises.size();
+    }
+
+    /**
+     * Recalcule les trajets et les heures pour un ordre imposé, sans TSP.
+     *
+     * @param heureDepart heure de départ
+     * @param adresses arrêts ordonnés, entrepôt au début et à la fin
+     * @param durees durées sur place en secondes
+     * @param types ce que le livreur fait à chaque arrêt
+     * @param demandes demande servie à chaque arrêt, {@code null} à l'entrepôt
+     * @return tournée dans l'ordre fourni
+     * @throws IllegalArgumentException si l'ordre est invalide
+     * @throws IllegalStateException si la tournée est impossible
+     */
+    public Tournee recalculerTournee(LocalTime heureDepart,
+            List<Noeud> adresses, List<Integer> durees,
+            List<TypeArret> types, List<Demande> demandes) {
+        int taille = adresses.size();
+        if (taille == 0 || taille != durees.size() || taille != types.size()
+                || taille != demandes.size()
+                || !adresses.get(0).equals(adresses.get(taille - 1))
+                || durees.stream().anyMatch(duree -> duree < 0)
+                || durees.get(0) != 0 || durees.get(taille - 1) != 0) {
+            throw new IllegalArgumentException("Ordre des arrêts invalide.");
+        }
+        int nombre = Math.max(1, taille - 1);
+        List<Sommet> sommets = new ArrayList<>();
+        for (int rang = 0; rang < nombre; rang++) {
+            sommets.add(new Sommet(adresses.get(rang), durees.get(rang),
+                    types.get(rang), demandes.get(rang)));
+        }
+        Chemin[][] chemins = new Chemin[nombre][nombre];
+        List<Integer> ordre = new ArrayList<>();
+        for (int rang = 0; rang < nombre; rang++) {
+            ordre.add(rang);
+            int suivant = (rang + 1) % nombre;
+            chemins[rang][suivant] = plusCourtChemin(adresses.get(rang),
+                    adresses.get(suivant));
+        }
+        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre);
+    }
+
+    /**
+     * Insère collecte puis livraison à la position choisie par l'utilisateur.
+     * Seuls les trois nouveaux chemins entre les arrêts voisins sont calculés.
+     * Les autres chemins et les plages annoncées restent inchangés.
+     *
+     * @param tournee tournée de départ, jamais modifiée
+     * @param demande demande à insérer
+     * @param position rang de collecte, entre 1 et le rang du retour inclus
+     * @return nouvelle tournée sans recherche de position ni appel au TSP
+     * @throws IllegalArgumentException si la position est invalide
+     * @throws IllegalStateException si un nouveau chemin est inaccessible ou
+     *         si l'insertion rend le retour impossible (après 13 h, alors que
+     *         la tournée d'avant rentrait à l'heure)
+     */
+    public Tournee insererDemande(Tournee tournee, Demande demande,
+            int position) {
+        List<Tournee.Arret> anciens = new ArrayList<>(tournee.arrets());
+        if (anciens.size() == 1) {
+            anciens.add(anciens.get(0));
+        }
+        if (position < 1 || position >= anciens.size()) {
+            throw new IllegalArgumentException(
+                    "Position d'insertion invalide.");
+        }
+        // Le retour à l'entrepôt (dernier arrêt) n'est pas un sommet : l'étape
+        // des heures de passage l'ajoute elle-même.
+        List<Sommet> sommets = new ArrayList<>();
+        for (Tournee.Arret arret : anciens.subList(0, anciens.size() - 1)) {
+            sommets.add(new Sommet(arret.noeud(), dureeSurPlace(arret),
+                    arret.type(), arret.demande()));
+        }
+        sommets.add(position, new Sommet(demande.collecte(),
+                demande.dureeCollecte(), TypeArret.COLLECTE, demande));
+        sommets.add(position + 1, new Sommet(demande.livraison(),
+                demande.dureeLivraison(), TypeArret.LIVRAISON, demande));
+        List<Chemin> trajets = new ArrayList<>(tournee.chemins());
+        if (trajets.isEmpty()) {
+            trajets.add(new Chemin(0, List.of()));
+        }
+        trajets.remove(position - 1);
+        trajets.addAll(position - 1, List.of(
+                plusCourtChemin(anciens.get(position - 1).noeud(),
+                        demande.collecte()),
+                plusCourtChemin(demande.collecte(), demande.livraison()),
+                plusCourtChemin(demande.livraison(),
+                        anciens.get(position).noeud())));
+        int nombre = sommets.size();
+        Chemin[][] chemins = new Chemin[nombre][nombre];
+        List<Integer> ordre = new ArrayList<>();
+        for (int rang = 0; rang < nombre; rang++) {
+            ordre.add(rang);
+            chemins[rang][(rang + 1) % nombre] = trajets.get(rang);
+        }
+        Tournee candidate = calculerHeuresDePassage(anciens.get(0).depart(),
+                sommets, chemins, ordre);
+        List<Tournee.Arret> arrets = new ArrayList<>(candidate.arrets());
+        for (int rang = 0; rang < anciens.size(); rang++) {
+            int nouveauRang = rang < position ? rang : rang + 2;
+            Tournee.Arret nouveau = arrets.get(nouveauRang);
+            Tournee.Arret ancien = anciens.get(rang);
+            arrets.set(nouveauRang, new Tournee.Arret(nouveau.noeud(),
+                    nouveau.arrivee(), nouveau.depart(), nouveau.type(),
+                    nouveau.demande(), ancien.debutPlage(),
+                    ancien.finPlage()));
+        }
+        Tournee apres = new Tournee(arrets, candidate.chemins());
+        if (!apres.estPossible() && tournee.estPossible()) {
+            throw new IllegalStateException("Insertion refusée : le retour à "
+                    + "l'entrepôt serait à " + apres.obtenirHeureRetour()
+                    + ", après " + HEURE_LIMITE_RETOUR + ".");
+        }
+        return apres;
     }
 
     /**

@@ -106,4 +106,34 @@ public class TourneeTest {
         new Arret(A, LocalTime.of(8, 0), LocalTime.of(8, 0),
                 TypeArret.COLLECTE, null);
     }
+
+    /** Les bornes sont inclusives et restent fixes lorsque l'arrivée change. */
+    @Test
+    public void plageUneHeureEtDepassement() {
+        Arret arret = new Arret(A, LocalTime.of(9, 47), LocalTime.of(9, 52),
+                TypeArret.COLLECTE, DEMANDE);
+        assertEquals(LocalTime.of(8, 47), arret.debutPlage());
+        assertEquals(LocalTime.of(10, 47), arret.finPlage());
+        assertFalse(arret.estHorsPlage());
+        assertFalse(new Arret(A, LocalTime.of(10, 47), LocalTime.of(10, 52),
+                TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
+                arret.finPlage()).estHorsPlage());
+        assertTrue(new Arret(A, LocalTime.of(10, 48), LocalTime.of(10, 53),
+                TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
+                arret.finPlage()).estHorsPlage());
+    }
+
+    /** Une plage autour de minuit conserve son sens sur les deux jours. */
+    @Test
+    public void plageAutourDeMinuit() {
+        Arret arret = new Arret(A, LocalTime.of(0, 30), LocalTime.of(0, 35),
+                TypeArret.COLLECTE, DEMANDE);
+        assertFalse(arret.estHorsPlage());
+        assertFalse(new Arret(A, LocalTime.of(23, 45), LocalTime.of(23, 50),
+                TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
+                arret.finPlage()).estHorsPlage());
+        assertTrue(new Arret(A, LocalTime.of(12, 0), LocalTime.of(12, 5),
+                TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
+                arret.finPlage()).estHorsPlage());
+    }
 }

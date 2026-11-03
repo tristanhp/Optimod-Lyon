@@ -2,9 +2,11 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -16,7 +18,9 @@ import org.xml.sax.SAXException;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.SauvegardeTournee;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -97,6 +101,9 @@ public final class MainController {
     /** Plan actuellement chargé, ou {@code null}. */
     private Plan plan;
 
+    /** Référence du fichier du plan courant. */
+    private Path fichierPlan;
+
     /** Programme de livraisons actuellement chargé, ou {@code null}. */
     private ProgrammeLivraisons programme;
 
@@ -145,6 +152,8 @@ public final class MainController {
                 etat.changerOrdre(this, livreur, rang, 1));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
+        ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
+        ecran.definirActionRestaurer(() -> etat.restaurer(this));
         changerEtat(new EtatInitial());
     }
 
@@ -189,6 +198,7 @@ public final class MainController {
         oublierModifications();
         try {
             plan = new Plan(fichier.getPath());
+            fichierPlan = fichier.toPath();
             ecran.afficherPlan(plan);
             return Lecture.REUSSIE;
         } catch (IOException | SAXException | IllegalArgumentException e) {
@@ -263,6 +273,77 @@ public final class MainController {
         historique.memoriserTournees(programme.obtenirTournees());
     }
 
+    /**
+     * Renvoie la saisie des durées et du livreur, ou vide après annulation.
+     *
+     * @return saisie de la demande
+     */
+    Optional<MapScreen.SaisieDemande> saisirDemande() {
+        return ecran.saisirDemande();
+    }
+
+    /**
+     * Affiche les points choisis sans modifier le programme.
+     *
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
+        ecran.afficherPointsProvisoires(collecte, livraison);
+    }
+
+    /**
+     * Ajoute une demande. Si les tournées sont calculées, l'utilisateur choisit
+     * où l'insérer dans la tournée du livreur de la demande : elle est mise à
+     * jour localement ({@link Plan#insererDemande}) hors du thread de
+     * l'interface, sans relancer le voyageur de commerce, et les tournées des
+     * autres livreurs ne changent pas. Sinon la demande est simplement ajoutée.
+     * Comme pour la suppression, le calcul se fait avant la commande : annuler
+     * et rétablir ne recalculent rien.
+     *
+     * @param demande demande validée
+     */
+    void ajouterDemande(Demande demande) {
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
+        Commande commande = new CommandeAjouterDemande(programme, demande);
+        Tournee tourneeLivreur = avant.get(demande.livreur());
+        if (tourneeLivreur == null) {
+            executer(commande);
+            return;
+        }
+        Integer position = ecran.choisirPositionInsertion(tourneeLivreur)
+                .orElse(null);
+        if (position == null) {
+            retrouverEtatProgramme();
+            return;
+        }
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee apres = planCalcule.insererDemande(tourneeLivreur,
+                        demande, position);
+                interfaceUtilisateur.execute(() -> {
+                    ecran.afficherAttente(false);
+                    Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+                    tournees.put(demande.livreur(), apres);
+                    commande.memoriserTourneesAvant(avant);
+                    commande.memoriserTourneesApres(
+                            Collections.unmodifiableMap(tournees));
+                    executer(commande);
+                    afficherConsigneOrdreNonOptimise(demande.livreur());
+                });
+            } catch (RuntimeException erreur) {
+                interfaceUtilisateur.execute(() -> {
+                    ecran.afficherAttente(false);
+                    retrouverEtatProgramme();
+                    ecran.afficherErreurCalcul(erreur.getMessage());
+                });
+            }
+        });
+    }
+
     /** @param detail explication de l'échec du calcul */
     void afficherErreurCalcul(String detail) {
         ecran.afficherErreurCalcul(detail);
@@ -311,12 +392,60 @@ public final class MainController {
      * {@link EtatProgrammeCharge}.
      */
     void retrouverEtatProgramme() {
+        ecran.afficherPointsProvisoires(null, null);
         ecran.afficherConsigne("");
         if (programme.obtenirTournees().isEmpty()) {
             changerEtat(new EtatProgrammeCharge());
         } else {
             changerEtat(new EtatTourneeCalculee());
         }
+        ecran.signalerArretsHorsPlage(programme.obtenirTournees().values()
+                .stream().flatMap(tournee -> tournee.arrets().stream())
+                .filter(Tournee.Arret::estHorsPlage).toList());
+    }
+
+    /** Sauvegarde les tournées calculées dans le fichier choisi. */
+    void sauvegarderTournee() {
+        ecran.choisirFichierSauvegarde().ifPresent(fichier -> {
+            try {
+                SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
+                        programme);
+            } catch (IOException erreur) {
+                ecran.afficherErreurXml(erreur.getMessage());
+            }
+        });
+    }
+
+    /** Restaure intégralement avant de remplacer l'état courant. */
+    void restaurerSauvegarde() {
+        ecran.choisirFichierRestauration().ifPresent(fichier -> {
+            Etat ancienEtat = etat;
+            changerEtat(new EtatRestauration());
+            ecran.afficherAttente(true);
+            arrierePlan.execute(() -> {
+                try {
+                    SauvegardeTournee sauvegarde =
+                            SauvegardeTournee.restaurer(fichier.toPath());
+                    interfaceUtilisateur.execute(() -> {
+                        plan = sauvegarde.plan();
+                        fichierPlan = sauvegarde.fichierPlan();
+                        programme = sauvegarde.programme();
+                        oublierModifications();
+                        ecran.afficherPlan(plan);
+                        ecran.afficherProgramme(programme);
+                        rangerTournees(Map.of(1, sauvegarde.tournee()));
+                        ecran.afficherAttente(false);
+                        retrouverEtatProgramme();
+                    });
+                } catch (SAXException erreur) {
+                    interfaceUtilisateur.execute(() -> {
+                        ecran.afficherAttente(false);
+                        changerEtat(ancienEtat);
+                        ecran.afficherErreurXml(erreur.getMessage());
+                    });
+                }
+            });
+        });
     }
 
     /**
