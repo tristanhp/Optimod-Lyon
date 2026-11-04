@@ -2,7 +2,9 @@ package fr.insa.optimod.model;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
@@ -158,5 +160,21 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      */
     public boolean estPossible() {
         return !arrets.get(arrets.size() - 1).estApresHeureLimite();
+    }
+
+    /**
+     * Compte combien de fois la tournée parcourt chaque tronçon, dans le sens
+     * où elle le parcourt.
+     *
+     * @return nombre de passages par tronçon parcouru, non modifiable
+     */
+    public Map<Troncon, Integer> compterPassagesParTroncon() {
+        Map<Troncon, Integer> passages = new HashMap<>();
+        for (Chemin chemin : chemins) {
+            for (Troncon troncon : chemin.troncons()) {
+                passages.merge(troncon, 1, Integer::sum);
+            }
+        }
+        return Map.copyOf(passages);
     }
 }

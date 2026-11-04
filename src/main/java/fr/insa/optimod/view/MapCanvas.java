@@ -1,5 +1,7 @@
 package fr.insa.optimod.view;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -100,6 +102,20 @@ final class MapCanvas extends Pane {
 
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
+
+    /** Largeur du trait d'un tronçon parcouru plusieurs fois, en pixels. */
+    private static final double LARGEUR_TOURNEE_REPETEE = 3;
+
+    /** Écart entre deux passages sur un même tronçon, en pixels. */
+    private static final double ECART_PASSAGES = 3.5;
+
+    /** Longueur d'écran en dessous de laquelle « ×N » n'est pas écrit. */
+    private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
+
+    /** Rouge d'un arrêt hors plage ou après l'heure limite. */
+    private static final Color COULEUR_ARRET_TARDIF = Color.web("#c62828");
+
+    private static final Color COULEUR_FOND_ARRET_TARDIF = Color.web("#fce8e6");
 
     /** Demi-longueur d'une flèche de sens, en pixels. */
     private static final double TAILLE_FLECHE = 5;
@@ -537,7 +553,8 @@ final class MapCanvas extends Pane {
     /**
      * Trace les tronçons de chaque chemin d'un trait épais, du plus clair (au
      * départ) au plus foncé (au retour), avec une flèche au milieu de chaque
-     * tronçon pour montrer le sens de parcours.
+     * tronçon pour montrer le sens de parcours. Un tronçon parcouru plusieurs
+     * fois est tracé en traits parallèles et porte « ×N ».
      */
     private void dessinerTournees(GraphicsContext contexte) {
         contexte.setLineCap(StrokeLineCap.ROUND);
@@ -545,18 +562,29 @@ final class MapCanvas extends Pane {
             int total = tournee.chemins().stream()
                     .mapToInt(chemin -> chemin.troncons().size()).sum();
             int fait = 0;
+            Map<Troncon, Integer> passages =
+                    tournee.compterPassagesParTroncon();
+            Map<Troncon, Integer> dejaVus = new HashMap<>();
             for (Chemin chemin : tournee.chemins()) {
                 for (Troncon troncon : chemin.troncons()) {
                     verifierDansLePlan(troncon.origine());
                     verifierDansLePlan(troncon.destination());
                     double avancement = total <= 1 ? 0
                             : (double) fait / (total - 1);
+                    int nombre = passages.get(troncon);
+                    int rang = dejaVus.merge(troncon, 1, Integer::sum) - 1;
                     dessinerTroncon(contexte, troncon,
                             COULEUR_DEBUT_TOURNEE.interpolate(
-                                    COULEUR_FIN_TOURNEE, avancement));
+                                    COULEUR_FIN_TOURNEE, avancement),
+                            nombre, rang);
                     fait++;
                 }
             }
+            passages.forEach((troncon, nombre) -> {
+                if (nombre > 1) {
+                    dessinerNombrePassages(contexte, troncon, nombre);
+                }
+            });
         }
         contexte.setLineCap(StrokeLineCap.BUTT);
     }
@@ -569,31 +597,70 @@ final class MapCanvas extends Pane {
         }
     }
 
+    /**
+     * Trace un passage sur un tronçon ; quand le tronçon est parcouru
+     * plusieurs fois, chaque passage est décalé sur le côté du précédent.
+     *
+     * @param nombre nombre de passages de la tournée sur ce tronçon
+     * @param rang rang de ce passage parmi eux, à partir de 0
+     */
     private void dessinerTroncon(GraphicsContext contexte, Troncon troncon,
-            Color couleur) {
+            Color couleur, int nombre, int rang) {
         double x1 = ecranX(troncon.origine().longitude());
         double y1 = ecranY(troncon.origine().latitude());
         double x2 = ecranX(troncon.destination().longitude());
         double y2 = ecranY(troncon.destination().latitude());
-        contexte.setStroke(couleur);
-        contexte.setLineWidth(LARGEUR_TOURNEE);
-        contexte.strokeLine(x1, y1, x2, y2);
         double longueur = Math.hypot(x2 - x1, y2 - y1);
+        double ux = longueur == 0 ? 0 : (x2 - x1) / longueur;
+        double uy = longueur == 0 ? 0 : (y2 - y1) / longueur;
+        double decalage = (rang - (nombre - 1) / 2.0) * ECART_PASSAGES;
+        x1 -= uy * decalage;
+        y1 += ux * decalage;
+        x2 -= uy * decalage;
+        y2 += ux * decalage;
+        contexte.setStroke(couleur);
+        contexte.setLineWidth(nombre > 1 ? LARGEUR_TOURNEE_REPETEE
+                : LARGEUR_TOURNEE);
+        contexte.strokeLine(x1, y1, x2, y2);
         if (longueur < LONGUEUR_MINIMALE_FLECHE) {
             return;
         }
-        double ux = (x2 - x1) / longueur;
-        double uy = (y2 - y1) / longueur;
+        double taille = nombre > 1 ? TAILLE_FLECHE * 0.6 : TAILLE_FLECHE;
         double mx = (x1 + x2) / 2;
         double my = (y1 + y2) / 2;
-        double[] abscisses = {mx + ux * TAILLE_FLECHE,
-            mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
-            mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8};
-        double[] ordonnees = {my + uy * TAILLE_FLECHE,
-            my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
-            my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8};
+        double[] abscisses = {mx + ux * taille,
+            mx - ux * taille * 0.6 - uy * taille * 0.8,
+            mx - ux * taille * 0.6 + uy * taille * 0.8};
+        double[] ordonnees = {my + uy * taille,
+            my - uy * taille * 0.6 + ux * taille * 0.8,
+            my - uy * taille * 0.6 - ux * taille * 0.8};
         contexte.setFill(Color.WHITE);
         contexte.fillPolygon(abscisses, ordonnees, 3);
+    }
+
+    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois, s'il est long. */
+    private void dessinerNombrePassages(GraphicsContext contexte,
+            Troncon troncon, int nombre) {
+        double x1 = ecranX(troncon.origine().longitude());
+        double y1 = ecranY(troncon.origine().latitude());
+        double x2 = ecranX(troncon.destination().longitude());
+        double y2 = ecranY(troncon.destination().latitude());
+        if (Math.hypot(x2 - x1, y2 - y1) < LONGUEUR_MINIMALE_NOMBRE) {
+            return;
+        }
+        double x = (x1 + x2) / 2;
+        double y = (y1 + y2) / 2;
+        String texte = "×" + nombre;
+        contexte.setFont(Font.font(null, FontWeight.BOLD, 11));
+        contexte.setTextAlign(TextAlignment.CENTER);
+        contexte.setTextBaseline(VPos.CENTER);
+        contexte.setLineWidth(3);
+        contexte.setStroke(Color.WHITE);
+        contexte.strokeText(texte, x, y - ECART_PASSAGES - 6);
+        contexte.setFill(COULEUR_FIN_TOURNEE);
+        contexte.fillText(texte, x, y - ECART_PASSAGES - 6);
+        contexte.setTextBaseline(VPos.BASELINE);
+        contexte.setFont(Font.getDefault());
     }
 
     /**
@@ -613,17 +680,24 @@ final class MapCanvas extends Pane {
                 boolean selectionne = entree.getKey() == livreurSelectionne
                         && rang == rangSelectionne;
                 double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
+                boolean tardif = estTardif(arrets.get(rang));
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
-                        : Color.WHITE);
-                contexte.setStroke(COULEUR_FIN_TOURNEE);
+                        : tardif ? COULEUR_FOND_ARRET_TARDIF : Color.WHITE);
+                contexte.setStroke(tardif ? COULEUR_ARRET_TARDIF
+                        : COULEUR_FIN_TOURNEE);
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
-                contexte.setFill(Color.BLACK);
+                contexte.setFill(tardif ? COULEUR_ARRET_TARDIF : Color.BLACK);
                 contexte.fillText(String.valueOf(rang), x, y);
             }
         }
         contexte.setTextBaseline(VPos.BASELINE);
+    }
+
+    /** Indique si l'arrivée sort de la plage annoncée ou dépasse 13 h. */
+    private static boolean estTardif(Tournee.Arret arret) {
+        return arret.estHorsPlage() || arret.estApresHeureLimite();
     }
 
     /** Dessine l'aperçu au-dessus des points déjà validés. */
@@ -704,12 +778,21 @@ final class MapCanvas extends Pane {
      * si une tournée est affichée, son tracé (du clair au foncé).
      */
     private void dessinerLegende(GraphicsContext contexte) {
-        boolean avecTournee = !tournees.isEmpty();
         String[] libelles = {"Entrepôt", "Point de collecte",
-            "Point de livraison", "Tournée (clair → foncé)"};
-        int lignes = avecTournee ? libelles.length : libelles.length - 1;
-        double largeur = 170;
-        double hauteur = HAUTEUR_LIGNE_LEGENDE * lignes + 8;
+            "Point de livraison", "Tournée (clair → foncé)",
+            "Tronçon repassé (×N)", "Arrêt hors plage ou après 13 h"};
+        List<Integer> symboles = new ArrayList<>(List.of(0, 1, 2));
+        if (!tournees.isEmpty()) {
+            symboles.add(3);
+            if (existePassageRepete()) {
+                symboles.add(4);
+            }
+            if (existeArretTardif()) {
+                symboles.add(5);
+            }
+        }
+        double largeur = 210;
+        double hauteur = HAUTEUR_LIGNE_LEGENDE * symboles.size() + 8;
         double gauche = MARGE_LEGENDE;
         double haut = canevas.getHeight() - MARGE_LEGENDE - hauteur;
         contexte.setFill(Color.web("#ffffff", 0.92));
@@ -719,13 +802,26 @@ final class MapCanvas extends Pane {
         contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
         contexte.setFont(Font.getDefault());
         contexte.setTextAlign(TextAlignment.LEFT);
-        for (int i = 0; i < lignes; i++) {
+        for (int i = 0; i < symboles.size(); i++) {
             double cx = gauche + 16;
             double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (i + 0.5);
-            dessinerSymboleLegende(contexte, i, cx, cy);
+            dessinerSymboleLegende(contexte, symboles.get(i), cx, cy);
             contexte.setFill(COULEUR_TEXTE);
-            contexte.fillText(libelles[i], cx + 16, cy + 4);
+            contexte.fillText(libelles[symboles.get(i)], cx + 16, cy + 4);
         }
+    }
+
+    /** Indique si une tournée affichée parcourt un tronçon plus d'une fois. */
+    private boolean existePassageRepete() {
+        return tournees.values().stream().anyMatch(tournee -> tournee
+                .compterPassagesParTroncon().values().stream()
+                .anyMatch(nombre -> nombre > 1));
+    }
+
+    /** Indique si une tournée affichée a un arrêt hors plage ou après 13 h. */
+    private boolean existeArretTardif() {
+        return tournees.values().stream().anyMatch(tournee -> tournee.arrets()
+                .stream().anyMatch(MapCanvas::estTardif));
     }
 
     /** Dessine le symbole de la ligne i de la légende, centré en (cx, cy). */
@@ -746,13 +842,25 @@ final class MapCanvas extends Pane {
         } else if (i == 2) {
             contexte.setFill(COULEUR_RUE);
             contexte.fillOval(cx - t, cy - t, 2 * t, 2 * t);
-        } else {
+        } else if (i == 3) {
             contexte.setLineCap(StrokeLineCap.ROUND);
             contexte.setLineWidth(4);
             contexte.setStroke(COULEUR_DEBUT_TOURNEE);
             contexte.strokeLine(cx - 8, cy, cx, cy);
             contexte.setStroke(COULEUR_FIN_TOURNEE);
             contexte.strokeLine(cx, cy, cx + 8, cy);
+        } else if (i == 5) {
+            contexte.setFill(COULEUR_FOND_ARRET_TARDIF);
+            contexte.setStroke(COULEUR_ARRET_TARDIF);
+            contexte.setLineWidth(2);
+            contexte.fillOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
+            contexte.strokeOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
+        } else {
+            contexte.setLineCap(StrokeLineCap.ROUND);
+            contexte.setLineWidth(LARGEUR_TOURNEE_REPETEE);
+            contexte.setStroke(COULEUR_FIN_TOURNEE);
+            contexte.strokeLine(cx - 8, cy - 2.5, cx + 8, cy - 2.5);
+            contexte.strokeLine(cx - 8, cy + 2.5, cx + 8, cy + 2.5);
         }
     }
 

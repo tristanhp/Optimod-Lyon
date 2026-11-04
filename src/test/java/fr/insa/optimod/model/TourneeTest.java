@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 
@@ -135,5 +136,29 @@ public class TourneeTest {
         assertTrue(new Arret(A, LocalTime.of(12, 0), LocalTime.of(12, 5),
                 TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
                 arret.finPlage()).estHorsPlage());
+    }
+
+    /** Un tronçon repris dans deux chemins est compté deux fois. */
+    @Test
+    public void tronconReprisDeuxFois() {
+        Troncon allerAB = new Troncon(A, B, 100, "rue A");
+        Troncon allerBE = new Troncon(B, ENTREPOT, 100, "rue B");
+        Troncon retourBA = new Troncon(B, A, 100, "rue A");
+        Tournee tournee = new Tournee(tourneeRevenantA(
+                LocalTime.of(9, 0)).arrets(), List.of(
+                new Chemin(200, List.of(allerAB, allerBE)),
+                new Chemin(200, List.of(allerBE, allerAB, retourBA))));
+        Map<Troncon, Integer> passages = tournee.compterPassagesParTroncon();
+        assertEquals(Integer.valueOf(2), passages.get(allerAB));
+        assertEquals(Integer.valueOf(2), passages.get(allerBE));
+        assertEquals(Integer.valueOf(1), passages.get(retourBA));
+        assertEquals(3, passages.size());
+    }
+
+    /** Une tournée sans chemin n'a aucun tronçon compté. */
+    @Test
+    public void tourneeSansCheminSansPassage() {
+        assertTrue(Tournee.vide(ENTREPOT, LocalTime.of(8, 0))
+                .compterPassagesParTroncon().isEmpty());
     }
 }
