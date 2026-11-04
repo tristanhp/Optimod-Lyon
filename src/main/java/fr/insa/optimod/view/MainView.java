@@ -115,10 +115,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      * @param rang rang de l'arrêt dans la tournée du livreur (0 est le départ
      *        de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
-     * @param horsPlage vrai si l'arrivée sort de la plage annoncée
+     * @param style style de l'arrêt, rouge en cas d'alerte
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
-            boolean horsPlage) {
+            String style) {
     }
 
     /** Lignes de {@link #listeTournee}, dans le même ordre. */
@@ -161,10 +161,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                boolean horsPlage = !vide && getIndex() >= 0
+                String style = !vide && getIndex() >= 0
                         && getIndex() < lignesTournee.size()
-                        && lignesTournee.get(getIndex()).horsPlage();
-                setStyle(horsPlage ? "-fx-text-fill: #c62828;" : "");
+                        ? lignesTournee.get(getIndex()).style() : "";
+                setStyle(style);
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -682,15 +682,16 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
                 lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
-                        false));
+                        ""));
             }
             int rang = 0;
             for (Tournee.Arret arret : entree.getValue().arrets()) {
                 listeTournee.getItems().add(decrireArret(arret));
                 lignesTournee.add(new LigneTournee(livreur, rang++,
-                        dernierRang, arret.estHorsPlage()));
+                        dernierRang, LibellesArrets.style(arret)));
             }
         }
+        listeTournee.refresh();
         carte.afficherTournees(tournees);
         listeTournee.setVisible(true);
         listeTournee.setManaged(true);

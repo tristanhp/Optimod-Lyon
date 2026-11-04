@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<demandeDeLivraisons>
+    <!-- À importer avec petitPlan.xml, avec un seul livreur.
+         Départ à 8 h, 12 h sur place : retour après 20 h hors trajets.
+         Les derniers arrêts dépassent largement 13 h. -->
+    <entrepot adresse="2835339774" heureDepart="8:0:0"/>
+    <livraison adresseEnlevement="1679901320" adresseLivraison="208769457"
+        dureeEnlevement="10800" dureeLivraison="10800"/>
+    <livraison adresseEnlevement="208769120" adresseLivraison="25336179"
+        dureeEnlevement="10800" dureeLivraison="10800"/>
+</demandeDeLivraisons>

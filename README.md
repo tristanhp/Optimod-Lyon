@@ -132,6 +132,10 @@ Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 demandes (`demandePetit1.xml` … `demandeGrand9.xml`), chacun prévu pour le plan
 de même taille.
 
+Pour tester les arrêts rouges après 13 h, importer `petitPlan.xml`, puis
+`demande_trop_importante.xml` et calculer avec un seul livreur : les douze
+heures sur place imposent un retour après 20 h.
+
 1. **Importer le plan** : choisir un fichier de plan. La carte s'affiche
    (tronçons en gris, nœuds en points sombres). Molette pour zoomer,
    glisser pour se déplacer, double-clic pour revenir à la vue d'ensemble.
@@ -143,8 +147,9 @@ de même taille.
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
    inaccessible, un message l'explique ; si un livreur revient après 13 h,
-   sa tournée est affichée quand même, sans message d'erreur (les arrêts en
-   retard seront mis en rouge : TIG-71).
+   sa tournée est affichée quand même, sans message d'erreur. Les arrêts dont
+   l'arrivée dépasse 13 h sont rouges dans la liste et le popup, avec la
+   mention « Après 13 h », même s'ils respectent leur plage annoncée.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées

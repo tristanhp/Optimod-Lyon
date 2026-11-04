@@ -170,7 +170,13 @@ package "controller" {
 package "view" {
   class MainView
   class MapCanvas
-  class LibellesArrets
+  class LibellesArrets {
+    {static} style(arret) : String
+  }
+  note right of LibellesArrets
+    Liste et popup : rouge hors plage
+    ou si l'arrivée dépasse 13 h.
+  end note
   class MapProjection
 }
 
