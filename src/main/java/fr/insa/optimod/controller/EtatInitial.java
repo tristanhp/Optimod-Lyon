@@ -20,6 +20,10 @@ final class EtatInitial implements Etat {
     }
 
     @Override
+    public void erreurDessin(MainController controleur, String detail) {
+    }
+
+    @Override
     public Set<Action> actionsPermises(MainController controleur) {
         return EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER);
     }

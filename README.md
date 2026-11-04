@@ -190,8 +190,17 @@ L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
 Annuler reste disponible. Le bouton Calculer fixe de
 nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
-calcul volontaire. Survoler un arrêt affiche son heure et sa plage annoncée.
-Le support multi-livreurs reste à intégrer.
+calcul volontaire. Le support multi-livreurs reste à intégrer.
+
+Une fois la tournée calculée, elle est tracée sur la carte : le trait est clair
+au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de
+chaque tronçon indique le sens, et les arrêts sont numérotés 1, 2, 3… dans
+l'ordre de passage. Cliquer sur un arrêt (ou le choisir dans la liste de
+droite, les deux sont synchronisés) ouvre un popup avec son type (entrepôt,
+point de collecte, point de livraison), son adresse (noms des rues), ses heures
+d'arrivée et de départ et sa plage annoncée. Si le dessin échoue (plan sans
+nœud ni tronçon, adresse de la tournée absente du plan, exception), un message
+remplace la carte et l'application revient à l'état initial.
 
 Un fichier invalide (XML mal formé, adresse absente du plan, durée négative…)
 ouvre une fenêtre qui explique l'erreur ; rien n'est perdu.

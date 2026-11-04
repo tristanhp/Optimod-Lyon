@@ -163,6 +163,7 @@ package "controller" {
 package "view" {
   class MainView
   class MapCanvas
+  class LibellesArrets
   class MapProjection
 }
 
@@ -212,4 +213,6 @@ MainView ..|> MapScreen
 MainView ..|> Observateur
 MainView *--> "1" MapCanvas
 MapCanvas ..> MapProjection
+MapCanvas ..> LibellesArrets
+MainView ..> LibellesArrets
 @enduml
