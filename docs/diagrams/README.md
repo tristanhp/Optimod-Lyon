@@ -17,6 +17,7 @@ machine).
 | Charger le programme | [sequence-chargement-programme.puml](sequence-chargement-programme.puml) | Séquence |
 | Calculer la tournée | [sequence-calcul-tournee.puml](sequence-calcul-tournee.puml) | Séquence |
 | Ajouter après calcul | [sequence-ajout-demande.puml](sequence-ajout-demande.puml) | Saisie, insertion sans TSP, commande et erreurs |
+| Changer le livreur d'une demande | [sequence-changer-livreur.puml](sequence-changer-livreur.puml) | Retrait, insertion sans TSP, commande et refus |
 
 Règles : les diagrammes qui ne sont pas de séquence contiennent
 `!pragma layout smetana` (rendu identique partout, sans Graphviz) ; on met à

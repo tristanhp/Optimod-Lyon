@@ -22,10 +22,14 @@ MainController -> MainView : saisirDemande
 MainView --> MainController : durées et livreur, ou annulation
 EtatAjoutLivraison -> MainController : ajouterDemande(demande validée)
 MainController -> MainView : choisirPositionInsertion(tournée du livreur)
-MainView --> MainController : intervalle choisi, ou annulation sans mutation
+MainView --> MainController : intervalle, « Moindre coût » ou annulation sans mutation
 MainController -> MainController : EtatCalculEnCours, attente
-MainController -> Plan : insererDemande(tournée, demande, position)
 note right : Exécuteur en arrière-plan.
+opt « Moindre coût » choisi par l'administrateur
+  MainController -> Plan : trouverPositionMoindreCout(tournée, demande)
+  Plan --> MainController : rang de collecte au retour le plus tôt
+end
+MainController -> Plan : insererDemande(tournée, demande, position)
 Plan -> Plan : trois chemins A* entre voisins et nouveaux arrêts
 Plan -> Plan : réutiliser les autres chemins, propager les horaires
 alt insertion possible

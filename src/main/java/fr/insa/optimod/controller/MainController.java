@@ -68,6 +68,13 @@ public final class MainController {
     static final String CONSIGNE_ORDRE_GARDE_LIVREUR = "Livreur %d : ordre non "
             + "optimisé, il n'est peut-être plus le plus court.";
 
+    /**
+     * Consigne après un changement de livreur : les deux tournées touchées
+     * (ancien livreur, puis nouveau) ne viennent plus du voyageur de commerce.
+     */
+    static final String CONSIGNE_ORDRE_GARDE_LIVREURS = "Livreurs %d et %d : "
+            + "ordre non optimisé, il n'est peut-être plus le plus court.";
+
     /** Consigne quand aucun point de collecte ou de livraison est choisi. */
     static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
             + "liste de la tournée, le point de collecte ou de livraison à "
@@ -162,6 +169,8 @@ public final class MainController {
                 etat.changerOrdre(this, livreur, rang, 1));
         ecran.definirActionDeplacerPoint((livreur, rang) ->
                 etat.deplacerPoint(this, livreur, rang));
+        ecran.definirActionChangerLivreur(
+                position -> etat.changerLivreur(this, position));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
@@ -335,7 +344,8 @@ public final class MainController {
         arrierePlan.execute(() -> {
             try {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
-                        demande, position);
+                        demande, positionEffective(planCalcule,
+                                tourneeLivreur, demande, position));
                 interfaceUtilisateur.execute(() -> {
                     ecran.afficherAttente(false);
                     Map<Integer, Tournee> tournees = new TreeMap<>(avant);
@@ -354,6 +364,111 @@ public final class MainController {
                 });
             }
         });
+    }
+
+    /**
+     * Rang de collecte où insérer une demande : celui choisi par
+     * l'administrateur, ou, s'il a choisi l'entrée « Moindre coût », celui que
+     * calcule {@link Plan#trouverPositionMoindreCout}. À appeler hors du thread
+     * de l'interface, car la recherche lance des plus courts chemins.
+     */
+    private static int positionEffective(Plan plan, Tournee tournee,
+            Demande demande, int choix) {
+        return choix == MapScreen.POSITION_MOINDRE_COUT
+                ? plan.trouverPositionMoindreCout(tournee, demande) : choix;
+    }
+
+    /**
+     * Confie une demande à un autre livreur, par une commande annulable.
+     * L'administrateur choisit le livreur, puis la position dans la tournée de
+     * ce livreur (ou « Moindre coût »). Sans choix, rien ne change. Ensuite,
+     * hors du thread de l'interface et actions bloquées
+     * ({@link EtatCalculEnCours}), la demande est retirée de la tournée de
+     * l'ancien livreur ({@link Plan#calculerTourneeSansDemande}) puis insérée
+     * dans celle du nouveau ({@link Plan#insererDemande}), sans relancer le
+     * voyageur de commerce ; les tournées des autres livreurs ne changent pas.
+     * Le résultat est traité sur le thread de l'interface
+     * ({@link #finirChangementLivreur}).
+     *
+     * @param position rang dans le programme de la demande ; une position
+     *        invalide est ignorée, de même que tout appel avec un seul livreur
+     */
+    void changerLivreurDemande(int position) {
+        List<Demande> demandes = programme.obtenirDemandes();
+        int nombreDeLivreurs = programme.obtenirNombreLivreurs();
+        if (position < 0 || position >= demandes.size()
+                || nombreDeLivreurs < 2) {
+            return;
+        }
+        Demande ancienne = demandes.get(position);
+        int livreur = ecran.choisirLivreur(ancienne.livreur(),
+                nombreDeLivreurs).orElse(ancienne.livreur());
+        if (livreur == ancienne.livreur() || livreur < 1
+                || livreur > nombreDeLivreurs) {
+            return;
+        }
+        Map<Integer, Tournee> avant = programme.obtenirTournees();
+        Tournee cible = avant.get(livreur);
+        Integer choix = ecran.choisirPositionInsertion(cible).orElse(null);
+        if (choix == null) {
+            return;
+        }
+        Demande nouvelle = ancienne.avecLivreur(livreur);
+        Plan planCalcule = plan;
+        changerEtat(new EtatCalculEnCours());
+        ecran.afficherAttente(true);
+        arrierePlan.execute(() -> {
+            try {
+                Tournee sans = planCalcule.calculerTourneeSansDemande(
+                        avant.get(ancienne.livreur()), ancienne);
+                Tournee avec = planCalcule.insererDemande(cible, nouvelle,
+                        positionEffective(planCalcule, cible, nouvelle,
+                                choix));
+                Map<Integer, Tournee> apres = new TreeMap<>(avant);
+                apres.put(ancienne.livreur(), sans);
+                apres.put(livreur, avec);
+                interfaceUtilisateur.execute(() -> finirChangementLivreur(
+                        position, ancienne, nouvelle, avant,
+                        Collections.unmodifiableMap(apres), null));
+            } catch (RuntimeException e) {
+                interfaceUtilisateur.execute(() -> finirChangementLivreur(
+                        position, ancienne, nouvelle, avant, null, e));
+            }
+        });
+    }
+
+    /**
+     * Fin du changement de livreur, sur le thread de l'interface. S'il est
+     * refusé (adresse inaccessible, ou retour à l'entrepôt du nouveau livreur
+     * rendu impossible après 13 h), l'écran affiche la raison et rien n'est
+     * modifié, pas même l'historique. Sinon la commande remplace la demande par
+     * la même confiée au nouveau livreur et range les tournées recalculées.
+     *
+     * <p>Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
+     * plus : seul un changement qui rend impossible une tournée possible est
+     * refusé ({@link Plan#insererDemande}).
+     *
+     * @param position rang de la demande dans le programme
+     * @param ancienne la demande chez son ancien livreur
+     * @param nouvelle la demande chez son nouveau livreur
+     * @param avant tournées d'avant le changement
+     * @param apres tournées d'après, ou {@code null} en cas de refus
+     * @param echec cause du refus, ou {@code null}
+     */
+    private void finirChangementLivreur(int position, Demande ancienne,
+            Demande nouvelle, Map<Integer, Tournee> avant,
+            Map<Integer, Tournee> apres, RuntimeException echec) {
+        ecran.afficherAttente(false);
+        if (echec != null) {
+            retrouverEtatProgramme();
+            signalerRefus(echec, ecran::afficherRefusChangementLivreur,
+                    "du changement de livreur");
+            return;
+        }
+        executer(new CommandeChangerLivreur(programme, position, nouvelle,
+                avant, apres));
+        ecran.afficherConsigne(CONSIGNE_ORDRE_GARDE_LIVREURS.formatted(
+                ancienne.livreur(), nouvelle.livreur()));
     }
 
     /** @param detail explication de l'échec du calcul */

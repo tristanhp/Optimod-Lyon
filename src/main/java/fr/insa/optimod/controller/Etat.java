@@ -118,6 +118,16 @@ interface Etat {
     }
 
     /**
+     * Clic sur « Changer de livreur » : confie une demande à un autre livreur.
+     * Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param position rang de la demande sélectionnée dans le programme
+     */
+    default void changerLivreur(MainController controleur, int position) {
+    }
+
+    /**
      * Clic sur une intersection de la carte. Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter
