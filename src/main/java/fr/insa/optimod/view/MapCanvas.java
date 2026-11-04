@@ -1,5 +1,6 @@
 package fr.insa.optimod.view;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -110,6 +111,11 @@ final class MapCanvas extends Pane {
 
     /** Longueur d'écran en dessous de laquelle « ×N » n'est pas écrit. */
     private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
+
+    /** Rouge d'un arrêt hors plage ou après l'heure limite. */
+    private static final Color COULEUR_ARRET_TARDIF = Color.web("#c62828");
+
+    private static final Color COULEUR_FOND_ARRET_TARDIF = Color.web("#fce8e6");
 
     /** Demi-longueur d'une flèche de sens, en pixels. */
     private static final double TAILLE_FLECHE = 5;
@@ -674,17 +680,24 @@ final class MapCanvas extends Pane {
                 boolean selectionne = entree.getKey() == livreurSelectionne
                         && rang == rangSelectionne;
                 double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
+                boolean tardif = estTardif(arrets.get(rang));
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
-                        : Color.WHITE);
-                contexte.setStroke(COULEUR_FIN_TOURNEE);
+                        : tardif ? COULEUR_FOND_ARRET_TARDIF : Color.WHITE);
+                contexte.setStroke(tardif ? COULEUR_ARRET_TARDIF
+                        : COULEUR_FIN_TOURNEE);
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
-                contexte.setFill(Color.BLACK);
+                contexte.setFill(tardif ? COULEUR_ARRET_TARDIF : Color.BLACK);
                 contexte.fillText(String.valueOf(rang), x, y);
             }
         }
         contexte.setTextBaseline(VPos.BASELINE);
+    }
+
+    /** Indique si l'arrivée sort de la plage annoncée ou dépasse 13 h. */
+    private static boolean estTardif(Tournee.Arret arret) {
+        return arret.estHorsPlage() || arret.estApresHeureLimite();
     }
 
     /** Dessine l'aperçu au-dessus des points déjà validés. */
@@ -765,13 +778,21 @@ final class MapCanvas extends Pane {
      * si une tournée est affichée, son tracé (du clair au foncé).
      */
     private void dessinerLegende(GraphicsContext contexte) {
-        boolean avecTournee = !tournees.isEmpty();
         String[] libelles = {"Entrepôt", "Point de collecte",
             "Point de livraison", "Tournée (clair → foncé)",
-            "Tronçon repassé (×N)"};
-        int lignes = !avecTournee ? 3 : existePassageRepete() ? 5 : 4;
-        double largeur = 170;
-        double hauteur = HAUTEUR_LIGNE_LEGENDE * lignes + 8;
+            "Tronçon repassé (×N)", "Arrêt hors plage ou après 13 h"};
+        List<Integer> symboles = new ArrayList<>(List.of(0, 1, 2));
+        if (!tournees.isEmpty()) {
+            symboles.add(3);
+            if (existePassageRepete()) {
+                symboles.add(4);
+            }
+            if (existeArretTardif()) {
+                symboles.add(5);
+            }
+        }
+        double largeur = 210;
+        double hauteur = HAUTEUR_LIGNE_LEGENDE * symboles.size() + 8;
         double gauche = MARGE_LEGENDE;
         double haut = canevas.getHeight() - MARGE_LEGENDE - hauteur;
         contexte.setFill(Color.web("#ffffff", 0.92));
@@ -781,12 +802,12 @@ final class MapCanvas extends Pane {
         contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
         contexte.setFont(Font.getDefault());
         contexte.setTextAlign(TextAlignment.LEFT);
-        for (int i = 0; i < lignes; i++) {
+        for (int i = 0; i < symboles.size(); i++) {
             double cx = gauche + 16;
             double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (i + 0.5);
-            dessinerSymboleLegende(contexte, i, cx, cy);
+            dessinerSymboleLegende(contexte, symboles.get(i), cx, cy);
             contexte.setFill(COULEUR_TEXTE);
-            contexte.fillText(libelles[i], cx + 16, cy + 4);
+            contexte.fillText(libelles[symboles.get(i)], cx + 16, cy + 4);
         }
     }
 
@@ -795,6 +816,12 @@ final class MapCanvas extends Pane {
         return tournees.values().stream().anyMatch(tournee -> tournee
                 .compterPassagesParTroncon().values().stream()
                 .anyMatch(nombre -> nombre > 1));
+    }
+
+    /** Indique si une tournée affichée a un arrêt hors plage ou après 13 h. */
+    private boolean existeArretTardif() {
+        return tournees.values().stream().anyMatch(tournee -> tournee.arrets()
+                .stream().anyMatch(MapCanvas::estTardif));
     }
 
     /** Dessine le symbole de la ligne i de la légende, centré en (cx, cy). */
@@ -822,6 +849,12 @@ final class MapCanvas extends Pane {
             contexte.strokeLine(cx - 8, cy, cx, cy);
             contexte.setStroke(COULEUR_FIN_TOURNEE);
             contexte.strokeLine(cx, cy, cx + 8, cy);
+        } else if (i == 5) {
+            contexte.setFill(COULEUR_FOND_ARRET_TARDIF);
+            contexte.setStroke(COULEUR_ARRET_TARDIF);
+            contexte.setLineWidth(2);
+            contexte.fillOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
+            contexte.strokeOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
         } else {
             contexte.setLineCap(StrokeLineCap.ROUND);
             contexte.setLineWidth(LARGEUR_TOURNEE_REPETEE);
