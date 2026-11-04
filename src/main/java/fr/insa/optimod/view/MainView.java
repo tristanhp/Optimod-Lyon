@@ -77,6 +77,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     private final Button boutonAjouter = new Button("Ajouter une demande");
     private final Button boutonSupprimer = new Button("Supprimer la demande");
+    private final Button boutonChangerLivreur =
+            new Button("Changer de livreur");
     private final Button boutonMonter = new Button("Monter");
     private final Button boutonDescendre = new Button("Descendre");
     private final Button boutonDeplacer = new Button("Déplacer");
@@ -88,6 +90,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
+
+    /** Vrai si l'état du contrôleur permet de changer le livreur. */
+    private boolean changementLivreurPermis;
 
     /** Vrai si l'état du contrôleur permet de changer l'ordre des arrêts. */
     private boolean changementOrdrePermis;
@@ -184,6 +189,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 (observable, ancien, nouveau) -> {
                     carte.mettreEnEvidence(nouveau.intValue());
                     actualiserBoutonSupprimer();
+                    actualiserBoutonChangerLivreur();
                 });
         listeTournee.getSelectionModel().selectedIndexProperty().addListener(
                 (observable, ancien, nouveau) -> {
@@ -209,7 +215,12 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         actualiserBoutonsOrdre();
         VBox.setVgrow(listeDemandes, Priority.ALWAYS);
         boutonSupprimer.setMaxWidth(Double.MAX_VALUE);
-        VBox panneauDemandes = new VBox(4, listeDemandes, boutonSupprimer);
+        boutonChangerLivreur.setMaxWidth(Double.MAX_VALUE);
+        boutonChangerLivreur.setTooltip(new Tooltip("Sélectionnez une demande "
+                + "dans la liste, puis choisissez son nouveau livreur."));
+        actualiserBoutonChangerLivreur();
+        VBox panneauDemandes = new VBox(4, listeDemandes, boutonSupprimer,
+                boutonChangerLivreur);
         panneauDemandes.visibleProperty().bind(listeDemandes.visibleProperty());
         panneauDemandes.managedProperty().bind(listeDemandes.managedProperty());
         effacerDemandes();
@@ -252,6 +263,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonRefaire.setDisable(!actions.contains(Action.REFAIRE));
         suppressionPermise = actions.contains(Action.SUPPRIMER_DEMANDE);
         actualiserBoutonSupprimer();
+        changementLivreurPermis = actions.contains(Action.CHANGER_LIVREUR);
+        actualiserBoutonChangerLivreur();
         changementOrdrePermis = actions.contains(Action.CHANGER_ORDRE);
         actualiserBoutonsOrdre();
         boutonDeplacer.setDisable(!actions.contains(Action.DEPLACER_POINT));
@@ -282,6 +295,47 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void actualiserBoutonSupprimer() {
         boutonSupprimer.setDisable(!suppressionPermise
                 || listeDemandes.getSelectionModel().getSelectedIndex() < 0);
+    }
+
+    /** Changer de livreur : action permise et demande sélectionnée. */
+    private void actualiserBoutonChangerLivreur() {
+        boutonChangerLivreur.setDisable(!changementLivreurPermis
+                || listeDemandes.getSelectionModel().getSelectedIndex() < 0);
+    }
+
+    @Override
+    public void definirActionChangerLivreur(IntConsumer action) {
+        boutonChangerLivreur.setOnAction(event -> action.accept(
+                listeDemandes.getSelectionModel().getSelectedIndex()));
+    }
+
+    @Override
+    public Optional<Integer> choisirLivreur(int livreurActuel,
+            int nombreDeLivreurs) {
+        List<Integer> livreurs = new java.util.ArrayList<>();
+        for (int livreur = 1; livreur <= nombreDeLivreurs; livreur++) {
+            if (livreur != livreurActuel) {
+                livreurs.add(livreur);
+            }
+        }
+        ChoiceDialog<Integer> dialogue = new ChoiceDialog<>(livreurs.get(0),
+                livreurs);
+        dialogue.setTitle("Changer de livreur");
+        dialogue.setHeaderText("La demande est confiée au livreur "
+                + livreurActuel + ".");
+        dialogue.setContentText("Nouveau livreur :");
+        dialogue.initOwner(getScene().getWindow());
+        return dialogue.showAndWait();
+    }
+
+    @Override
+    public void afficherRefusChangementLivreur(String detail) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Changement de livreur impossible");
+        alert.setContentText(detail);
+        alert.initOwner(getScene().getWindow());
+        alert.showAndWait();
     }
 
     @Override
@@ -404,7 +458,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public Optional<Integer> choisirPositionInsertion(Tournee tournee) {
+        // L'entrée « Moindre coût » est la première (indice 0, comme
+        // POSITION_MOINDRE_COUT) ; la position r est à l'indice r.
         List<String> choix = new java.util.ArrayList<>();
+        choix.add("Moindre coût : position calculée par l'application");
         int nombre = Math.max(1, tournee.arrets().size() - 1);
         for (int rang = 0; rang < nombre; rang++) {
             Tournee.Arret avant = tournee.arrets().get(rang);
@@ -415,12 +472,13 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                     + HEURE.format(avant.depart()) + "), avant le nœud "
                     + apres.noeud().identifiant());
         }
-        ChoiceDialog<String> dialogue = new ChoiceDialog<>(choix.get(0), choix);
+        // Sélection par défaut : la première position, pas le moindre coût.
+        ChoiceDialog<String> dialogue = new ChoiceDialog<>(choix.get(1), choix);
         dialogue.setTitle("Position de la demande");
         dialogue.setHeaderText("Insérer la collecte puis la livraison");
         dialogue.setContentText("Entre quels arrêts ?");
         dialogue.initOwner(getScene().getWindow());
-        return dialogue.showAndWait().map(valeur -> choix.indexOf(valeur) + 1);
+        return dialogue.showAndWait().map(choix::indexOf);
     }
 
     public void afficherAttente(boolean enAttente) {

@@ -11,7 +11,8 @@ import fr.insa.optimod.model.Tournee;
  * même demande dont un point a changé de nœud ; l'annulation remet l'ancienne.
  * La commande garde les tournées d'avant et d'après, calculées avant elle :
  * exécuter, annuler ou rétablir ne fait que les ranger dans le programme,
- * sans aucun calcul.
+ * sans aucun calcul, et les observateurs ne sont prévenus qu'une fois, quand
+ * la demande et les tournées sont cohérentes.
  */
 final class CommandeDeplacerPoint implements Commande {
 
@@ -47,14 +48,13 @@ final class CommandeDeplacerPoint implements Commande {
 
     @Override
     public void executer() {
-        avant = programme.remplacerDemande(position, apres);
-        programme.definirTournees(tourneesApres);
+        avant = programme.remplacerDemandeEtTournees(position, apres,
+                tourneesApres);
     }
 
     @Override
     public void annuler() {
-        programme.remplacerDemande(position, avant);
-        programme.definirTournees(tourneesAvant);
+        programme.remplacerDemandeEtTournees(position, avant, tourneesAvant);
     }
 
     @Override

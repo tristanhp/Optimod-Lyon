@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -68,6 +69,12 @@ public class MainControllerTest {
         private String erreurCalcul;
         private String refusOrdre;
         private String refusDeplacement;
+        private IntConsumer actionChangerLivreur;
+        private Optional<Integer> livreurChoisi = Optional.of(2);
+        private int nombreDeChoixDeLivreur;
+        private int livreurActuelPropose;
+        private int nombreDeLivreursProposes;
+        private String refusChangementLivreur;
         private int livreurSelectionne = -1;
         private int arretSelectionne = -1;
         private Optional<SaisieDemande> saisie = Optional.of(
@@ -251,6 +258,26 @@ public class MainControllerTest {
         public void afficherRefusOrdre(String detail) {
             refusOrdre = detail;
             evenements.add("refus");
+        }
+
+        @Override
+        public void definirActionChangerLivreur(IntConsumer action) {
+            actionChangerLivreur = action;
+        }
+
+        @Override
+        public Optional<Integer> choisirLivreur(int livreurActuel,
+                int nombreDeLivreurs) {
+            nombreDeChoixDeLivreur++;
+            livreurActuelPropose = livreurActuel;
+            nombreDeLivreursProposes = nombreDeLivreurs;
+            return livreurChoisi;
+        }
+
+        @Override
+        public void afficherRefusChangementLivreur(String detail) {
+            refusChangementLivreur = detail;
+            evenements.add("refus livreur");
         }
 
         @Override
@@ -2075,5 +2102,381 @@ public class MainControllerTest {
             assertFalse(ecran.actions.contains(Action.ANNULER));
         }
         assertTrue("au moins un retour refusé après 13 h", refus > 0);
+    }
+
+    // --- Changer le livreur d'une demande (TIG-80) ---
+
+    /**
+     * Sur les demandes déjà chargées : deux livreurs, la seconde demande est
+     * confiée au livreur dit, puis les tournées sont calculées (vrai calcul).
+     */
+    private void repartirEtCalculer(int livreurDeLaSeconde) {
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1,
+                demandes().get(1).avecLivreur(livreurDeLaSeconde));
+        ecran.actionCalculer.run();
+    }
+
+    /** Charge les deux demandes, les répartit et calcule les tournées. */
+    private void calculerAvecDeuxLivreurs(int livreurDeLaSeconde)
+            throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        repartirEtCalculer(livreurDeLaSeconde);
+    }
+
+    /** Vérifie que la tournée ne sert que cette demande (et l'entrepôt). */
+    private static void verifierSeulesLesArretsDe(Tournee tournee,
+            Demande demande) {
+        for (Tournee.Arret arret : tournee.arrets()) {
+            assertTrue(arret.demande() == null
+                    || arret.demande().equals(demande));
+        }
+    }
+
+    /**
+     * Changer le livreur d'une demande la retire de la tournée de l'ancien
+     * livreur et l'insère dans celle du nouveau, sans relancer le voyageur de
+     * commerce. Elle garde son rang dans le programme et la consigne nomme les
+     * deux livreurs.
+     */
+    @Test
+    public void changerLivreurRetireChezLAncienEtInsereChezLeNouveau()
+            throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Demande premiere = demandes().get(0);
+        Demande seconde = demandes().get(1);
+        assertEquals(6, tournees().get(1).arrets().size());
+        assertEquals(1, tournees().get(2).arrets().size());
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertEquals(1, ecran.nombreDeChoixDeLivreur);
+        assertEquals(1, ecran.livreurActuelPropose);
+        assertEquals(2, ecran.nombreDeLivreursProposes);
+        assertEquals(List.of(premiere, seconde.avecLivreur(2)), demandes());
+        assertEquals(4, tournees().get(1).arrets().size());
+        assertEquals(4, tournees().get(2).arrets().size());
+        verifierSeulesLesArretsDe(tournees().get(1), premiere);
+        verifierSeulesLesArretsDe(tournees().get(2), seconde.avecLivreur(2));
+        assertEquals(1, nombreDeCalculs);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertFalse(ecran.attente);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE_LIVREURS
+                .formatted(1, 2), ecran.consigne);
+        assertTrue(ecran.actions.contains(Action.ANNULER));
+    }
+
+    /** Donner sa seule demande à un autre livreur laisse une tournée vide. */
+    @Test
+    public void changerLivreurDeLaDerniereDemandeVideLaTournee()
+            throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        ecran.actionChangerLivreur.accept(0);
+        assertEquals(1, tournees().get(1).arrets().size());
+        assertEquals(6, tournees().get(2).arrets().size());
+    }
+
+    /**
+     * Le scénario de la démo : deux demandes passent du livreur 1 au livreur 2
+     * puis Ctrl+Z, deux fois, remet les tournées d'origine ; rétablir les
+     * range de nouveau. Rien n'est recalculé.
+     */
+    @Test
+    public void deuxChangementsPuisDeuxAnnulations() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> origine = tournees();
+
+        ecran.actionChangerLivreur.accept(0);
+        Map<Integer, Tournee> apresLePremier = tournees();
+        ecran.actionChangerLivreur.accept(1);
+        assertEquals(1, tournees().get(1).arrets().size());
+        assertEquals(6, tournees().get(2).arrets().size());
+        assertEquals(2, demandes().get(0).livreur());
+        assertEquals(2, demandes().get(1).livreur());
+
+        ecran.actionAnnuler.run();
+        assertSame(apresLePremier.get(1), tournees().get(1));
+        assertSame(apresLePremier.get(2), tournees().get(2));
+        assertEquals(2, demandes().get(0).livreur());
+        assertEquals(1, demandes().get(1).livreur());
+
+        ecran.actionAnnuler.run();
+        assertSame(origine.get(1), tournees().get(1));
+        assertSame(origine.get(2), tournees().get(2));
+        assertEquals(1, demandes().get(0).livreur());
+        assertEquals(1, demandes().get(1).livreur());
+
+        ecran.actionRefaire.run();
+        ecran.actionRefaire.run();
+        assertEquals(1, tournees().get(1).arrets().size());
+        assertEquals(6, tournees().get(2).arrets().size());
+        assertEquals(2, demandes().get(0).livreur());
+        assertEquals(2, demandes().get(1).livreur());
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * L'entrée « Moindre coût » du dialogue de position insère la demande à la
+     * position qui fait rentrer le livreur le plus tôt : aucune autre position
+     * ne donne un retour plus matinal.
+     */
+    @Test
+    public void changerLivreurAuMoindreCoutInsereALaMeilleurePosition()
+            throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        Tournee cible = tournees().get(2);
+        Demande deplacee = demandes().get(0).avecLivreur(2);
+        ecran.positionInsertion = Optional.of(MapScreen.POSITION_MOINDRE_COUT);
+
+        ecran.actionChangerLivreur.accept(0);
+
+        Plan plan = controleur.obtenirPlan();
+        int position = plan.trouverPositionMoindreCout(cible, deplacee);
+        assertEquals(plan.insererDemande(cible, deplacee, position),
+                tournees().get(2));
+        LocalTime retour = tournees().get(2).obtenirHeureRetour();
+        for (int autre = 1; autre < cible.arrets().size(); autre++) {
+            assertFalse(plan.insererDemande(cible, deplacee, autre)
+                    .obtenirHeureRetour().isBefore(retour));
+        }
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * L'entrée « Moindre coût » sert aussi à l'ajout d'une demande : elle est
+     * insérée à la meilleure position de la tournée du livreur choisi.
+     */
+    @Test
+    public void ajouterAuMoindreCoutInsereALaMeilleurePosition()
+            throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        Tournee cible = tournees().get(2);
+        ecran.positionInsertion = Optional.of(MapScreen.POSITION_MOINDRE_COUT);
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("2", "3", 2));
+
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+
+        Demande ajoutee = demandes().get(2);
+        Plan plan = controleur.obtenirPlan();
+        int position = plan.trouverPositionMoindreCout(cible, ajoutee);
+        assertEquals(plan.insererDemande(cible, ajoutee, position),
+                tournees().get(2));
+        LocalTime retour = tournees().get(2).obtenirHeureRetour();
+        for (int autre = 1; autre < cible.arrets().size(); autre++) {
+            assertFalse(plan.insererDemande(cible, ajoutee, autre)
+                    .obtenirHeureRetour().isBefore(retour));
+        }
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /**
+     * Un changement qui ferait rentrer après 13 h un livreur qui rentrait à
+     * l'heure est refusé avec un message : demandes, tournées et historique ne
+     * changent pas.
+     */
+    @Test
+    public void changerLivreurImpossibleNeChangeRien() throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        Tournee deHuitHeures = tournees().get(2);
+        long secondes = deHuitHeures.arrets().get(0).arrivee().until(
+                deHuitHeures.obtenirHeureRetour(),
+                java.time.temporal.ChronoUnit.SECONDS);
+        importerProgramme(deuxDemandesPartantA(
+                LocalTime.of(13, 0).minusSeconds(secondes)));
+        repartirEtCalculer(2);
+        Map<Integer, Tournee> limite = tournees();
+        assertEquals(LocalTime.of(13, 0), limite.get(2).obtenirHeureRetour());
+        List<Demande> avant = List.copyOf(demandes());
+
+        ecran.actionChangerLivreur.accept(0);
+
+        assertNotNull(ecran.refusChangementLivreur);
+        assertTrue(ecran.refusChangementLivreur.contains("13:00"));
+        assertEquals(avant, demandes());
+        assertSame(limite.get(1), tournees().get(1));
+        assertSame(limite.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Si le recalcul échoue chez l'ancien livreur (sa tournée ne contient pas
+     * la demande), le refus est le même : message affiché, demandes, tournées
+     * et historique intacts. L'insertion chez le nouveau livreur, elle,
+     * réussirait.
+     */
+    @Test
+    public void changerLivreurRefuseSiLeRecalculEchoueChezLAncienLivreur()
+            throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        Map<Integer, Tournee> incoherentes = new TreeMap<>(tournees());
+        incoherentes.put(1, tournees().get(2));
+        programme.definirTournees(incoherentes);
+        List<Demande> avant = List.copyOf(demandes());
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertNotNull(ecran.refusChangementLivreur);
+        assertTrue(ecran.refusChangementLivreur.contains("introuvable"));
+        assertEquals(avant, demandes());
+        assertSame(incoherentes.get(1), tournees().get(1));
+        assertSame(incoherentes.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
+     * plus : seul le changement qui rend impossible une tournée possible est
+     * refusé.
+     */
+    @Test
+    public void changerLivreurVersTourneeDejaEnRetardAccepte()
+            throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        Tournee deHuitHeures = tournees().get(2);
+        long secondes = deHuitHeures.arrets().get(0).arrivee().until(
+                deHuitHeures.obtenirHeureRetour(),
+                java.time.temporal.ChronoUnit.SECONDS);
+        importerProgramme(deuxDemandesPartantA(
+                LocalTime.of(13, 30).minusSeconds(secondes)));
+        repartirEtCalculer(2);
+        assertFalse(tournees().get(2).estPossible());
+
+        ecran.actionChangerLivreur.accept(0);
+
+        assertNull(ecran.refusChangementLivreur);
+        assertEquals(2, demandes().get(0).livreur());
+        assertTrue(controleur.peutAnnuler());
+    }
+
+    /** Annuler le choix du livreur ne change rien, pas même l'historique. */
+    @Test
+    public void annulerLeChoixDuLivreurNeChangeRien() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+        ecran.livreurChoisi = Optional.empty();
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertEquals(1, demandes().get(1).livreur());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Annuler le choix de la position ne change rien non plus. */
+    @Test
+    public void annulerLeChoixDeLaPositionNeChangeRien() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+        ecran.positionInsertion = Optional.empty();
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertEquals(1, demandes().get(1).livreur());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Choisir le livreur qu'a déjà la demande ne change rien. */
+    @Test
+    public void changerVersLeMemeLivreurNeChangeRien() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+        ecran.livreurChoisi = Optional.of(1);
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertSame(avant.get(1), tournees().get(1));
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /** Une demande qui n'existe pas est ignorée, sans ouvrir de dialogue. */
+    @Test
+    public void changerLivreurPositionInvalideIgnoree() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+
+        ecran.actionChangerLivreur.accept(-1);
+        ecran.actionChangerLivreur.accept(2);
+
+        assertEquals(0, ecran.nombreDeChoixDeLivreur);
+        assertSame(avant.get(1), tournees().get(1));
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /**
+     * Le recalcul des deux tournées tourne hors du thread de l'interface :
+     * l'attente est affichée et les actions sont bloquées jusqu'au résultat.
+     */
+    @Test
+    public void changerLivreurSeFaitHorsDuThreadInterface() throws Exception {
+        utiliserLeVraiCalculEnArrierePlan();
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        Map<Integer, Tournee> avant = tournees();
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
+        assertTrue(ecran.attente);
+        assertEquals(1, demandes().get(1).livreur());
+        assertSame(avant.get(1), tournees().get(1));
+        assertEquals(1, arrierePlan.size());
+
+        executerArrierePlan();
+
+        assertFalse(ecran.attente);
+        assertEquals(2, demandes().get(1).livreur());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Avant le calcul des tournées, l'action est ignorée et inactive. */
+    @Test
+    public void changerLivreurIgnoreHorsTourneeCalculee() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        ecran.actionChangerLivreur.accept(0);
+        assertEquals(0, ecran.nombreDeChoixDeLivreur);
+        assertEquals(1, demandes().get(0).livreur());
+        assertFalse(ecran.actions.contains(Action.CHANGER_LIVREUR));
+    }
+
+    /**
+     * Avec un seul livreur, il n'y a personne à qui confier la demande : le
+     * bouton est inactif, et l'action ignorée si elle arrive quand même.
+     */
+    @Test
+    public void changerLivreurInactifAvecUnSeulLivreur() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        Tournee avant = tournees().get(1);
+
+        assertFalse(ecran.actions.contains(Action.CHANGER_LIVREUR));
+        ecran.actionChangerLivreur.accept(0);
+
+        assertEquals(0, ecran.nombreDeChoixDeLivreur);
+        assertSame(avant, tournees().get(1));
+    }
+
+    /** Avec plusieurs livreurs, l'action est permise après le calcul. */
+    @Test
+    public void changerLivreurActifAvecPlusieursLivreurs() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        assertTrue(ecran.actions.contains(Action.CHANGER_LIVREUR));
     }
 }

@@ -616,7 +616,108 @@ public class PlanTest {
                 plan.obtenirNoeud(2), 60, 60), 1);
     }
 
+    /**
+     * Dans une tournée vide, le retour à l'entrepôt a sa propre plage annoncée
+     * (une heure de part et d'autre de son arrivée) : il n'hérite pas de celle
+     * du départ, sinon un retour tardif serait signalé hors plage à tort.
+     */
+    @Test
+    public void insertionDansTourneeVideNeSignalePasLeRetourHorsPlage()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee vide = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(plan.obtenirNoeud(1)), List.of(0));
+        Tournee apres = plan.insererDemande(vide, new Demande(
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2), 7200, 60), 1);
+        Tournee.Arret retour = apres.arrets().get(3);
+        assertTrue(retour.arrivee().isAfter(LocalTime.of(10, 0)));
+        assertFalse(retour.estHorsPlage());
+    }
 
+    // --- Position d'insertion au moindre coût ---
+
+    /** Tournée 1, 3, 2, 1 du petit réseau : collecte en 3, livraison en 2. */
+    private static Tournee tourneeDeTroisNoeuds(Plan plan) {
+        Noeud entrepot = plan.obtenirNoeud(1);
+        return tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(entrepot, plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                        entrepot),
+                List.of(0, 60, 60, 0));
+    }
+
+    /**
+     * Calculé à la main sur le petit réseau : insérer une collecte en 3 et une
+     * livraison en 2 entre les arrêts 3 et 2 ne rallonge pas le parcours, alors
+     * que les deux autres positions ajoutent 549,6 m. La position trouvée est
+     * celle qui donne le retour le plus tôt parmi toutes les positions.
+     */
+    @Test
+    public void moindreCoutChoisitLeRetourLePlusTot() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeDeTroisNoeuds(plan);
+        Demande demande = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 120, 120);
+        int position = plan.trouverPositionMoindreCout(avant, demande);
+        assertEquals(2, position);
+        LocalTime retour = plan.insererDemande(avant, demande, position)
+                .obtenirHeureRetour();
+        for (int autre = 1; autre < avant.arrets().size(); autre++) {
+            assertFalse(plan.insererDemande(avant, demande, autre)
+                    .obtenirHeureRetour().isBefore(retour));
+        }
+    }
+
+    /**
+     * Une demande dont les deux adresses sont celle de l'entrepôt coûte la même
+     * chose au début et à la fin de la tournée : c'est la première position
+     * qui est gardée.
+     */
+    @Test
+    public void moindreCoutGardeLaPremierePositionEnCasDEgalite()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeDeTroisNoeuds(plan);
+        Demande demande = new Demande(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(1), 60, 60);
+        assertEquals(
+                plan.insererDemande(avant, demande, 1).obtenirHeureRetour(),
+                plan.insererDemande(avant, demande, 3).obtenirHeureRetour());
+        assertEquals(1, plan.trouverPositionMoindreCout(avant, demande));
+    }
+
+    /** Dans une tournée vide, la seule position est la première. */
+    @Test
+    public void moindreCoutDansTourneeVideDonneLaPosition1() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee vide = tourneeImposee(plan, LocalTime.of(8, 0),
+                List.of(plan.obtenirNoeud(1)), List.of(0));
+        assertEquals(1, plan.trouverPositionMoindreCout(vide, new Demande(
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60, 60)));
+    }
+
+    /** Une adresse inaccessible n'a aucune position : demande refusée. */
+    @Test
+    public void moindreCoutSansPositionAccessibleLeveException()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeDeTroisNoeuds(plan);
+        Demande demande = new Demande(plan.obtenirNoeud(4),
+                plan.obtenirNoeud(2), 60, 60);
+        assertThrows(IllegalStateException.class,
+                () -> plan.trouverPositionMoindreCout(avant, demande));
+    }
+
+    /** Chercher la position ne lance pas le voyageur de commerce. */
+    @Test
+    public void moindreCoutNeLancePasLeVoyageurDeCommerce() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee tournee = premiereTournee(plan,
+                programme(plan, LocalTime.of(8, 0), 3, 2));
+        int memorises = plan.nombreOrdresMemorises();
+        plan.trouverPositionMoindreCout(tournee, new Demande(
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60, 60));
+        assertEquals(memorises, plan.nombreOrdresMemorises());
+    }
 
     // --- Mémoire de l'ordre de passage du voyageur de commerce ---
 

@@ -11,6 +11,7 @@ EtatProgrammeCharge : Restaurer
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
+EtatTourneeCalculee : + Changer de livreur [plusieurs livreurs]
 EtatRestauration : boutons : aucun
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
@@ -56,6 +57,10 @@ EtatDeplacementPoint --> EtatCalculEnCours : cliquerNoeud [autre adresse]
 EtatCalculEnCours --> choix : fin du déplacement / CommandeDeplacerPoint
 EtatCalculEnCours --> choix : fin du déplacement [refusé]
 EtatDeplacementPoint --> choix : deplacerPoint (annule le déplacement)
+
+EtatTourneeCalculee --> EtatCalculEnCours : changerLivreur [livreur et position choisis]
+EtatCalculEnCours --> choix : fin du changement de livreur / CommandeChangerLivreur
+EtatCalculEnCours --> choix : fin du changement de livreur [refusé]
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]

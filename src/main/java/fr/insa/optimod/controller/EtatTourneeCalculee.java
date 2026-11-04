@@ -53,6 +53,16 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         controleur.choisirPointADeplacer(livreur, rang);
     }
 
+    /**
+     * Confie une demande à un autre livreur : le contrôleur fait choisir le
+     * livreur et la position, puis recalcule les deux tournées localement,
+     * hors du thread de l'interface, avant d'exécuter la commande.
+     */
+    @Override
+    public void changerLivreur(MainController controleur, int position) {
+        controleur.changerLivreurDemande(position);
+    }
+
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
@@ -61,6 +71,9 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
         actions.add(Action.SAUVEGARDER);
+        if (controleur.obtenirProgramme().obtenirNombreLivreurs() > 1) {
+            actions.add(Action.CHANGER_LIVREUR);
+        }
         return actions;
     }
 }

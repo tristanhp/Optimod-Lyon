@@ -15,6 +15,7 @@ package "model" {
     +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
     +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
     +insererDemande(tournee, demande, position) : Tournee
+    +trouverPositionMoindreCout(tournee, demande) : int
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     +calculerTourneeAvecPointDeplace(tournee : Tournee, rang : int, nouveau : Noeud) : Tournee
@@ -65,6 +66,7 @@ package "model" {
     +ajouterDemande(position : int, demande : Demande)
     +retirerDemande(position : int) : Demande
     +remplacerDemande(position : int, demande : Demande)
+    +remplacerDemandeEtTournees(position : int, demande : Demande, tournees : Map<Integer, Tournee>)
     +obtenirNombreLivreurs() : int
     +definirNombreLivreurs(nombre : int)
     +obtenirTournees() : Map<Integer, Tournee>
@@ -121,13 +123,17 @@ package "controller" {
     ~rangerTournees(tournees : Map<Integer, Tournee>)
     ~supprimerDemandeEnGardantLOrdre(position : int)
     ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
+    ~changerLivreurDemande(position : int)
     ~choisirPointADeplacer(livreur : int, rang : int)
     ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
   interface MapScreen {
     +saisirDemande() : Optional<SaisieDemande>
     +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
+    +{static} POSITION_MOINDRE_COUT : int = 0
     +choisirPositionInsertion(tournee) : Optional<Integer>
+    +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
+    +afficherRefusChangementLivreur(detail)
     +signalerArretsHorsPlage(arrets)
   }
   class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
@@ -158,6 +164,7 @@ package "controller" {
   class CommandeSupprimerDemande
   class CommandeChangerOrdre
   class CommandeDeplacerPoint
+  class CommandeChangerLivreur
 }
 
 package "view" {
@@ -208,6 +215,7 @@ CommandeAjouterDemande ..|> Commande
 CommandeSupprimerDemande ..|> Commande
 CommandeChangerOrdre ..|> Commande
 CommandeDeplacerPoint ..|> Commande
+CommandeChangerLivreur ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur

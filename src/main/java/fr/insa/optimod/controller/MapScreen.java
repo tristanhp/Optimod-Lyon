@@ -63,9 +63,20 @@ public interface MapScreen {
     void afficherPointsProvisoires(Noeud collecte, Noeud livraison);
 
     /**
-     * Fait choisir l'intervalle où insérer collecte puis livraison.
+     * Valeur renvoyée par {@link #choisirPositionInsertion} quand
+     * l'administrateur choisit l'entrée « Moindre coût » : le contrôleur
+     * cherche alors la position qui fait rentrer le livreur le plus tôt. Les
+     * vraies positions commencent à 1.
+     */
+    int POSITION_MOINDRE_COUT = 0;
+
+    /**
+     * Fait choisir l'intervalle où insérer collecte puis livraison, ou
+     * l'entrée « Moindre coût » qui laisse l'application proposer la position
+     * (rien n'est calculé tant que l'administrateur ne la choisit pas).
      * @param tournee arrêts existants dans leur ordre de passage
-     * @return rang de collecte (à partir de 1), ou vide après annulation
+     * @return rang de collecte (à partir de 1), {@link #POSITION_MOINDRE_COUT},
+     *         ou vide après annulation
      */
     Optional<Integer> choisirPositionInsertion(Tournee tournee);
 
@@ -91,6 +102,8 @@ public interface MapScreen {
         CHANGER_ORDRE,
         /** Bouton « Déplacer » (ou annuler le déplacement en cours). */
         DEPLACER_POINT,
+        /** Bouton « Changer de livreur » (demande sélectionnée). */
+        CHANGER_LIVREUR,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -214,6 +227,34 @@ public interface MapScreen {
      *        si aucun arrêt n'est sélectionné
      */
     void definirActionDeplacerPoint(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Changer de livreur » (confier la demande
+     * sélectionnée dans la liste des demandes à un autre livreur).
+     *
+     * @param action reçoit le rang de la demande sélectionnée dans le
+     *        programme, ou {@code -1} si aucune n'est sélectionnée
+     */
+    void definirActionChangerLivreur(IntConsumer action);
+
+    /**
+     * Fait choisir à quel livreur confier une demande.
+     *
+     * @param livreurActuel numéro du livreur qui a la demande, à ne pas
+     *        proposer
+     * @param nombreDeLivreurs nombre de livreurs (numérotés à partir de 1)
+     * @return numéro du livreur choisi, ou vide après annulation
+     */
+    Optional<Integer> choisirLivreur(int livreurActuel, int nombreDeLivreurs);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement de livreur est refusé
+     * (adresse inaccessible, retour après 13 h) ; les demandes et les tournées
+     * n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusChangementLivreur(String detail);
 
     /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.

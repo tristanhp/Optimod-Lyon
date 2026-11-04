@@ -362,19 +362,51 @@ public final class ProgrammeLivraisons extends Observable {
      *         une tournée de livreur
      */
     public void definirTournees(Map<Integer, Tournee> nouvellesTournees) {
-        if (!nouvellesTournees.isEmpty()) {
-            boolean complet = nouvellesTournees.size() == nombreLivreurs;
-            for (int livreur = 1; livreur <= nombreLivreurs; livreur++) {
-                complet &= nouvellesTournees.get(livreur) != null;
-            }
-            if (!complet) {
-                throw new IllegalArgumentException("Il faut une tournée par "
-                        + "livreur, de 1 à " + nombreLivreurs + ".");
-            }
-        }
+        verifierTournees(nouvellesTournees);
         tournees.clear();
         tournees.putAll(nouvellesTournees);
         notifierObservateurs();
+    }
+
+    /**
+     * Remplace une demande (par exemple pour la confier à un autre livreur)
+     * et range les tournées qui vont avec, en ne prévenant les observateurs
+     * qu'<b>une fois</b>, quand les demandes et les tournées sont cohérentes.
+     * Si la demande ou les tournées sont refusées, rien n'est modifié.
+     *
+     * @param position rang de la demande à remplacer
+     * @param demande nouvelle demande
+     * @param nouvellesTournees une tournée par livreur, de 1 au nombre de
+     *        livreurs, ou aucune
+     * @return la demande remplacée
+     * @throws IndexOutOfBoundsException si la position est hors de la liste
+     * @throws IllegalArgumentException si le livreur de la demande n'existe
+     *         pas, ou s'il manque ou s'il y a en trop une tournée de livreur
+     */
+    public Demande remplacerDemandeEtTournees(int position, Demande demande,
+            Map<Integer, Tournee> nouvellesTournees) {
+        Objects.checkIndex(position, demandes.size());
+        verifierLivreur(demande);
+        verifierTournees(nouvellesTournees);
+        Demande remplacee = demandes.set(position, demande);
+        tournees.clear();
+        tournees.putAll(nouvellesTournees);
+        notifierObservateurs();
+        return remplacee;
+    }
+
+    private void verifierTournees(Map<Integer, Tournee> nouvellesTournees) {
+        if (nouvellesTournees.isEmpty()) {
+            return;
+        }
+        boolean complet = nouvellesTournees.size() == nombreLivreurs;
+        for (int livreur = 1; livreur <= nombreLivreurs; livreur++) {
+            complet &= nouvellesTournees.get(livreur) != null;
+        }
+        if (!complet) {
+            throw new IllegalArgumentException("Il faut une tournée par "
+                    + "livreur, de 1 à " + nombreLivreurs + ".");
+        }
     }
 
     /**

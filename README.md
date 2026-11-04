@@ -37,6 +37,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Saisir les durées et insérer une demande sans relancer le TSP | fait |
 | Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
 | Déplacer un point de collecte ou de livraison | fait |
+| Changer le livreur d'une demande (annulable) | fait |
 | Régler le nombre de livreurs | à faire |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
@@ -175,6 +176,15 @@ de même taille.
      seule la tournée de son livreur change. Si la tournée devient impossible
      (adresse inaccessible, ou retour après 13 h pour une tournée qui rentrait
      à l'heure), une fenêtre explique le refus et rien ne change ;
+   - *Changer de livreur* : sélectionner une demande dans la liste de gauche,
+     cliquer sur le bouton sous la liste, choisir le nouveau livreur, puis
+     l'endroit de sa tournée où insérer la demande (voir plus bas). La demande
+     quitte la tournée de son ancien livreur, qui garde l'ordre de ses autres
+     arrêts, et entre dans celle du nouveau, sans relancer le TSP ; les autres
+     tournées ne changent pas. Si le nouveau livreur, qui rentrait à l'heure,
+     rentrerait après 13 h, ou si une adresse est inaccessible, une fenêtre
+     explique le refus et rien ne change. Le bouton n'est actif que s'il y a
+     plusieurs livreurs (le réglage de leur nombre reste à faire, TIG-55) ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.
@@ -184,6 +194,11 @@ arrêts insérer la demande. La collecte puis la livraison sont insérées
 consécutivement à cette position, sans modifier l'ordre des anciens arrêts
 et sans relancer le TSP. Seuls les trois trajets reliant les voisins à la
 nouvelle demande sont recalculés. Annuler ce choix ne modifie rien.
+La première entrée du dialogue, *Moindre coût*, laisse l'application proposer
+la position qui fait rentrer le livreur le plus tôt (collecte et livraison
+côte à côte) : l'administrateur garde la main, le calcul n'a lieu que s'il
+choisit cette entrée, et Annuler le défait. Le même dialogue sert à l'ajout
+d'une demande et au changement de livreur.
 Un ajout impossible avant 13 h est refusé sans modifier le programme.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les

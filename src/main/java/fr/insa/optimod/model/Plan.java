@@ -368,7 +368,8 @@ public final class Plan {
     public Tournee insererDemande(Tournee tournee, Demande demande,
             int position) {
         List<Tournee.Arret> anciens = new ArrayList<>(tournee.arrets());
-        if (anciens.size() == 1) {
+        boolean tourneeVide = anciens.size() == 1;
+        if (tourneeVide) {
             anciens.add(anciens.get(0));
         }
         if (position < 1 || position >= anciens.size()) {
@@ -408,6 +409,9 @@ public final class Plan {
                 sommets, chemins, ordre);
         List<Tournee.Arret> arrets = new ArrayList<>(candidate.arrets());
         for (int rang = 0; rang < anciens.size(); rang++) {
+            if (tourneeVide && rang == 1) {
+                continue; // retour ajouté plus haut : il garde sa plage
+            }
             int nouveauRang = rang < position ? rang : rang + 2;
             Tournee.Arret nouveau = arrets.get(nouveauRang);
             Tournee.Arret ancien = anciens.get(rang);
@@ -423,6 +427,69 @@ public final class Plan {
                     + ", après " + HEURE_LIMITE_RETOUR + ".");
         }
         return apres;
+    }
+
+    /**
+     * Cherche la position où insérer une demande pour que le livreur rentre à
+     * l'entrepôt le plus tôt : la collecte puis la livraison sont placées l'une
+     * après l'autre, comme le fait {@link #insererDemande}. C'est une aide à la
+     * décision : rien n'est inséré, et l'administrateur reste libre de choisir
+     * une autre position.
+     *
+     * <p>Les durées sur place sont les mêmes à toute position : seul compte le
+     * temps de trajet ajouté, c'est-à-dire les deux trajets qui entourent la
+     * demande moins le trajet direct qu'ils remplacent (repris de la tournée).
+     * Le voyageur de commerce n'est pas lancé. En cas d'égalité, la première
+     * position est gardée. La règle des 13 h n'est pas vérifiée ici, mais par
+     * {@link #insererDemande}.
+     *
+     * @param tournee tournée actuelle d'un livreur, jamais modifiée
+     * @param demande demande à insérer
+     * @return rang de collecte, entre 1 et le rang du retour inclus (valide
+     *         pour {@link #insererDemande})
+     * @throws IllegalStateException si aucune position n'est accessible
+     */
+    public int trouverPositionMoindreCout(Tournee tournee, Demande demande) {
+        List<Tournee.Arret> arrets = tournee.arrets();
+        if (!plusCourtChemin(demande.collecte(), demande.livraison())
+                .estAccessible()) {
+            throw new IllegalStateException("La livraison (nœud "
+                    + demande.livraison().identifiant() + ") est inaccessible "
+                    + "depuis la collecte (nœud "
+                    + demande.collecte().identifiant() + ").");
+        }
+        int meilleurePosition = -1;
+        long meilleurAjout = Long.MAX_VALUE;
+        for (int position = 1; position <= Math.max(1, arrets.size() - 1);
+                position++) {
+            Noeud precedent = arrets.get(position - 1).noeud();
+            Noeud suivant = arrets.get(Math.min(position,
+                    arrets.size() - 1)).noeud();
+            Chemin allee = plusCourtChemin(precedent, demande.collecte());
+            Chemin retour = plusCourtChemin(demande.livraison(), suivant);
+            if (!allee.estAccessible() || !retour.estAccessible()) {
+                continue;
+            }
+            // Trajet direct remplacé : celui de la tournée, nul si elle est
+            // vide.
+            long direct = arrets.size() == 1 ? 0
+                    : secondesDeTrajet(tournee.chemins().get(position - 1)
+                            .longueur());
+            long ajout = secondesDeTrajet(allee.longueur())
+                    + secondesDeTrajet(retour.longueur()) - direct;
+            if (ajout < meilleurAjout) {
+                meilleurAjout = ajout;
+                meilleurePosition = position;
+            }
+        }
+        if (meilleurePosition < 0) {
+            throw new IllegalStateException("Aucune position possible : la "
+                    + "collecte (nœud " + demande.collecte().identifiant()
+                    + ") ou la livraison (nœud "
+                    + demande.livraison().identifiant() + ") est "
+                    + "inaccessible depuis cette tournée.");
+        }
+        return meilleurePosition;
     }
 
     /**

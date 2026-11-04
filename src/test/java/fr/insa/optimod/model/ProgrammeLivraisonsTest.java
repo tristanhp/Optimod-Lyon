@@ -282,6 +282,57 @@ public class ProgrammeLivraisonsTest {
         assertEquals(List.of(1), appels);
     }
 
+    /**
+     * Remplacer une demande et ranger les tournées d'un coup ne prévient les
+     * observateurs qu'une fois, avec la demande et les tournées déjà à jour.
+     */
+    @Test
+    public void remplacerDemandeEtTourneesNotifieUneSeuleFois() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        Demande demande = new Demande(A, B, 0, 0);
+        programme.ajouterDemande(0, demande);
+        Map<Integer, Tournee> tournees = tourneesVides(2);
+        List<String> vues = new ArrayList<>();
+        programme.ajouterObservateur(source -> vues.add(
+                ((ProgrammeLivraisons) source).obtenirDemandes().get(0)
+                        .livreur() + "/"
+                        + ((ProgrammeLivraisons) source).obtenirTournees()
+                                .size()));
+        Demande remplacee = programme.remplacerDemandeEtTournees(0,
+                demande.avecLivreur(2), tournees);
+        assertSame(demande, remplacee);
+        assertEquals(List.of("2/2"), vues);
+        assertSame(tournees.get(2), programme.obtenirTournees().get(2));
+    }
+
+    /**
+     * Un refus (livreur inconnu, tournées incomplètes) ne change ni les
+     * demandes ni les tournées, et ne prévient personne.
+     */
+    @Test
+    public void remplacerDemandeEtTourneesRefuseNeChangeRien() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        Demande demande = new Demande(A, B, 0, 0);
+        programme.ajouterDemande(0, demande);
+        Map<Integer, Tournee> avant = tourneesVides(2);
+        programme.definirTournees(avant);
+        List<Integer> appels = new ArrayList<>();
+        programme.ajouterObservateur(source -> appels.add(1));
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.remplacerDemandeEtTournees(0,
+                        demande.avecLivreur(3), tourneesVides(2)));
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.remplacerDemandeEtTournees(0,
+                        demande.avecLivreur(2), tourneesVides(1)));
+        assertThrows(IndexOutOfBoundsException.class,
+                () -> programme.remplacerDemandeEtTournees(1,
+                        demande.avecLivreur(2), tourneesVides(2)));
+        assertEquals(List.of(demande), programme.obtenirDemandes());
+        assertSame(avant.get(1), programme.obtenirTournees().get(1));
+        assertSame(avant.get(2), programme.obtenirTournees().get(2));
+        assertEquals(List.of(), appels);
+    }
+
     /** Les tournées rangées sont relues par livreur et notifiées. */
     @Test
     public void tourneesRangeesParLivreur() {
