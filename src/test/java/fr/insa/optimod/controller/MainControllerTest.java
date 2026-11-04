@@ -40,6 +40,10 @@ import fr.insa.optimod.model.Tournee.TypeArret;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 
+/**
+ * Tests de {@link MainController} avec un faux écran, des exécuteurs
+ * synchrones et un calcul factice ou réel.
+ */
 public class MainControllerTest {
 
     /** Écran factice qui enregistre ce que le contrôleur lui demande. */
@@ -355,6 +359,7 @@ public class MainControllerTest {
     /** Nombre de calculs complets (voyageur de commerce) lancés. */
     private int nombreDeCalculs;
 
+    /** Crée le faux écran et le contrôleur avant chaque test. */
     @Before
     public void creer() {
         ecran = new EcranFactice();
@@ -473,6 +478,7 @@ public class MainControllerTest {
 
     // --- État initial ---
 
+    /** Le contrôleur branche les actions des boutons d'import et de calcul. */
     @Test
     public void brancheLesBoutons() {
         assertNotNull(ecran.actionImportPlan);
@@ -480,6 +486,7 @@ public class MainControllerTest {
         assertNotNull(ecran.actionCalculer);
     }
 
+    /** Au départ seul l'import du plan est possible. */
     @Test
     public void auDepartSeulLImportDuPlanEstPossible() {
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
@@ -489,6 +496,7 @@ public class MainControllerTest {
         assertTrue(ecran.evenements.isEmpty());
     }
 
+    /** Programme sans plan ignoré. */
     @Test
     public void programmeSansPlanIgnore() {
         ecran.actionImportLivraison.run();
@@ -500,6 +508,7 @@ public class MainControllerTest {
 
     // --- Import du plan ---
 
+    /** Après l'import d'un plan valide, l'écran affiche ce plan. */
     @Test
     public void afficheLePlanImporte() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
@@ -511,6 +520,7 @@ public class MainControllerTest {
                 Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
+    /** Plan invalide ouvre la fenêtre et vide la page. */
     @Test
     public void planInvalideOuvreLaFenetreEtVideLaPage() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
@@ -522,6 +532,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
     }
 
+    /** Annuler l'import du plan ne change rien. */
     @Test
     public void annulerLImportDuPlanNeChangeRien() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
@@ -531,6 +542,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
     }
 
+    /** Nouveau plan oublie la livraison. */
     @Test
     public void nouveauPlanOublieLaLivraison() throws Exception {
         chargerPlanEtLivraison();
@@ -541,6 +553,7 @@ public class MainControllerTest {
                 Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
+    /** Plan invalide oublie la livraison. */
     @Test
     public void planInvalideOublieLaLivraison() throws Exception {
         chargerPlanEtLivraison();
@@ -600,6 +613,7 @@ public class MainControllerTest {
 
     // --- Import des demandes ---
 
+    /** Importe les demandes et active le calcul. */
     @Test
     public void importeLesDemandesEtActiveLeCalcul() throws Exception {
         importerPlan(ressource("/data/petitPlan.xml"));
@@ -613,6 +627,7 @@ public class MainControllerTest {
         assertEquals(MODIFIABLE, ecran.actions);
     }
 
+    /** Programme hors plan refusé. */
     @Test
     public void programmeHorsPlanRefuse() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
@@ -623,6 +638,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
     }
 
+    /** Programme invalide conserve le précédent. */
     @Test
     public void programmeInvalideConserveLePrecedent() throws Exception {
         chargerPlanEtLivraison();
@@ -634,6 +650,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 
+    /** Annuler l'import des demandes les conserve. */
     @Test
     public void annulerLImportDesDemandesLesConserve() throws Exception {
         chargerPlanEtLivraison();
@@ -645,6 +662,7 @@ public class MainControllerTest {
 
     // --- Calcul de la tournée ---
 
+    /** Calculer sans demandes ne lance rien. */
     @Test
     public void calculerSansDemandesNeLanceRien() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
@@ -653,6 +671,7 @@ public class MainControllerTest {
         assertEquals(List.of("plan"), ecran.evenements);
     }
 
+    /** Calcul bloque toutes les actions. */
     @Test
     public void calculBloqueToutesLesActions() throws Exception {
         chargerPlanEtLivraison();
@@ -678,6 +697,7 @@ public class MainControllerTest {
         assertEquals(MODIFIABLE_AVEC_TOURNEE, ecran.actions);
     }
 
+    /** Un second clic pendant le calcul est ignoré. */
     @Test
     public void unSecondClicPendantLeCalculEstIgnore() throws Exception {
         chargerPlanEtLivraison();
@@ -686,6 +706,7 @@ public class MainControllerTest {
         assertEquals(1, arrierePlan.size());
     }
 
+    /** Imports ignorés pendant le calcul. */
     @Test
     public void importsIgnoresPendantLeCalcul() throws Exception {
         chargerPlanEtLivraison();
@@ -700,6 +721,7 @@ public class MainControllerTest {
         assertSame(TOURNEE, tournees().get(1));
     }
 
+    /** Erreur de calcul affiche l'erreur. */
     @Test
     public void erreurDeCalculAfficheLErreur() throws Exception {
         erreurDeCalcul = new IllegalStateException("Tournée impossible");
@@ -714,6 +736,7 @@ public class MainControllerTest {
         assertEquals(MODIFIABLE, ecran.actions);
     }
 
+    /** Erreur sans message affiche le type de l'erreur. */
     @Test
     public void erreurSansMessageAfficheLeTypeDeLErreur() throws Exception {
         erreurDeCalcul = new IllegalStateException();
@@ -723,6 +746,9 @@ public class MainControllerTest {
         assertEquals("IllegalStateException", ecran.erreurCalcul);
     }
 
+    /**
+     * Calculer de nouveau après une tournée relance un calcul en arrière-plan.
+     */
     @Test
     public void recalculerApresUneTournee() throws Exception {
         chargerPlanEtLivraison();
@@ -733,6 +759,7 @@ public class MainControllerTest {
         assertEquals(1, arrierePlan.size());
     }
 
+    /** Contrôleur par defaut calcule la tournée avec le plan. */
     @Test
     public void controleurParDefautCalculeLaTourneeAvecLePlan()
             throws Exception {
@@ -746,6 +773,10 @@ public class MainControllerTest {
 
     // --- Modification des demandes (design pattern Command) ---
 
+    /**
+     * Le contrôleur branche les actions de modification, d'annulation et de
+     * clic sur la carte.
+     */
     @Test
     public void brancheLesBoutonsDeModification() {
         assertNotNull(ecran.actionAjouter);
@@ -755,6 +786,7 @@ public class MainControllerTest {
         assertNotNull(ecran.actionClicNoeud);
     }
 
+    /** Supprimer puis annuler et rétablir. */
     @Test
     public void supprimerPuisAnnulerEtRetablir() throws Exception {
         chargerDeuxDemandes();
@@ -776,6 +808,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
     }
 
+    /** Supprimer une position invalide est ignoré. */
     @Test
     public void supprimerUnePositionInvalideEstIgnore() throws Exception {
         chargerDeuxDemandes();
@@ -785,6 +818,7 @@ public class MainControllerTest {
         assertEquals(MODIFIABLE, ecran.actions);
     }
 
+    /** Annuler sans historique est ignoré. */
     @Test
     public void annulerSansHistoriqueEstIgnore() throws Exception {
         chargerDeuxDemandes();
@@ -820,6 +854,7 @@ public class MainControllerTest {
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
     }
 
+    /** Rétablir retrouve la tournée recalculée. */
     @Test
     public void retablirRetrouveLaTourneeRecalculee() throws Exception {
         chargerDeuxDemandes();
@@ -888,6 +923,7 @@ public class MainControllerTest {
         assertNull(ecran.erreurCalcul);
     }
 
+    /** Modifications bloquées pendant le calcul. */
     @Test
     public void modificationsBloqueesPendantLeCalcul() throws Exception {
         chargerDeuxDemandes();
@@ -900,6 +936,7 @@ public class MainControllerTest {
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
     }
 
+    /** Nouvelles demandes oublient l'historique. */
     @Test
     public void nouvellesDemandesOublientLHistorique() throws Exception {
         chargerDeuxDemandes();
@@ -910,6 +947,7 @@ public class MainControllerTest {
         assertEquals(2, demandes().size());
     }
 
+    /** Ajouter une demande en cliquant deux nœuds. */
     @Test
     public void ajouterUneDemandeEnCliquantDeuxNoeuds() throws Exception {
         chargerDeuxDemandes();
@@ -1191,6 +1229,7 @@ public class MainControllerTest {
         assertTrue(ecran.horsPlage.isEmpty());
     }
 
+    /** Une livraison au même endroit que la collecte est refusée. */
     @Test
     public void livraisonAuMemeEndroitQueLaCollecteRefusee() throws Exception {
         chargerDeuxDemandes();
@@ -1202,6 +1241,7 @@ public class MainControllerTest {
         assertTrue(ecran.consigne.startsWith("La livraison doit"));
     }
 
+    /** Un second clic sur ajouter annule l'ajout. */
     @Test
     public void unSecondClicSurAjouterAnnuleLAjout() throws Exception {
         chargerDeuxDemandes();
@@ -1220,6 +1260,7 @@ public class MainControllerTest {
         assertNull(ecran.livraisonProvisoire);
     }
 
+    /** Imports ignorés pendant l'ajout. */
     @Test
     public void importsIgnoresPendantLAjout() throws Exception {
         chargerDeuxDemandes();
@@ -1254,7 +1295,8 @@ public class MainControllerTest {
 
     /** Un échec restaure l'état et conserve les commandes. */
     @Test
-    public void restaurationInvalideConserveEtatEtHistorique() throws Exception {
+    public void restaurationInvalideConserveEtatEtHistorique()
+            throws Exception {
         chargerDeuxDemandes();
         ecran.actionSupprimer.accept(0);
         Etat avant = controleur.obtenirEtat();
@@ -1292,6 +1334,7 @@ public class MainControllerTest {
         assertEquals(0, fichier.length());
     }
 
+    /** Un clic sur la carte hors de l'ajout d'une demande est ignoré. */
     @Test
     public void clicSurLaCarteHorsAjoutIgnore() throws Exception {
         chargerDeuxDemandes();
@@ -1923,9 +1966,9 @@ public class MainControllerTest {
     }
 
     /**
-     * Avec deux livreurs, seule la tournée du livreur de l'arrêt change : l'autre
-     * est la même, la consigne nomme le livreur, c'est son arrêt qui reste
-     * sélectionné, et Annuler remet les deux tournées.
+     * Avec deux livreurs, seule la tournée du livreur de l'arrêt change :
+     * l'autre est la même, la consigne nomme le livreur, c'est son arrêt qui
+     * reste sélectionné, et Annuler remet les deux tournées.
      */
     @Test
     public void changerLOrdreNeChangeQueLeLivreurConcerne() throws Exception {

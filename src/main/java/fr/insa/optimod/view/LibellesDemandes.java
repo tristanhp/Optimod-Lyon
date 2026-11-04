@@ -18,7 +18,8 @@ final class LibellesDemandes {
      * @return texte de la ligne
      */
     static String decrire(int rang, Demande demande) {
-        return "Demande " + rang + " : collecte " + formaterDuree(demande.dureeCollecte())
+        return "Demande " + rang + " : collecte "
+                + formaterDuree(demande.dureeCollecte())
                 + ", livraison " + formaterDuree(demande.dureeLivraison());
     }
 

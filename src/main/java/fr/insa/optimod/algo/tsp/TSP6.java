@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+/** Variante non fonctionnelle, à supprimer avec TIG-98. */
 public class TSP6 extends TSP3 {
 
     /**
@@ -13,7 +14,8 @@ public class TSP6 extends TSP3 {
      * @return la borne inferieur
      */
     @Override
-    protected int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus) {
+    protected int calculerBorneInferieure(Integer sommetCourant,
+            Collection<Integer> nonVus) {
         List<Integer> sommets = new ArrayList<>(nonVus);
         if (!sommets.contains(sommetCourant)) {
             sommets.add(sommetCourant);
@@ -33,7 +35,8 @@ public class TSP6 extends TSP3 {
             return (cout != -1) ? cout : 0;
         }
 
-        // --- 1. Calcul d'un Arbre Couvrant Minimum (MST) via l'algorithme de Prim ---
+        // --- 1. Calcul d'un Arbre Couvrant Minimum (MST) via l'algorithme de
+        // Prim ---
         boolean[] inMST = new boolean[n];
         int[] minDist = new int[n];
         for (int i = 0; i < n; i++) {
@@ -70,13 +73,16 @@ public class TSP6 extends TSP3 {
             }
         }
 
-        // --- 2. Ajout des arêtes minimales incidentes pour respecter la structure du
+        // --- 2. Ajout des arêtes minimales incidentes pour respecter la
+        // structure du
         // TSP ---
-        // On cherche l'arête sortante la moins coûteuse à partir de `sommetCourant`
+        // On cherche l'arête sortante la moins coûteuse à partir de
+        // `sommetCourant`
         int minArcCourant = Integer.MAX_VALUE;
         for (int i = 0; i < n; i++) {
-            if (sommets.get(i).equals(sommetCourant))
+            if (sommets.get(i).equals(sommetCourant)) {
                 continue;
+            }
             int cout = g.obtenirCoutArc(sommetCourant, sommets.get(i));
             if (cout != -1 && cout < minArcCourant) {
                 minArcCourant = cout;
@@ -84,6 +90,7 @@ public class TSP6 extends TSP3 {
         }
 
         // Borne inférieure finale (MST + liaison minimale du sommet courant)
-        return mstCost + (minArcCourant == Integer.MAX_VALUE ? 0 : minArcCourant);
+        return mstCost + (minArcCourant == Integer.MAX_VALUE ? 0
+                : minArcCourant);
     }
 }

@@ -40,7 +40,7 @@
         <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
 
         <!-- Seuil minimal de couverture de lignes (0.50 = 50 %), à relever à chaque itération -->
-        <jacoco.line.minimum>0.50</jacoco.line.minimum>
+        <jacoco.line.minimum>0.90</jacoco.line.minimum>
     </properties>
 
     <dependencies>

@@ -42,9 +42,12 @@ public class PlanTest {
             <noeud id="1" latitude="45.75" longitude="4.85"/>
             <noeud id="2129259178" latitude="45.76" longitude="4.87"/>
             <noeud id="3" latitude="45.77" longitude="4.88"/>
-            <troncon destination="2129259178" longueur="69.9" nomRue="Rue Danton" origine="1"/>
-            <troncon destination="3" longueur="12.5" nomRue="" origine="2129259178"/>
-            <troncon destination="1" longueur="30.0" nomRue="Rue Garibaldi" origine="2129259178"/>
+            <troncon destination="2129259178" longueur="69.9"
+                nomRue="Rue Danton" origine="1"/>
+            <troncon destination="3" longueur="12.5" nomRue=""
+                origine="2129259178"/>
+            <troncon destination="1" longueur="30.0"
+                nomRue="Rue Garibaldi" origine="2129259178"/>
             </reseau>
             """;
 
@@ -100,7 +103,8 @@ public class PlanTest {
     /** Un nombre illisible est refusé avec une SAXException. */
     @Test(expected = SAXException.class)
     public void nombreIllisibleRefuse() throws Exception {
-        lire("<reseau><noeud id=\"x\" latitude=\"0\" longitude=\"0\"/></reseau>");
+        lire("<reseau><noeud id=\"x\" latitude=\"0\" "
+                + "longitude=\"0\"/></reseau>");
     }
 
     /** Un XML mal formé est refusé. */
@@ -1165,8 +1169,8 @@ public class PlanTest {
     }
 
     /**
-     * Tournée de {@link #deuxDemandesDuPetitReseau} partant à l'heure dite, dans
-     * l'ordre 1, 3 (60), 2 (30), 2 (120), 3 (45), 1.
+     * Tournée de {@link #deuxDemandesDuPetitReseau} partant à l'heure dite,
+     * dans l'ordre 1, 3 (60), 2 (30), 2 (120), 3 (45), 1.
      */
     private static Tournee tourneeDeDeuxDemandes(Plan plan, LocalTime depart) {
         Noeud entrepot = plan.obtenirNoeud(1);

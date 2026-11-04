@@ -37,27 +37,36 @@ final class MapProjection {
      * @param hauteur hauteur disponible, en pixels
      * @param margeInterieure marge intérieure, en pixels
      */
-    MapProjection(Collection<Noeud> noeuds, double largeur, double hauteur, double margeInterieure) {
+    MapProjection(Collection<Noeud> noeuds, double largeur, double hauteur,
+            double margeInterieure) {
         double latitudeMinimale = Double.POSITIVE_INFINITY;
         double latitudeMaximaleLue = Double.NEGATIVE_INFINITY;
         double longitudeMinimaleLue = Double.POSITIVE_INFINITY;
         double longitudeMaximale = Double.NEGATIVE_INFINITY;
         for (Noeud noeud : noeuds) {
             latitudeMinimale = Math.min(latitudeMinimale, noeud.latitude());
-            latitudeMaximaleLue = Math.max(latitudeMaximaleLue, noeud.latitude());
-            longitudeMinimaleLue = Math.min(longitudeMinimaleLue, noeud.longitude());
+            latitudeMaximaleLue = Math.max(latitudeMaximaleLue,
+                    noeud.latitude());
+            longitudeMinimaleLue = Math.min(longitudeMinimaleLue,
+                    noeud.longitude());
             longitudeMaximale = Math.max(longitudeMaximale, noeud.longitude());
         }
-        correctionLongitude = Math.cos(Math.toRadians((latitudeMinimale + latitudeMaximaleLue) / 2));
-        double etendueHorizontale = Math.max((longitudeMaximale - longitudeMinimaleLue) * correctionLongitude, 1e-9);
-        double etendueVerticale = Math.max(latitudeMaximaleLue - latitudeMinimale, 1e-9);
+        correctionLongitude = Math.cos(Math.toRadians((latitudeMinimale
+                + latitudeMaximaleLue) / 2));
+        double etendueHorizontale = Math.max((longitudeMaximale
+                - longitudeMinimaleLue) * correctionLongitude, 1e-9);
+        double etendueVerticale = Math.max(latitudeMaximaleLue
+                - latitudeMinimale, 1e-9);
         double largeurDisponible = Math.max(largeur - 2 * margeInterieure, 1);
         double hauteurDisponible = Math.max(hauteur - 2 * margeInterieure, 1);
-        echelle = Math.min(largeurDisponible / etendueHorizontale, hauteurDisponible / etendueVerticale);
+        echelle = Math.min(largeurDisponible / etendueHorizontale,
+                hauteurDisponible / etendueVerticale);
         longitudeMinimale = longitudeMinimaleLue;
         latitudeMaximale = latitudeMaximaleLue;
-        decalageHorizontal = margeInterieure + (largeurDisponible - etendueHorizontale * echelle) / 2;
-        decalageVertical = margeInterieure + (hauteurDisponible - etendueVerticale * echelle) / 2;
+        decalageHorizontal = margeInterieure + (largeurDisponible
+                - etendueHorizontale * echelle) / 2;
+        decalageVertical = margeInterieure + (hauteurDisponible
+                - etendueVerticale * echelle) / 2;
     }
 
     /**
@@ -67,7 +76,8 @@ final class MapProjection {
      * @return abscisse, croissante vers l'est
      */
     double calculerAbscisseEcran(double longitude) {
-        return decalageHorizontal + (longitude - longitudeMinimale) * correctionLongitude * echelle;
+        return decalageHorizontal + (longitude - longitudeMinimale)
+                * correctionLongitude * echelle;
     }
 
     /**

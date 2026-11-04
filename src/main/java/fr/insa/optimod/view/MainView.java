@@ -369,7 +369,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void definirActionDeplacerPoint(BiConsumer<Integer, Integer> action) {
+    public void definirActionDeplacerPoint(
+            BiConsumer<Integer, Integer> action) {
         boutonDeplacer.setOnAction(event -> {
             LigneTournee ligne = ligneSelectionnee();
             boolean arret = ligne != null && ligne.rang() >= 0;

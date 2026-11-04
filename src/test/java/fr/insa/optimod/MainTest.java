@@ -30,7 +30,8 @@ public class MainTest {
     /** Avec --version, le jar n'ouvre pas l'interface graphique. */
     @Test
     public void versionOptionDoesNotLaunchGui() {
-        assertFalse(Main.doitOuvrirInterface(new String[] {Main.OPTION_VERSION}));
+        assertFalse(Main.doitOuvrirInterface(
+                new String[] {Main.OPTION_VERSION}));
     }
 
     /** Avec --version, le démarrage affiche seulement le message. */
