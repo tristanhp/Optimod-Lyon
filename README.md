@@ -213,7 +213,9 @@ au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de
 chaque tronçon indique le sens, et les arrêts sont numérotés 1, 2, 3… dans
 l'ordre de passage. Un tronçon que la tournée parcourt plusieurs fois est tracé
 en traits parallèles, un par passage, et porte « ×2 », « ×3 »… (la légende le
-rappelle). Cliquer sur un arrêt (ou le choisir dans la liste de
+rappelle). Un arrêt dont l'arrivée sort de la plage annoncée ou dépasse 13 h
+est entouré de rouge, comme dans la liste de droite ; la légende l'indique.
+Cliquer sur un arrêt (ou le choisir dans la liste de
 droite, les deux sont synchronisés) ouvre un popup avec son type (entrepôt,
 point de collecte, point de livraison), son adresse (noms des rues), ses heures
 d'arrivée et de départ et sa plage annoncée. Si le dessin échoue (plan sans
