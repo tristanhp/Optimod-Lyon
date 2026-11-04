@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -56,6 +57,8 @@ public class MainControllerTest {
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
         private LongConsumer actionClicNoeud;
+        private Consumer<String> actionErreurDessin;
+        private String erreurCarte;
         private String consigne = "";
         private File fichierChoisi;
         private final List<String> evenements = new ArrayList<>();
@@ -275,6 +278,17 @@ public class MainControllerTest {
         public void afficherRefusChangementLivreur(String detail) {
             refusChangementLivreur = detail;
             evenements.add("refus livreur");
+        }
+
+        @Override
+        public void definirActionErreurDessin(Consumer<String> action) {
+            actionErreurDessin = action;
+        }
+
+        @Override
+        public void afficherErreurCarte(String detail) {
+            erreurCarte = detail;
+            evenements.add("erreur carte");
         }
     }
 
@@ -533,6 +547,54 @@ public class MainControllerTest {
         importerPlan(ecrire("<reseau>"));
         assertNull(controleur.obtenirProgramme());
         assertNull(controleur.obtenirPlan());
+        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+    }
+
+    /** Plan sans nœud ni tronçon : message, page vidée, état initial. */
+    @Test
+    public void planSansNoeudNiTronconOuvreLaFenetreEtVideLaPage()
+            throws Exception {
+        importerPlan(ecrire("<reseau></reseau>"));
+        assertEquals(List.of("invalide", "reinitialiser"), ecran.evenements);
+        assertNull(controleur.obtenirPlan());
+        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+    }
+
+    // --- Erreur pendant le dessin de la carte (cas 7) ---
+
+    /** Une exception pendant le dessin remplace la carte par un message. */
+    @Test
+    public void erreurPendantLeDessinAfficheLeMessageEtRevientALEtatInitial()
+            throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionErreurDessin.accept("dessin impossible");
+        assertEquals("dessin impossible", ecran.erreurCarte);
+        assertEquals(List.of("reinitialiser", "erreur carte"),
+                ecran.evenements);
+        assertNull(controleur.obtenirPlan());
+        assertNull(controleur.obtenirProgramme());
+        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+        assertEquals(EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER),
+                ecran.actions);
+    }
+
+    /** Après l'erreur, un nouveau plan se charge normalement. */
+    @Test
+    public void apresUneErreurDeDessinOnPeutReimporterUnPlan()
+            throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionErreurDessin.accept("dessin impossible");
+        importerPlan(ressource("/data/petitPlan.xml"));
+        assertNotNull(controleur.obtenirPlan());
+        assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
+    }
+
+    /** Sans plan, il n'y a rien à dessiner : l'erreur est ignorée. */
+    @Test
+    public void erreurDeDessinSansPlanIgnoree() {
+        ecran.actionErreurDessin.accept("dessin impossible");
+        assertNull(ecran.erreurCarte);
+        assertTrue(ecran.evenements.isEmpty());
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
     }
 

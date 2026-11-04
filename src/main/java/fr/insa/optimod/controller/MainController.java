@@ -175,6 +175,8 @@ public final class MainController {
         ecran.definirActionRefaire(() -> etat.refaire(this));
         ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
         ecran.definirActionRestaurer(() -> etat.restaurer(this));
+        ecran.definirActionErreurDessin(
+                detail -> etat.erreurDessin(this, detail));
         changerEtat(new EtatInitial());
     }
 
@@ -218,7 +220,13 @@ public final class MainController {
         programme = null;
         oublierModifications();
         try {
-            plan = new Plan(fichier.getPath());
+            Plan nouveauPlan = new Plan(fichier.getPath());
+            if (nouveauPlan.obtenirNoeuds().isEmpty()
+                    && nouveauPlan.obtenirTroncons().isEmpty()) {
+                throw new SAXException("Le plan ne contient ni nœud ni "
+                        + "tronçon : il n'y a rien à afficher.");
+            }
+            plan = nouveauPlan;
             fichierPlan = fichier.toPath();
             ecran.afficherPlan(plan);
             return Lecture.REUSSIE;
@@ -893,6 +901,22 @@ public final class MainController {
         // executer réaffiche les tournées, ce qui efface la sélection de la
         // liste : on la remet sur l'arrêt déplacé.
         ecran.selectionnerArretTournee(livreur, rang);
+    }
+
+    /**
+     * Abandonne l'affichage après une exception pendant le dessin : oublie le
+     * plan, le programme et l'historique, vide la page, affiche le message à
+     * la place de la carte et revient à {@link EtatInitial} (comme le cas 1).
+     *
+     * @param detail explication de l'erreur
+     */
+    void abandonnerAffichage(String detail) {
+        plan = null;
+        programme = null;
+        oublierModifications();
+        ecran.reinitialiser();
+        ecran.afficherErreurCarte(detail);
+        changerEtat(new EtatInitial());
     }
 
     /**

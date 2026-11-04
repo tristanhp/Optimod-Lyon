@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -129,6 +130,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /** Demandes affichées et observées, ou {@code null}. */
     private ProgrammeLivraisons programmeObserve;
 
+    /** Plan affiché (pour décrire les adresses des arrêts), ou {@code null}. */
+    private Plan planAffiche;
+
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
     private File dernierDossier;
 
@@ -188,7 +192,14 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                     actualiserBoutonChangerLivreur();
                 });
         listeTournee.getSelectionModel().selectedIndexProperty().addListener(
-                (observable, ancien, nouveau) -> actualiserBoutonsOrdre());
+                (observable, ancien, nouveau) -> {
+                    actualiserBoutonsOrdre();
+                    LigneTournee ligne = ligneSelectionnee();
+                    boolean arret = ligne != null && ligne.rang() >= 0;
+                    carte.selectionnerArret(arret ? ligne.livreur() : -1,
+                            arret ? ligne.rang() : -1);
+                });
+        carte.definirSurClicArret(this::selectionnerArretTournee);
         boutonMonter.setMaxWidth(Double.MAX_VALUE);
         boutonDescendre.setMaxWidth(Double.MAX_VALUE);
         boutonDeplacer.setMaxWidth(Double.MAX_VALUE);
@@ -378,6 +389,17 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public void definirActionErreurDessin(Consumer<String> action) {
+        carte.definirSurErreurDessin(action);
+    }
+
+    @Override
+    public void afficherErreurCarte(String detail) {
+        carte.afficherMessageErreur(detail);
+        message.setText("Erreur d'affichage de la carte : " + detail);
+    }
+
+    @Override
     public void definirActionClicNoeud(LongConsumer action) {
         carte.definirSurClicNoeud(action);
     }
@@ -511,6 +533,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void afficherPlan(Plan plan) {
+        planAffiche = plan;
         effacerListeTournee();
         effacerDemandes();
         carte.afficherPlan(plan);
@@ -571,6 +594,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void reinitialiser() {
+        planAffiche = null;
         effacerListeTournee();
         effacerDemandes();
         carte.effacerCarte();
@@ -667,24 +691,14 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                         dernierRang, arret.estHorsPlage()));
             }
         }
-        carte.afficherArrets(tournees.values().stream()
-                .flatMap(tournee -> tournee.arrets().stream()).toList());
+        carte.afficherTournees(tournees);
         listeTournee.setVisible(true);
         listeTournee.setManaged(true);
     }
 
-    /** Heures, plage annoncée et décalage d'un arrêt. */
-    private static String decrireArret(Tournee.Arret arret) {
-        long decalage = arret.obtenirDecalageSecondes();
-        String signe = decalage >= 0 ? "+" : "−";
-        long secondes = Math.abs(decalage);
-        return HEURE.format(arret.arrivee()) + " → "
-                + HEURE.format(arret.depart()) + "   nœud "
-                + arret.noeud().identifiant() + "\nPlage : "
-                + HEURE.format(arret.debutPlage()) + " – "
-                + HEURE.format(arret.finPlage()) + "\nDécalage : " + signe
-                + secondes / 60 + " min " + secondes % 60 + " s"
-                + (arret.estHorsPlage() ? " — Hors plage" : "");
+    /** Type, adresse, heures, plage annoncée et décalage d'un arrêt. */
+    private String decrireArret(Tournee.Arret arret) {
+        return LibellesArrets.decrire(planAffiche, arret);
     }
 
     private void effacerDemandes() {
@@ -692,7 +706,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     private void effacerListeTournee() {
-        carte.afficherArrets(List.of());
+        carte.afficherTournees(Map.of());
         listeTournee.getItems().clear();
         lignesTournee.clear();
         listeTournee.setVisible(false);

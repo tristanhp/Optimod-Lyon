@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -318,6 +319,23 @@ public interface MapScreen {
      * @param detail explication du refus
      */
     void afficherRefusDeplacement(String detail);
+
+    /**
+     * Définit l'action déclenchée quand le dessin de la carte lève une
+     * exception.
+     *
+     * @param action reçoit l'explication de l'erreur
+     */
+    void definirActionErreurDessin(Consumer<String> action);
+
+    /**
+     * Affiche un message à la place de la carte : le plan ou la tournée n'a
+     * pas pu être dessiné. La page a déjà été vidée par
+     * {@link #reinitialiser()}.
+     *
+     * @param detail explication de l'erreur
+     */
+    void afficherErreurCarte(String detail);
 
     /**
      * Signale que le calcul a échoué.

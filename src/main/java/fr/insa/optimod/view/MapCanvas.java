@@ -1,8 +1,9 @@
 package fr.insa.optimod.view;
 
 import java.util.List;
-import java.time.format.DateTimeFormatter;
-import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
@@ -10,14 +11,19 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Chemin;
 import fr.insa.optimod.model.Troncon;
 import fr.insa.optimod.model.Tournee;
+import javafx.geometry.Pos;
+import javafx.geometry.VPos;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.text.TextAlignment;
 
 /**
@@ -73,6 +79,24 @@ final class MapCanvas extends Pane {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
     }
 
+    /** Couleur de la tournée au départ de l'entrepôt (clair). */
+    private static final Color COULEUR_DEBUT_TOURNEE = Color.web("#8ab4f8");
+
+    /** Couleur de la tournée au retour à l'entrepôt (foncé). */
+    private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
+
+    /** Largeur du trait de la tournée, en pixels. */
+    private static final double LARGEUR_TOURNEE = 5;
+
+    /** Demi-longueur d'une flèche de sens, en pixels. */
+    private static final double TAILLE_FLECHE = 5;
+
+    /** Longueur d'écran en dessous de laquelle un tronçon n'a pas de flèche. */
+    private static final double LONGUEUR_MINIMALE_FLECHE = 14;
+
+    /** Rayon du disque qui porte le numéro d'un arrêt, en pixels. */
+    private static final double RAYON_NUMERO = 8;
+
     private static final Color COULEUR_FOND = Color.web("#f8f9fa");
     private static final Color COULEUR_RUE = Color.web("#9aa0a6");
     private static final Color COULEUR_INTERSECTION = Color.web("#3c4043");
@@ -80,11 +104,20 @@ final class MapCanvas extends Pane {
     /** Surface de dessin. */
     private final Canvas canevas = new Canvas();
 
-    /** Arrêts affichables dans le popup de survol. */
-    private List<Tournee.Arret> arrets = List.of();
+    /** Tournées dessinées, par numéro de livreur. */
+    private Map<Integer, Tournee> tournees = Map.of();
 
-    /** Popup des heures et plages annoncées au nœud survolé. */
+    /** Popup du type, de l'adresse et des heures de l'arrêt cliqué. */
     private final Tooltip detailsArret = new Tooltip();
+
+    /** Message affiché à la place de la carte, quand le dessin échoue. */
+    private final Label messageErreur = new Label();
+
+    /** Livreur de l'arrêt sélectionné, ou -1. */
+    private int livreurSelectionne = -1;
+
+    /** Rang dans sa tournée de l'arrêt sélectionné, ou -1. */
+    private int rangSelectionne = -1;
 
     /** Plan affiché, ou {@code null}. */
     private Plan plan;
@@ -130,10 +163,21 @@ final class MapCanvas extends Pane {
     /** Prévenu de l'identifiant de l'intersection cliquée. */
     private LongConsumer surClicNoeud = idNoeud -> { };
 
+    /** Prévenu du livreur et du rang de l'arrêt cliqué. */
+    private BiConsumer<Integer, Integer> surClicArret =
+            (livreur, rang) -> { };
+
+    /** Prévenu de l'explication quand le dessin lève une exception. */
+    private Consumer<String> surErreurDessin = detail -> { };
+
     /** Crée une carte vide. */
     MapCanvas() {
-        getChildren().add(canevas);
-        Tooltip.install(this, detailsArret);
+        messageErreur.setWrapText(true);
+        messageErreur.setAlignment(Pos.CENTER);
+        messageErreur.setStyle("-fx-font-size: 14px; -fx-text-fill: #c62828;");
+        messageErreur.setVisible(false);
+        detailsArret.setAutoHide(true);
+        getChildren().addAll(canevas, messageErreur);
         setOnScroll(evenement -> {
             if (evenement.getDeltaY() != 0) {
                 zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1 / FACTEUR_MOLETTE,
@@ -163,35 +207,98 @@ final class MapCanvas extends Pane {
                 if (noeud != null) {
                     surClicNoeud.accept(noeud.identifiant());
                 }
+                montrerArret(noeud, evenement.getScreenX(),
+                        evenement.getScreenY());
             }
         });
-        setOnMouseMoved(evenement -> {
-            signalerSurvol(trouverDemande(evenement.getX(), evenement.getY()));
-            Noeud noeud = trouverNoeud(evenement.getX(), evenement.getY());
-            DateTimeFormatter heure = DateTimeFormatter.ofPattern("HH:mm");
-            String texte = arrets.stream()
-                    .filter(arret -> arret.noeud().equals(noeud))
-                    .map(arret -> "Arrivée " + heure.format(arret.arrivee())
-                            + " — plage " + heure.format(arret.debutPlage())
-                            + " – " + heure.format(arret.finPlage())
-                            + (arret.estHorsPlage() ? " (hors plage)" : ""))
-                    .collect(Collectors.joining("\n"));
-            detailsArret.setText(texte);
-            if (texte.isEmpty()) {
-                detailsArret.hide();
-            }
-        });
-        setOnMouseExited(evenement -> {
-            signalerSurvol(-1);
-            detailsArret.hide();
-        });
+        setOnMouseMoved(evenement -> signalerSurvol(
+                trouverDemande(evenement.getX(), evenement.getY())));
+        setOnMouseExited(evenement -> signalerSurvol(-1));
     }
 
-    /** @param passages arrêts à présenter au survol, vide pour les effacer */
-    void afficherArrets(List<Tournee.Arret> passages) {
-        arrets = List.copyOf(passages);
+    /**
+     * Dessine les tournées : tronçons en dégradé, flèches de sens, numéros des
+     * arrêts.
+     *
+     * @param nouvellesTournees tournées par numéro de livreur, vide pour les
+     *        effacer
+     */
+    void afficherTournees(Map<Integer, Tournee> nouvellesTournees) {
+        tournees = Map.copyOf(nouvellesTournees);
         detailsArret.hide();
-        detailsArret.setText("");
+        livreurSelectionne = -1;
+        rangSelectionne = -1;
+        dessinerCarte();
+    }
+
+    /**
+     * Met en évidence un arrêt, sans prévenir personne (la liste l'a choisi).
+     *
+     * @param livreur numéro du livreur, ou -1 pour aucun
+     * @param rang rang de l'arrêt dans sa tournée, ou -1 pour aucun
+     */
+    void selectionnerArret(int livreur, int rang) {
+        if (livreur != livreurSelectionne || rang != rangSelectionne) {
+            livreurSelectionne = livreur;
+            rangSelectionne = rang;
+            dessinerCarte();
+        }
+    }
+
+    /**
+     * Définit l'action déclenchée par un clic sur un arrêt de la tournée.
+     *
+     * @param action reçoit le livreur puis le rang de l'arrêt
+     */
+    void definirSurClicArret(BiConsumer<Integer, Integer> action) {
+        surClicArret = action;
+    }
+
+    /**
+     * Définit l'action déclenchée quand le dessin lève une exception.
+     *
+     * @param action reçoit l'explication de l'erreur
+     */
+    void definirSurErreurDessin(Consumer<String> action) {
+        surErreurDessin = action;
+    }
+
+    /**
+     * Affiche un message à la place de la carte.
+     *
+     * @param detail explication de l'erreur
+     */
+    void afficherMessageErreur(String detail) {
+        messageErreur.setText("La carte ne peut pas être affichée.\n" + detail);
+        messageErreur.setVisible(true);
+        requestLayout();
+    }
+
+    /**
+     * Sélectionne et décrit l'arrêt qui se trouve au nœud cliqué ; sans arrêt,
+     * ferme le popup.
+     */
+    private void montrerArret(Noeud noeud, double ecranXSouris,
+            double ecranYSouris) {
+        detailsArret.hide();
+        if (noeud == null) {
+            return;
+        }
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            List<Tournee.Arret> arrets = entree.getValue().arrets();
+            for (int rang = 0; rang < arrets.size(); rang++) {
+                Tournee.Arret arret = arrets.get(rang);
+                if (arret.noeud().equals(noeud)) {
+                    selectionnerArret(entree.getKey(), rang);
+                    surClicArret.accept(entree.getKey(), rang);
+                    detailsArret.setText(
+                            LibellesArrets.decrire(plan, arret));
+                    detailsArret.show(this, ecranXSouris + 12,
+                            ecranYSouris + 12);
+                    return;
+                }
+            }
+        }
     }
 
     /**
@@ -314,6 +421,8 @@ final class MapCanvas extends Pane {
         livraisonProvisoire = null;
         plan = nouveauPlan;
         programme = null;
+        tournees = Map.of();
+        messageErreur.setVisible(false);
         demandeEnEvidence = -1;
         zoom = 1;
         decalageX = 0;
@@ -338,6 +447,9 @@ final class MapCanvas extends Pane {
         livraisonProvisoire = null;
         plan = null;
         programme = null;
+        tournees = Map.of();
+        messageErreur.setVisible(false);
+        detailsArret.hide();
         demandeEnEvidence = -1;
         zoom = 1;
         decalageX = 0;
@@ -349,11 +461,25 @@ final class MapCanvas extends Pane {
     protected void layoutChildren() {
         canevas.setWidth(getWidth());
         canevas.setHeight(getHeight());
+        messageErreur.resizeRelocate(MARGE_INTERIEURE, MARGE_INTERIEURE,
+                Math.max(0, getWidth() - 2 * MARGE_INTERIEURE),
+                Math.max(0, getHeight() - 2 * MARGE_INTERIEURE));
         contenirDansLaCarte();
         dessinerCarte();
     }
 
+    /** Dessine la carte ; une exception remplace la carte par un message. */
     private void dessinerCarte() {
+        try {
+            dessinerCarteComplete();
+        } catch (RuntimeException erreur) {
+            String detail = erreur.getMessage() != null ? erreur.getMessage()
+                    : erreur.getClass().getSimpleName();
+            surErreurDessin.accept(detail);
+        }
+    }
+
+    private void dessinerCarteComplete() {
         GraphicsContext contexteGraphique = canevas.getGraphicsContext2D();
         contexteGraphique.setFill(COULEUR_FOND);
         contexteGraphique.fillRect(0, 0, canevas.getWidth(), canevas.getHeight());
@@ -379,10 +505,104 @@ final class MapCanvas extends Pane {
                     ecranY(noeud.latitude()) - RAYON_INTERSECTION,
                     2 * RAYON_INTERSECTION, 2 * RAYON_INTERSECTION);
         }
+        dessinerTournees(contexteGraphique);
         if (programme != null) {
             dessinerDemandes(contexteGraphique);
         }
+        dessinerNumerosArrets(contexteGraphique);
         dessinerPointsProvisoires(contexteGraphique);
+    }
+
+    /**
+     * Trace les tronçons de chaque chemin d'un trait épais, du plus clair (au
+     * départ) au plus foncé (au retour), avec une flèche au milieu de chaque
+     * tronçon pour montrer le sens de parcours.
+     */
+    private void dessinerTournees(GraphicsContext contexte) {
+        contexte.setLineCap(StrokeLineCap.ROUND);
+        for (Tournee tournee : tournees.values()) {
+            int total = tournee.chemins().stream()
+                    .mapToInt(chemin -> chemin.troncons().size()).sum();
+            int fait = 0;
+            for (Chemin chemin : tournee.chemins()) {
+                for (Troncon troncon : chemin.troncons()) {
+                    verifierDansLePlan(troncon.origine());
+                    verifierDansLePlan(troncon.destination());
+                    double avancement = total <= 1 ? 0
+                            : (double) fait / (total - 1);
+                    dessinerTroncon(contexte, troncon,
+                            COULEUR_DEBUT_TOURNEE.interpolate(
+                                    COULEUR_FIN_TOURNEE, avancement));
+                    fait++;
+                }
+            }
+        }
+        contexte.setLineCap(StrokeLineCap.BUTT);
+    }
+
+    /** Signale une adresse de la tournée qui n'existe pas dans le plan. */
+    private void verifierDansLePlan(Noeud noeud) {
+        if (plan.obtenirNoeud(noeud.identifiant()) == null) {
+            throw new IllegalStateException("Adresse " + noeud.identifiant()
+                    + " absente du plan.");
+        }
+    }
+
+    private void dessinerTroncon(GraphicsContext contexte, Troncon troncon,
+            Color couleur) {
+        double x1 = ecranX(troncon.origine().longitude());
+        double y1 = ecranY(troncon.origine().latitude());
+        double x2 = ecranX(troncon.destination().longitude());
+        double y2 = ecranY(troncon.destination().latitude());
+        contexte.setStroke(couleur);
+        contexte.setLineWidth(LARGEUR_TOURNEE);
+        contexte.strokeLine(x1, y1, x2, y2);
+        double longueur = Math.hypot(x2 - x1, y2 - y1);
+        if (longueur < LONGUEUR_MINIMALE_FLECHE) {
+            return;
+        }
+        double ux = (x2 - x1) / longueur;
+        double uy = (y2 - y1) / longueur;
+        double mx = (x1 + x2) / 2;
+        double my = (y1 + y2) / 2;
+        double[] abscisses = {mx + ux * TAILLE_FLECHE,
+            mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
+            mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8};
+        double[] ordonnees = {my + uy * TAILLE_FLECHE,
+            my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
+            my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8};
+        contexte.setFill(Color.WHITE);
+        contexte.fillPolygon(abscisses, ordonnees, 3);
+    }
+
+    /**
+     * Numérote les arrêts dans l'ordre de passage (le départ et le retour de
+     * l'entrepôt gardent le losange) et entoure l'arrêt sélectionné.
+     */
+    private void dessinerNumerosArrets(GraphicsContext contexte) {
+        contexte.setTextAlign(TextAlignment.CENTER);
+        contexte.setTextBaseline(VPos.CENTER);
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            List<Tournee.Arret> arrets = entree.getValue().arrets();
+            for (int rang = 1; rang < arrets.size() - 1; rang++) {
+                Noeud noeud = arrets.get(rang).noeud();
+                verifierDansLePlan(noeud);
+                double x = ecranX(noeud.longitude());
+                double y = ecranY(noeud.latitude());
+                boolean selectionne = entree.getKey() == livreurSelectionne
+                        && rang == rangSelectionne;
+                double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
+                contexte.setFill(selectionne ? Color.web("#fbbc04")
+                        : Color.WHITE);
+                contexte.setStroke(COULEUR_FIN_TOURNEE);
+                contexte.setLineWidth(selectionne ? 3 : 2);
+                contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
+                contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
+                contexte.setFill(Color.BLACK);
+                contexte.fillText(String.valueOf(rang), x, y);
+            }
+        }
+        contexte.setTextBaseline(VPos.BASELINE);
     }
 
     /** Dessine l'aperçu au-dessus des points déjà validés. */

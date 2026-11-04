@@ -137,6 +137,19 @@ interface Etat {
     }
 
     /**
+     * Exception pendant le dessin de la carte (cas 7) : la page est vidée, un
+     * message remplace la carte et le contrôleur revient à
+     * {@link EtatInitial}. Valable dans tous les états où une carte est
+     * affichée ; {@link EtatInitial}, sans carte, l'ignore.
+     *
+     * @param controleur contrôleur à piloter
+     * @param detail explication de l'erreur
+     */
+    default void erreurDessin(MainController controleur, String detail) {
+        controleur.abandonnerAffichage(detail);
+    }
+
+    /**
      * « Annuler » (Ctrl+Z). Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter
