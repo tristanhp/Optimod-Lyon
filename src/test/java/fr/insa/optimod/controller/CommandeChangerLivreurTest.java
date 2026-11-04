@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -100,6 +101,36 @@ public class CommandeChangerLivreurTest {
         assertEquals(List.of(premiere, seconde), programme.obtenirDemandes());
         assertSame(avant.get(1), programme.obtenirTournees().get(1));
         assertSame(avant.get(2), programme.obtenirTournees().get(2));
+    }
+
+    /**
+     * Un observateur ne voit jamais d'état intermédiaire : à chaque
+     * notification, la seconde demande est dans la tournée de son livreur.
+     * Exécuter, annuler et rétablir notifient chacun une seule fois.
+     */
+    @Test
+    public void lesObservateursNeVoientAucunEtatIntermediaire() {
+        programme.definirTournees(avant);
+        List<String> incoherences = new ArrayList<>();
+        int[] notifications = {0};
+        programme.ajouterObservateur(source -> {
+            notifications[0]++;
+            Demande courante = programme.obtenirDemandes().get(1);
+            boolean presente = programme.obtenirTournees()
+                    .get(courante.livreur()).arrets().stream()
+                    .anyMatch(arret -> courante.equals(arret.demande()));
+            if (!presente) {
+                incoherences.add("livreur " + courante.livreur());
+            }
+        });
+        ListeDeCommandes historique = new ListeDeCommandes();
+        historique.executer(commande());
+        assertEquals(1, notifications[0]);
+        historique.annuler();
+        assertEquals(2, notifications[0]);
+        historique.refaire();
+        assertEquals(3, notifications[0]);
+        assertEquals(List.of(), incoherences);
     }
 
     /** Rétablir range de nouveau les tournées d'après, sans aucun calcul. */

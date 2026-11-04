@@ -27,8 +27,8 @@ alt insertion possible
   Plan --> MainController : tournée du nouveau livreur avec la demande
   MainController -> MainController : exécuteur de l'interface, tournées avant et après
   MainController -> ListeDeCommandes : executer(CommandeChangerLivreur)
-  ListeDeCommandes -> ProgrammeLivraisons : remplacerDemande, definirTournees
-  ProgrammeLivraisons -> MainView : notifierObservateurs
+  ListeDeCommandes -> ProgrammeLivraisons : remplacerDemandeEtTournees
+  ProgrammeLivraisons -> MainView : notifierObservateurs (une seule fois)
   MainController -> MainView : afficherConsigne (ordre non optimisé, deux livreurs)
 else adresse inaccessible ou retour après 13 h
   Plan --> MainController : IllegalStateException

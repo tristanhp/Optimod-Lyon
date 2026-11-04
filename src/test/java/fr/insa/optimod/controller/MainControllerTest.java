@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.IntConsumer;
@@ -2236,6 +2237,34 @@ public class MainControllerTest {
         assertEquals(avant, demandes());
         assertSame(limite.get(1), tournees().get(1));
         assertSame(limite.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Si le recalcul échoue chez l'ancien livreur (sa tournée ne contient pas
+     * la demande), le refus est le même : message affiché, demandes, tournées
+     * et historique intacts. L'insertion chez le nouveau livreur, elle,
+     * réussirait.
+     */
+    @Test
+    public void changerLivreurRefuseSiLeRecalculEchoueChezLAncienLivreur()
+            throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        Map<Integer, Tournee> incoherentes = new TreeMap<>(tournees());
+        incoherentes.put(1, tournees().get(2));
+        programme.definirTournees(incoherentes);
+        List<Demande> avant = List.copyOf(demandes());
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertNotNull(ecran.refusChangementLivreur);
+        assertTrue(ecran.refusChangementLivreur.contains("introuvable"));
+        assertEquals(avant, demandes());
+        assertSame(incoherentes.get(1), tournees().get(1));
+        assertSame(incoherentes.get(2), tournees().get(2));
         assertFalse(controleur.peutAnnuler());
         assertFalse(ecran.attente);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);

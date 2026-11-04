@@ -10,7 +10,9 @@ import fr.insa.optimod.model.Tournee;
  * Confie une demande à un autre livreur ; l'annulation la rend à son livreur
  * d'avant. La demande garde son rang dans le programme. La commande garde les
  * tournées d'avant et d'après, calculées avant elle : exécuter, annuler ou
- * rétablir ne fait que les ranger dans le programme, sans aucun calcul.
+ * rétablir ne fait que les ranger dans le programme, sans aucun calcul, et
+ * les observateurs ne sont prévenus qu'une fois, quand la demande et les
+ * tournées sont cohérentes.
  */
 final class CommandeChangerLivreur implements Commande {
 
@@ -47,14 +49,13 @@ final class CommandeChangerLivreur implements Commande {
 
     @Override
     public void executer() {
-        avant = programme.remplacerDemande(position, apres);
-        programme.definirTournees(tourneesApres);
+        avant = programme.remplacerDemandeEtTournees(position, apres,
+                tourneesApres);
     }
 
     @Override
     public void annuler() {
-        programme.remplacerDemande(position, avant);
-        programme.definirTournees(tourneesAvant);
+        programme.remplacerDemandeEtTournees(position, avant, tourneesAvant);
     }
 
     @Override

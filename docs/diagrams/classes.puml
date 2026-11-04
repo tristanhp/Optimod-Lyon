@@ -66,6 +66,7 @@ package "model" {
     +ajouterDemande(position : int, demande : Demande)
     +retirerDemande(position : int) : Demande
     +remplacerDemande(position : int, demande : Demande)
+    +remplacerDemandeEtTournees(position : int, demande : Demande, tournees : Map<Integer, Tournee>)
     +obtenirNombreLivreurs() : int
     +definirNombreLivreurs(nombre : int)
     +obtenirTournees() : Map<Integer, Tournee>
