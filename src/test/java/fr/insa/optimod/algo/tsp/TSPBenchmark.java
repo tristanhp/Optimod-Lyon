@@ -4,6 +4,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Map;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -39,7 +40,7 @@ public class TSPBenchmark {
 
         // Calcul TSP
         long tpsDebut = System.currentTimeMillis();
-        plan.calculerTournee(livraisons);
+        plan.calculerTournees(livraisons);
         long tpsFin = System.currentTimeMillis();
         // Fin Calcul
 
@@ -61,11 +62,11 @@ public class TSPBenchmark {
 
         // Calcul TSP
         long tpsDebut = System.currentTimeMillis();
-        Tournee t = plan.calculerTournee(livraisons);
+        Map<Integer, Tournee> t = plan.calculerTournees(livraisons);
         long tpsFin = System.currentTimeMillis();
         // Fin Calcul
 
-        Iterator<Arret> it = t.arrets().iterator();
+        Iterator<Arret> it = t.get(1).arrets().iterator();
         while (it.hasNext()) {
             Arret i = it.next();
             System.out.print(i.noeud().identifiant() + " ");
