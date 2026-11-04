@@ -3,42 +3,73 @@
 title États du contrôleur (design pattern State)
 hide empty description
 [*] --> EtatInitial
-EtatInitial : boutons : Plan
-EtatPlanCharge : boutons : Plan, Demandes
+EtatInitial : boutons : Plan, Restaurer
+EtatPlanCharge : boutons : Plan, Demandes, Restaurer
 EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
+EtatProgrammeCharge : Restaurer
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
-EtatTourneeCalculee : (sous-classe)
-EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout)
-EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout)
+EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
+EtatTourneeCalculee : + Changer de livreur [plusieurs livreurs]
+EtatRestauration : boutons : aucun
+EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
+EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : idCollecte : long
+EtatDeplacementPoint : boutons : Déplacer (= annuler le déplacement)
+EtatDeplacementPoint : livreur : int
+EtatDeplacementPoint : rang : int
 
 EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
-EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournée]
+EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
 EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
 EtatTourneeCalculee --> EtatCalculEnCours : calculer
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
-state "Choix de l'état selon le cache" as cache <<choice>>
-EtatProgrammeCharge --> cache : supprimerDemande / annuler / refaire
-EtatTourneeCalculee --> cache : supprimerDemande / annuler / refaire
-cache --> EtatTourneeCalculee : [tournée des demandes en cache]
-cache --> EtatProgrammeCharge : [sinon]
+state "Choix de l'état selon les tournées du programme" as choix <<choice>>
+EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
+EtatTourneeCalculee --> choix : annuler / refaire
+EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
+EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
+EtatTourneeCalculee --> EtatCalculEnCours : changerOrdre (livreur, rang)
+EtatCalculEnCours --> choix : fin du changement d'ordre / CommandeChangerOrdre
+EtatCalculEnCours --> EtatTourneeCalculee : fin du changement d'ordre [refusé]
+choix --> EtatTourneeCalculee : [tournées rangées dans le programme]
+choix --> EtatProgrammeCharge : [sinon]
 
 EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
 EtatTourneeCalculee --> EtatAjoutCollecte : ajouterDemande
-EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud
-EtatAjoutLivraison --> cache : cliquerNoeud [autre noeud] / CommandeAjouterDemande
-EtatAjoutCollecte --> cache : ajouterDemande (annule l'ajout)
-EtatAjoutLivraison --> cache : ajouterDemande (annule l'ajout)
+EtatAjoutCollecte --> EtatAjoutLivraison : cliquerNoeud [valide] / afficher collecte provisoire
+EtatAjoutLivraison --> EtatAjoutLivraison : second clic / afficher livraison provisoire
+EtatAjoutLivraison --> choix : saisie valide [sans tournées] / CommandeAjouterDemande
+EtatAjoutLivraison --> EtatCalculEnCours : saisie valide [tournées calculées] / insertion
+EtatCalculEnCours --> EtatTourneeCalculee : insertion réussie / CommandeAjouterDemande
+EtatCalculEnCours --> EtatTourneeCalculee : insertion impossible / état conservé, alerte
+EtatAjoutLivraison --> EtatAjoutLivraison : saisie invalide / message
+EtatAjoutCollecte --> choix : ajouterDemande ou annuler / effacer aperçu
+EtatAjoutLivraison --> choix : ajouterDemande, annuler ou dialogue annulé / effacer aperçu
+
+EtatTourneeCalculee --> EtatDeplacementPoint : deplacerPoint [arrêt choisi]
+EtatDeplacementPoint --> EtatCalculEnCours : cliquerNoeud [autre adresse]
+EtatCalculEnCours --> choix : fin du déplacement / CommandeDeplacerPoint
+EtatCalculEnCours --> choix : fin du déplacement [refusé]
+EtatDeplacementPoint --> choix : deplacerPoint (annule le déplacement)
+
+EtatTourneeCalculee --> EtatCalculEnCours : changerLivreur [livreur et position choisis]
+EtatCalculEnCours --> choix : fin du changement de livreur / CommandeChangerLivreur
+EtatCalculEnCours --> choix : fin du changement de livreur [refusé]
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]
 tous --> EtatInitial : importerPlan [plan invalide]
+tous --> EtatInitial : erreurDessin [exception pendant le dessin]
+tous --> EtatRestauration : restaurer [fichier choisi]
+EtatRestauration --> EtatTourneeCalculee : succès / vider historique
+EtatRestauration --> tous : erreur / retrouver état précédent
+EtatTourneeCalculee --> EtatTourneeCalculee : sauvegarder
 
 note bottom of tous
 Règles par défaut de l'interface Etat (EtatCalculEnCours et

@@ -18,6 +18,7 @@ rectangle "Optimod'Lyon" {
         usecase "Décaler une collecte" as UC4c
         usecase "Déplacer une collecte\nou une livraison" as UC4d
         usecase "Changer l'ordre\nde passage" as UC4e
+        usecase "Changer le livreur\nd'une demande" as UC4f
     }
     package "Optimisation" {
         usecase "Cas 5 : Calculer le meilleur\nitinéraire" as UC5
@@ -48,6 +49,7 @@ UC4 <|-- UC4b
 UC4 <|-- UC4c
 UC4 <|-- UC4d
 UC4 <|-- UC4e
+UC4 <|-- UC4f
 
 UC4 ..> UC5 : <<include>>
 UC6 ..> UC5 : <<extend>>

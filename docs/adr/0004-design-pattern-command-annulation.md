@@ -1,6 +1,7 @@
 # 0004. Design pattern Command pour annuler les modifications
 
-- **Statut** : Acceptée
+- **Statut** : Acceptée ; point 3 (cache des tournées) remplacé par
+  [0006](0006-plusieurs-livreurs.md)
 - **Date** : 2026-10-25
 
 ## Contexte
@@ -19,7 +20,19 @@ Issue Linear : TIG-92.
    `controller`) : `CommandeAjouterDemande` (ajout en fin de liste) et
    `CommandeSupprimerDemande` (garde la demande retirée et son rang pour la
    remettre). Les commandes modifient `ProgrammeLivraisons`, qui prévient la vue
-   (Observer, ADR 0003).
+   (Observer, ADR 0003). `CommandeChangerOrdre` est la seule à ne pas toucher
+   aux demandes : elle garde deux actions (ranger la tournée au nouvel ordre
+   dans le cache, remettre l'ancienne). Chaque action ne remplace l'entrée du
+   cache que si elle contient encore la tournée que la commande y avait mise :
+   après un nouveau « Calculer », annuler ou rétablir ne l'écrase donc pas.
+   *(Depuis l'ADR 0006, il n'y a plus de cache : cette commande garde les
+   tournées d'avant et d'après du programme, comme les autres.)*
+   Le recalcul de l'ordre tourne hors du thread JavaFX et reprend les chemins
+   de `Tournee.chemins()` (A* seulement autour des deux arrêts échangés).
+   `CommandeDeplacerPoint` remplace une demande par la même dont un point a
+   changé de nœud ; elle garde les tournées d'avant et d'après du programme
+   (calculées avant la commande, seule la tournée du livreur change) :
+   annuler remet l'ancienne demande et les tournées d'avant, sans recalcul.
 2. `ListeDeCommandes` garde l'historique : `executer`, `annuler`, `refaire`,
    `vider`. Exécuter une nouvelle commande oublie les commandes annulées.
    L'historique est vidé quand un plan ou des demandes sont importés.
@@ -56,8 +69,11 @@ Issue Linear : TIG-92.
   changement.
 - `Demande` n'a pas d'`equals` : la clé du cache compare les demandes par
   identité, ce qui est voulu (une commande rejouée réutilise les mêmes objets).
+  *(Lié au point 3, remplacé par l'ADR 0006 ; `Demande` est depuis un
+  `record`, comparé par valeur.)*
 - Une demande ajoutée à la main a des durées de collecte et de livraison de
   5 minutes (`EtatAjoutLivraison.DUREE_PAR_DEFAUT`) ; les saisir sera une
   évolution.
 - Le cache grandit avec le nombre de listes calculées dans une session ; il est
-  vidé à chaque import, ce qui suffit pour l'usage prévu.
+  vidé à chaque import, ce qui suffit pour l'usage prévu. *(Lié au point 3,
+  remplacé par l'ADR 0006.)*

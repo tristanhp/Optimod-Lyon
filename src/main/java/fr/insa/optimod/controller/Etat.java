@@ -1,5 +1,6 @@
 package fr.insa.optimod.controller;
 
+import java.util.Map;
 import java.util.Set;
 
 import fr.insa.optimod.model.Tournee;
@@ -14,6 +15,14 @@ import fr.insa.optimod.model.Tournee;
  * redéfinit que ses exceptions.
  */
 interface Etat {
+
+    /** @param controleur contrôleur ; sauvegarde ignorée par défaut */
+    default void sauvegarder(MainController controleur) {
+    }
+
+    /** @param controleur contrôleur ; restauration ignorée par défaut */
+    default void restaurer(MainController controleur) {
+    }
 
     /**
      * Clic sur « Importer le plan » : un plan valide mène à
@@ -51,15 +60,16 @@ interface Etat {
     }
 
     /**
-     * Fin du calcul de la tournée, sur le thread de l'interface. Ignorée par
+     * Fin du calcul des tournées, sur le thread de l'interface. Ignorée par
      * défaut.
      *
      * @param controleur contrôleur à piloter
-     * @param tournee tournée calculée, ou {@code null} en cas d'erreur
+     * @param tournees tournées par numéro de livreur, ou {@code null} en cas
+     *        d'erreur
      * @param erreur explication de l'erreur, ou {@code null}
      */
-    default void finirCalcul(MainController controleur, Tournee tournee,
-            String erreur) {
+    default void finirCalcul(MainController controleur,
+            Map<Integer, Tournee> tournees, String erreur) {
     }
 
     /**
@@ -80,12 +90,63 @@ interface Etat {
     }
 
     /**
+     * Clic sur « Monter » ou « Descendre » : change l'ordre d'un arrêt de la
+     * tournée d'un livreur. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param livreur numéro du livreur de l'arrêt sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
+     *        descendre
+     */
+    default void changerOrdre(MainController controleur, int livreur,
+            int rang, int decalage) {
+    }
+
+    /**
+     * Clic sur « Déplacer » : commence le déplacement d'un point de la tournée
+     * affichée, ou l'annule s'il est en cours. Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param livreur numéro du livreur de l'arrêt sélectionné, ou {@code -1}
+     *        si aucun arrêt n'est sélectionné
+     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur,
+     *        ou {@code -1} si aucun arrêt n'est sélectionné
+     */
+    default void deplacerPoint(MainController controleur, int livreur,
+            int rang) {
+    }
+
+    /**
+     * Clic sur « Changer de livreur » : confie une demande à un autre livreur.
+     * Ignoré par défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param position rang de la demande sélectionnée dans le programme
+     */
+    default void changerLivreur(MainController controleur, int position) {
+    }
+
+    /**
      * Clic sur une intersection de la carte. Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter
      * @param idNoeud identifiant du noeud cliqué
      */
     default void cliquerNoeud(MainController controleur, long idNoeud) {
+    }
+
+    /**
+     * Exception pendant le dessin de la carte (cas 7) : la page est vidée, un
+     * message remplace la carte et le contrôleur revient à
+     * {@link EtatInitial}. Valable dans tous les états où une carte est
+     * affichée ; {@link EtatInitial}, sans carte, l'ignore.
+     *
+     * @param controleur contrôleur à piloter
+     * @param detail explication de l'erreur
+     */
+    default void erreurDessin(MainController controleur, String detail) {
+        controleur.abandonnerAffichage(detail);
     }
 
     /**

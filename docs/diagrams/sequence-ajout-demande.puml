@@ -1,0 +1,48 @@
+@startuml sequence-ajout-demande
+title Ajout d'une demande après calcul sans relancer le TSP
+actor Utilisateur
+participant MainView
+participant EtatAjoutCollecte
+participant EtatAjoutLivraison
+participant MainController
+participant Plan
+participant ListeDeCommandes
+participant ProgrammeLivraisons
+Utilisateur -> MainView : choisir collecte
+MainView -> EtatAjoutCollecte : cliquerNoeud
+EtatAjoutCollecte -> MainController : afficherPointsProvisoires(collecte, null)
+MainController -> MainView : afficherPointsProvisoires(collecte, null)
+note right : Carré visible immédiatement.\nAnnuler efface l'aperçu sans mutation.
+Utilisateur -> MainView : choisir livraison
+MainView -> EtatAjoutLivraison : cliquerNoeud
+EtatAjoutLivraison -> MainController : afficherPointsProvisoires(collecte, livraison)
+MainController -> MainView : afficherPointsProvisoires(collecte, livraison)
+EtatAjoutLivraison -> MainController : saisirDemande
+MainController -> MainView : saisirDemande
+MainView --> MainController : durées et livreur, ou annulation
+EtatAjoutLivraison -> MainController : ajouterDemande(demande validée)
+MainController -> MainView : choisirPositionInsertion(tournée du livreur)
+MainView --> MainController : intervalle, « Moindre coût » ou annulation sans mutation
+MainController -> MainController : EtatCalculEnCours, attente
+note right : Exécuteur en arrière-plan.
+opt « Moindre coût » choisi par l'administrateur
+  MainController -> Plan : trouverPositionMoindreCout(tournée, demande)
+  Plan --> MainController : rang de collecte au retour le plus tôt
+end
+MainController -> Plan : insererDemande(tournée, demande, position)
+Plan -> Plan : trois chemins A* entre voisins et nouveaux arrêts
+Plan -> Plan : réutiliser les autres chemins, propager les horaires
+alt insertion possible
+  Plan --> MainController : tournée à la position choisie, plages conservées
+  MainController -> MainController : exécuteur de l'interface, tournées avant et après
+  MainController -> ListeDeCommandes : executer(CommandeAjouterDemande)
+  ListeDeCommandes -> ProgrammeLivraisons : ajouterDemande, definirTournees
+  ProgrammeLivraisons -> MainView : notifierObservateurs
+  MainController -> MainView : signalerArretsHorsPlage
+else position choisie impossible
+  Plan --> MainController : IllegalStateException
+  MainController -> MainView : conserver tournée, afficherErreurCalcul
+end
+MainController -> MainView : afficherPointsProvisoires(null, null)
+note right : Aperçu effacé à la validation,\nà l'annulation ou en cas d'échec.
+@enduml

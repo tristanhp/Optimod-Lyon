@@ -2,19 +2,89 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Ce que le contrôleur attend de l'écran de la carte. Séparer cette interface
  * de la vue JavaFX permet de tester le contrôleur sans afficher de fenêtre.
  */
 public interface MapScreen {
+
+    /**
+     * Saisie des durées en minutes et du livreur choisi.
+     * @param dureeCollecte minutes de collecte saisies
+     * @param dureeLivraison minutes de livraison saisies
+     * @param livreur numéro du livreur
+     */
+    record SaisieDemande(String dureeCollecte, String dureeLivraison,
+            int livreur) {
+
+        /**
+         * Convertit une durée strictement positive en secondes entières.
+         * @param texte minutes saisies
+         * @return secondes
+         * @throws IllegalArgumentException si la saisie est invalide
+         */
+        public static int convertirDuree(String texte) {
+            try {
+                int minutes = Integer.parseInt(texte.trim());
+                if (minutes <= 0) {
+                    throw new NumberFormatException();
+                }
+                return Math.multiplyExact(minutes, 60);
+            } catch (NumberFormatException | ArithmeticException erreur) {
+                throw new IllegalArgumentException("Saisir une durée entière "
+                        + "strictement positive en minutes.", erreur);
+            }
+        }
+    }
+
+    /**
+     * Renvoie saisie des durées et du livreur, ou vide après annulation.
+     * @return saisie des durées et du livreur, ou vide après annulation
+     */
+    Optional<SaisieDemande> saisirDemande();
+
+    /**
+     * Affiche les points choisis avant validation de la demande.
+     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param livraison point de livraison, ou null avant le second clic
+     */
+    void afficherPointsProvisoires(Noeud collecte, Noeud livraison);
+
+    /**
+     * Valeur renvoyée par {@link #choisirPositionInsertion} quand
+     * l'administrateur choisit l'entrée « Moindre coût » : le contrôleur
+     * cherche alors la position qui fait rentrer le livreur le plus tôt. Les
+     * vraies positions commencent à 1.
+     */
+    int POSITION_MOINDRE_COUT = 0;
+
+    /**
+     * Fait choisir l'intervalle où insérer collecte puis livraison, ou
+     * l'entrée « Moindre coût » qui laisse l'application proposer la position
+     * (rien n'est calculé tant que l'administrateur ne la choisit pas).
+     * @param tournee arrêts existants dans leur ordre de passage
+     * @return rang de collecte (à partir de 1), {@link #POSITION_MOINDRE_COUT},
+     *         ou vide après annulation
+     */
+    Optional<Integer> choisirPositionInsertion(Tournee tournee);
+
+    /**
+     * Signale les arrêts hors de leur plage sans bloquer l'annulation.
+     * @param arrets arrêts concernés, vide pour retirer le signalement
+     */
+    void signalerArretsHorsPlage(List<Tournee.Arret> arrets);
 
     /** Actions de l'utilisateur que l'écran peut activer ou désactiver. */
     enum Action {
@@ -28,16 +98,32 @@ public interface MapScreen {
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */
         SUPPRIMER_DEMANDE,
+        /** Boutons « Monter » et « Descendre » (arrêt sélectionné). */
+        CHANGER_ORDRE,
+        /** Bouton « Déplacer » (ou annuler le déplacement en cours). */
+        DEPLACER_POINT,
+        /** Bouton « Changer de livreur » (demande sélectionnée). */
+        CHANGER_LIVREUR,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
-        REFAIRE
+        REFAIRE,
+        /** Sauvegarder la tournée calculée. */
+        SAUVEGARDER,
+        /** Restaurer une sauvegarde XML. */
+        RESTAURER
     }
 
-    /** Définit l'action d'import des demandes. @param action action au clic */
+    /**
+     * Définit l'action d'import des demandes.
+     * @param action action au clic
+     */
     void definirActionImportProgramme(Runnable action);
 
-    /** @return fichier XML de demandes choisi, ou vide après annulation */
+    /**
+     * Renvoie fichier XML de demandes choisi, ou vide après annulation.
+     * @return fichier XML de demandes choisi, ou vide après annulation
+     */
     Optional<File> choisirFichierDemandes();
 
     /**
@@ -113,6 +199,64 @@ public interface MapScreen {
     void definirActionSupprimerDemande(IntConsumer action);
 
     /**
+     * Définit l'action du bouton « Monter » (faire passer plus tôt l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionMonterArret(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Descendre » (faire passer plus tard l'arrêt
+     * sélectionné dans la liste des tournées).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur (0 est le départ de
+     *        l'entrepôt)
+     */
+    void definirActionDescendreArret(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Déplacer » (déplacer un point de collecte
+     * ou de livraison de la tournée).
+     *
+     * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
+     *        son rang dans la tournée de ce livreur ; {@code -1} et {@code -1}
+     *        si aucun arrêt n'est sélectionné
+     */
+    void definirActionDeplacerPoint(BiConsumer<Integer, Integer> action);
+
+    /**
+     * Définit l'action du bouton « Changer de livreur » (confier la demande
+     * sélectionnée dans la liste des demandes à un autre livreur).
+     *
+     * @param action reçoit le rang de la demande sélectionnée dans le
+     *        programme, ou {@code -1} si aucune n'est sélectionnée
+     */
+    void definirActionChangerLivreur(IntConsumer action);
+
+    /**
+     * Fait choisir à quel livreur confier une demande.
+     *
+     * @param livreurActuel numéro du livreur qui a la demande, à ne pas
+     *        proposer
+     * @param nombreDeLivreurs nombre de livreurs (numérotés à partir de 1)
+     * @return numéro du livreur choisi, ou vide après annulation
+     */
+    Optional<Integer> choisirLivreur(int livreurActuel, int nombreDeLivreurs);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement de livreur est refusé
+     * (adresse inaccessible, retour après 13 h) ; les demandes et les tournées
+     * n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusChangementLivreur(String detail);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter
@@ -141,9 +285,6 @@ public interface MapScreen {
      */
     void afficherConsigne(String consigne);
 
-    /** Retire la tournée affichée (elle ne correspond plus aux demandes). */
-    void effacerTournee();
-
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.
      *
@@ -152,11 +293,49 @@ public interface MapScreen {
     void afficherAttente(boolean waiting);
 
     /**
-     * Affiche la tournée calculée.
+     * Sélectionne un arrêt dans la liste des tournées. Après un changement
+     * d'ordre, la liste est refaite (la vue observe le programme) et la
+     * sélection perdue : le contrôleur resélectionne l'arrêt déplacé, à sa
+     * nouvelle place.
      *
-     * @param tournee arrêts de la tournée avec leurs heures de passage
+     * @param livreur numéro du livreur de la tournée
+     * @param rang rang de l'arrêt dans sa tournée (0 est le départ de
+     *        l'entrepôt)
      */
-    void afficherTournee(Tournee tournee);
+    void selectionnerArretTournee(int livreur, int rang);
+
+    /**
+     * Explique à l'utilisateur pourquoi le changement d'ordre est refusé ; les
+     * tournées affichées n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusOrdre(String detail);
+
+    /**
+     * Explique à l'utilisateur pourquoi le déplacement du point est refusé
+     * (tournée impossible) ; la tournée et les demandes n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusDeplacement(String detail);
+
+    /**
+     * Définit l'action déclenchée quand le dessin de la carte lève une
+     * exception.
+     *
+     * @param action reçoit l'explication de l'erreur
+     */
+    void definirActionErreurDessin(Consumer<String> action);
+
+    /**
+     * Affiche un message à la place de la carte : le plan ou la tournée n'a
+     * pas pu être dessiné. La page a déjà été vidée par
+     * {@link #reinitialiser()}.
+     *
+     * @param detail explication de l'erreur
+     */
+    void afficherErreurCarte(String detail);
 
     /**
      * Signale que le calcul a échoué.
@@ -164,4 +343,28 @@ public interface MapScreen {
      * @param detail explication de l'erreur
      */
     void afficherErreurCalcul(String detail);
+
+    /**
+     * Définit l'action de sauvegarde de la tournée.
+     * @param action action de sauvegarde
+     */
+    void definirActionSauvegarder(Runnable action);
+
+    /**
+     * Définit l'action de restauration de la tournée.
+     * @param action action de restauration
+     */
+    void definirActionRestaurer(Runnable action);
+
+    /**
+     * Renvoie destination XML, ou vide après annulation.
+     * @return destination XML, ou vide après annulation
+     */
+    Optional<File> choisirFichierSauvegarde();
+
+    /**
+     * Renvoie sauvegarde XML, ou vide après annulation.
+     * @return sauvegarde XML, ou vide après annulation
+     */
+    Optional<File> choisirFichierRestauration();
 }

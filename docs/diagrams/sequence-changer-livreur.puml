@@ -1,0 +1,37 @@
+@startuml sequence-changer-livreur
+title Changer le livreur d'une demande après calcul, sans relancer le TSP
+actor Administrateur
+participant MainView
+participant EtatTourneeCalculee
+participant MainController
+participant Plan
+participant ListeDeCommandes
+participant ProgrammeLivraisons
+Administrateur -> MainView : sélectionner une demande, « Changer de livreur »
+MainView -> EtatTourneeCalculee : changerLivreur(position de la demande)
+EtatTourneeCalculee -> MainController : changerLivreurDemande(position)
+MainController -> MainView : choisirLivreur(livreur actuel, nombre de livreurs)
+MainView --> MainController : nouveau livreur, ou annulation sans mutation
+MainController -> MainView : choisirPositionInsertion(tournée du nouveau livreur)
+MainView --> MainController : intervalle, « Moindre coût » ou annulation sans mutation
+MainController -> MainController : EtatCalculEnCours, attente
+note right : Exécuteur en arrière-plan.
+MainController -> Plan : calculerTourneeSansDemande(tournée de l'ancien livreur, demande)
+Plan --> MainController : tournée sans la demande, ordre des autres arrêts gardé
+opt « Moindre coût » choisi par l'administrateur
+  MainController -> Plan : trouverPositionMoindreCout(tournée du nouveau livreur, demande)
+  Plan --> MainController : rang de collecte au retour le plus tôt
+end
+MainController -> Plan : insererDemande(tournée du nouveau livreur, demande, position)
+alt insertion possible
+  Plan --> MainController : tournée du nouveau livreur avec la demande
+  MainController -> MainController : exécuteur de l'interface, tournées avant et après
+  MainController -> ListeDeCommandes : executer(CommandeChangerLivreur)
+  ListeDeCommandes -> ProgrammeLivraisons : remplacerDemandeEtTournees
+  ProgrammeLivraisons -> MainView : notifierObservateurs (une seule fois)
+  MainController -> MainView : afficherConsigne (ordre non optimisé, deux livreurs)
+else adresse inaccessible ou retour après 13 h
+  Plan --> MainController : IllegalStateException
+  MainController -> MainView : afficherRefusChangementLivreur, rien n'est modifié
+end
+@enduml

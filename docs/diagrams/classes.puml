@@ -12,11 +12,27 @@ package "model" {
     +obtenirNoeuds() : Collection<Noeud>
     +obtenirNoeud(identifiant : long) : Noeud
     +obtenirTroncons() : List<Troncon>
-    +calculerTournee(programme : ProgrammeLivraisons) : Tournee
-    -calculerPlusCourtsChemins(adresses) : Chemin[][]
-    -calculerOrdreDePassage(chemins) : List<Integer>
+    +calculerTournees(programme : ProgrammeLivraisons) : Map<Integer, Tournee>
+    +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
+    +insererDemande(tournee, demande, position) : Tournee
+    +trouverPositionMoindreCout(tournee, demande) : int
+    +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
+    +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
+    +calculerTourneeAvecPointDeplace(tournee : Tournee, rang : int, nouveau : Noeud) : Tournee
+    -ordresMemorises : Map<List<Sommet>, List<Integer>>
+    -calculerTournee(entrepot, heureDepart, demandes, limiteTemps) : Tournee
+    -calculerPlusCourtsChemins(sommets) : Chemin[][]
+    -calculerOrdreDePassage(chemins, limiteTemps) : List<Integer>
     -calculerHeuresDePassage(...) : Tournee
     ~plusCourtChemin(source : Noeud, cible : Noeud) : Chemin
+  }
+  class SauvegardeTournee <<record>> {
+    plan : Plan
+    fichierPlan : Path
+    programme : ProgrammeLivraisons
+    tournee : Tournee
+    +{static} sauvegarder(fichier, fichierPlan, programme, tournee)
+    +{static} restaurer(fichier) : SauvegardeTournee
   }
   class Noeud <<record>> {
     identifiant : long
@@ -49,22 +65,45 @@ package "model" {
     +obtenirDemandes() : List<Demande>
     +ajouterDemande(position : int, demande : Demande)
     +retirerDemande(position : int) : Demande
+    +remplacerDemande(position : int, demande : Demande)
+    +remplacerDemandeEtTournees(position : int, demande : Demande, tournees : Map<Integer, Tournee>)
+    +obtenirNombreLivreurs() : int
+    +definirNombreLivreurs(nombre : int)
+    +obtenirTournees() : Map<Integer, Tournee>
+    +definirTournees(tournees : Map<Integer, Tournee>)
+    +definirTournee(livreur : int, tournee : Tournee)
+    +effacerTournees()
   }
   class "ProgrammeLivraisons.Demande" as Demande <<record>> {
     collecte : Noeud
     livraison : Noeud
     dureeCollecte : int
     dureeLivraison : int
+    livreur : int
+    +avecLivreur(autreLivreur : int) : Demande
   }
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
     +obtenirHeureRetour() : LocalTime
+    +estPossible() : boolean
   }
   class "Tournee.Arret" as Arret <<record>> {
     noeud : Noeud
     arrivee : LocalTime
     depart : LocalTime
+    type : TypeArret
+    demande : Demande
+    debutPlage : LocalTime
+    finPlage : LocalTime
+    +estHorsPlage() : boolean
+    +obtenirDecalageSecondes() : long
+    +estApresHeureLimite() : boolean
+  }
+  enum "Tournee.TypeArret" as TypeArret {
+    ENTREPOT
+    COLLECTE
+    LIVRAISON
   }
 }
 
@@ -81,29 +120,57 @@ package "controller" {
     +obtenirProgramme() : ProgrammeLivraisons
     ~changerEtat(nouvelEtat : Etat)
     ~executer(commande : Commande)
-    -tourneesCalculees : Map<List<Demande>, Tournee>
+    ~rangerTournees(tournees : Map<Integer, Tournee>)
+    ~supprimerDemandeEnGardantLOrdre(position : int)
+    ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
+    ~changerLivreurDemande(position : int)
+    ~choisirPointADeplacer(livreur : int, rang : int)
+    ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
-  interface MapScreen
+  interface MapScreen {
+    +saisirDemande() : Optional<SaisieDemande>
+    +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
+    +{static} POSITION_MOINDRE_COUT : int = 0
+    +choisirPositionInsertion(tournee) : Optional<Integer>
+    +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
+    +afficherRefusChangementLivreur(detail)
+    +signalerArretsHorsPlage(arrets)
+  }
+  class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
+    dureeCollecte : String
+    dureeLivraison : String
+    livreur : int
+  }
   interface Etat
   class EtatInitial
   class EtatPlanCharge
   class EtatProgrammeCharge
   class EtatTourneeCalculee
   class EtatCalculEnCours
+  class EtatRestauration
   class EtatAjoutCollecte
   class EtatAjoutLivraison
+  class EtatDeplacementPoint
   interface Commande {
     +executer()
     +annuler()
+    +memoriserTourneesAvant(tournees : Map<Integer, Tournee>)
+    +memoriserTourneesApres(tournees : Map<Integer, Tournee>)
   }
-  class ListeDeCommandes
+  class ListeDeCommandes {
+    ~memoriserTournees(tournees : Map<Integer, Tournee>)
+  }
   class CommandeAjouterDemande
   class CommandeSupprimerDemande
+  class CommandeChangerOrdre
+  class CommandeDeplacerPoint
+  class CommandeChangerLivreur
 }
 
 package "view" {
   class MainView
   class MapCanvas
+  class LibellesArrets
   class MapProjection
 }
 
@@ -111,8 +178,8 @@ Plan *--> "*" Noeud
 Plan *--> "*" Troncon
 Troncon --> "2" Noeud
 Chemin o--> "*" Troncon
-Plan ..> ProgrammeLivraisons : calculerTournee
-Plan ..> Tournee : crée
+Plan ..> ProgrammeLivraisons : calculerTournees
+Plan ..> Tournee : crée et recalcule
 Plan ..> TSP3 : ordre de passage
 TSP3 --|> TemplateTSP
 TemplateTSP ..> GrapheDepandance
@@ -120,8 +187,11 @@ ProgrammeLivraisons --|> Observable
 Observable o--> "*" Observateur
 ProgrammeLivraisons *--> "*" Demande
 ProgrammeLivraisons --> "1" Noeud : entrepot
+ProgrammeLivraisons o--> "*" Tournee : une par livreur
 Demande --> "2" Noeud
 Tournee *--> "*" Arret
+Arret --> "1" TypeArret
+Arret --> "0..1" Demande
 Tournee o--> "*" Chemin
 
 MainController --> "1" MapScreen : ecran
@@ -134,14 +204,23 @@ EtatPlanCharge ..|> Etat
 EtatProgrammeCharge ..|> Etat
 EtatTourneeCalculee --|> EtatProgrammeCharge
 EtatCalculEnCours ..|> Etat
+EtatRestauration ..|> Etat
+MainController ..> SauvegardeTournee
+SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
+EtatDeplacementPoint ..|> Etat
 ListeDeCommandes o--> "*" Commande
 CommandeAjouterDemande ..|> Commande
 CommandeSupprimerDemande ..|> Commande
+CommandeChangerOrdre ..|> Commande
+CommandeDeplacerPoint ..|> Commande
+CommandeChangerLivreur ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur
 MainView *--> "1" MapCanvas
 MapCanvas ..> MapProjection
+MapCanvas ..> LibellesArrets
+MainView ..> LibellesArrets
 @enduml

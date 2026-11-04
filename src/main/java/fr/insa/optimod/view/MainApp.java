@@ -39,7 +39,7 @@ public final class MainApp extends Application {
             t.setDaemon(true);
             return t;
         });
-        controleur = new MainController(vue, Plan::calculerTournee, calcul,
+        controleur = new MainController(vue, Plan::calculerTournees, calcul,
                 Platform::runLater);
         Scene scene = new Scene(vue, LARGEUR, HAUTEUR);
         scene.getStylesheets().add(Objects.requireNonNull(
