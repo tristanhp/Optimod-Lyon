@@ -108,6 +108,9 @@ final class MapCanvas extends Pane {
     /** Écart entre deux passages sur un même tronçon, en pixels. */
     private static final double ECART_PASSAGES = 3.5;
 
+    /** Longueur d'écran en dessous de laquelle « ×N » n'est pas écrit. */
+    private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
+
     /** Demi-longueur d'une flèche de sens, en pixels. */
     private static final double TAILLE_FLECHE = 5;
 
@@ -616,25 +619,31 @@ final class MapCanvas extends Pane {
         if (longueur < LONGUEUR_MINIMALE_FLECHE) {
             return;
         }
+        double taille = nombre > 1 ? TAILLE_FLECHE * 0.6 : TAILLE_FLECHE;
         double mx = (x1 + x2) / 2;
         double my = (y1 + y2) / 2;
-        double[] abscisses = {mx + ux * TAILLE_FLECHE,
-            mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
-            mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8};
-        double[] ordonnees = {my + uy * TAILLE_FLECHE,
-            my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
-            my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8};
+        double[] abscisses = {mx + ux * taille,
+            mx - ux * taille * 0.6 - uy * taille * 0.8,
+            mx - ux * taille * 0.6 + uy * taille * 0.8};
+        double[] ordonnees = {my + uy * taille,
+            my - uy * taille * 0.6 + ux * taille * 0.8,
+            my - uy * taille * 0.6 - ux * taille * 0.8};
         contexte.setFill(Color.WHITE);
         contexte.fillPolygon(abscisses, ordonnees, 3);
     }
 
-    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois. */
+    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois, s'il est long. */
     private void dessinerNombrePassages(GraphicsContext contexte,
             Troncon troncon, int nombre) {
-        double x = (ecranX(troncon.origine().longitude())
-                + ecranX(troncon.destination().longitude())) / 2;
-        double y = (ecranY(troncon.origine().latitude())
-                + ecranY(troncon.destination().latitude())) / 2;
+        double x1 = ecranX(troncon.origine().longitude());
+        double y1 = ecranY(troncon.origine().latitude());
+        double x2 = ecranX(troncon.destination().longitude());
+        double y2 = ecranY(troncon.destination().latitude());
+        if (Math.hypot(x2 - x1, y2 - y1) < LONGUEUR_MINIMALE_NOMBRE) {
+            return;
+        }
+        double x = (x1 + x2) / 2;
+        double y = (y1 + y2) / 2;
         String texte = "×" + nombre;
         contexte.setFont(Font.font(null, FontWeight.BOLD, 11));
         contexte.setTextAlign(TextAlignment.CENTER);
