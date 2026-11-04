@@ -24,6 +24,9 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
 /**
@@ -41,10 +44,20 @@ final class MapCanvas extends Pane {
     /** Demi-côté d'un marqueur de collecte ou de livraison, en pixels. */
     private static final double TAILLE_MARQUEUR = 5;
 
-    private static final Color COULEUR_ENTREPOT = Color.web("#202124");
+    /** Orange vif, absent des couleurs des demandes et du fond. */
+    private static final Color COULEUR_ENTREPOT = Color.web("#ff6d00");
+
+    private static final Color COULEUR_CONTOUR_ENTREPOT = Color.WHITE;
+
+    private static final Color COULEUR_TEXTE = Color.web("#202124");
 
     /** Demi-diagonale du losange de l'entrepôt, en pixels. */
-    private static final double TAILLE_ENTREPOT = 9;
+    private static final double TAILLE_ENTREPOT = 11;
+
+    /** Marge, hauteur de ligne et taille des symboles de la légende. */
+    private static final double MARGE_LEGENDE = 10;
+    private static final double HAUTEUR_LIGNE_LEGENDE = 20;
+    private static final double TAILLE_SYMBOLE_LEGENDE = 5;
 
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
@@ -518,6 +531,7 @@ final class MapCanvas extends Pane {
         }
         dessinerNumerosArrets(contexteGraphique);
         dessinerPointsProvisoires(contexteGraphique);
+        dessinerLegende(contexteGraphique);
     }
 
     /**
@@ -640,13 +654,13 @@ final class MapCanvas extends Pane {
                 dessinerDemande(contexte, indice, false);
             }
         }
+        dessinerEntrepot(contexte);
         if (demandeEnEvidence >= 0 && demandeEnEvidence < demandes.size()) {
             dessinerDemande(contexte, demandeEnEvidence, true);
         }
-        dessinerEntrepot(contexte);
     }
 
-    /** Dessine l'entrepôt par-dessus le reste : losange étiqueté. */
+    /** Dessine l'entrepôt par-dessus les demandes, sauf celle en évidence. */
     private void dessinerEntrepot(GraphicsContext contexte) {
         Noeud depot = programme.obtenirEntrepot();
         if (depot == null) {
@@ -657,14 +671,89 @@ final class MapCanvas extends Pane {
         double[] abscisses = {x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT};
         double[] ordonnees = {y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y};
         contexte.setFill(COULEUR_ENTREPOT);
-        contexte.setStroke(COULEUR_FOND);
-        contexte.setLineWidth(2);
-        contexte.fillPolygon(abscisses, ordonnees, 4);
-        contexte.strokePolygon(abscisses, ordonnees, 4);
-        contexte.setTextAlign(TextAlignment.CENTER);
+        contexte.setStroke(COULEUR_CONTOUR_ENTREPOT);
         contexte.setLineWidth(3);
-        contexte.strokeText("Entrepôt", x, y - TAILLE_ENTREPOT - 4);
-        contexte.fillText("Entrepôt", x, y - TAILLE_ENTREPOT - 4);
+        contexte.strokePolygon(abscisses, ordonnees, 4);
+        contexte.fillPolygon(abscisses, ordonnees, 4);
+        dessinerEtiquetteEntrepot(contexte, x, y - TAILLE_ENTREPOT - 6);
+    }
+
+    /** Dessine « Entrepôt » dans une étiquette blanche, lisible sur le plan. */
+    private void dessinerEtiquetteEntrepot(GraphicsContext contexte,
+            double x, double basY) {
+        Font police = Font.font(null, FontWeight.BOLD, 12);
+        Text mesure = new Text("Entrepôt");
+        mesure.setFont(police);
+        double largeur = mesure.getLayoutBounds().getWidth() + 12;
+        double hauteur = 18;
+        double gauche = x - largeur / 2;
+        double haut = basY - hauteur;
+        contexte.setFill(Color.WHITE);
+        contexte.setStroke(COULEUR_ENTREPOT);
+        contexte.setLineWidth(2);
+        contexte.fillRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.setFont(police);
+        contexte.setTextAlign(TextAlignment.CENTER);
+        contexte.setFill(COULEUR_TEXTE);
+        contexte.fillText("Entrepôt", x, basY - 5);
+    }
+
+    /**
+     * Dessine la légende en bas à gauche : entrepôt, collecte, livraison et,
+     * si une tournée est affichée, son tracé (du clair au foncé).
+     */
+    private void dessinerLegende(GraphicsContext contexte) {
+        boolean avecTournee = !tournees.isEmpty();
+        String[] libelles = {"Entrepôt", "Point de collecte",
+            "Point de livraison", "Tournée (clair → foncé)"};
+        int lignes = avecTournee ? libelles.length : libelles.length - 1;
+        double largeur = 170;
+        double hauteur = HAUTEUR_LIGNE_LEGENDE * lignes + 8;
+        double gauche = MARGE_LEGENDE;
+        double haut = canevas.getHeight() - MARGE_LEGENDE - hauteur;
+        contexte.setFill(Color.web("#ffffff", 0.92));
+        contexte.setStroke(COULEUR_RUE);
+        contexte.setLineWidth(1);
+        contexte.fillRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.setFont(Font.getDefault());
+        contexte.setTextAlign(TextAlignment.LEFT);
+        for (int i = 0; i < lignes; i++) {
+            double cx = gauche + 16;
+            double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (i + 0.5);
+            dessinerSymboleLegende(contexte, i, cx, cy);
+            contexte.setFill(COULEUR_TEXTE);
+            contexte.fillText(libelles[i], cx + 16, cy + 4);
+        }
+    }
+
+    /** Dessine le symbole de la ligne i de la légende, centré en (cx, cy). */
+    private void dessinerSymboleLegende(GraphicsContext contexte, int i,
+            double cx, double cy) {
+        double t = TAILLE_SYMBOLE_LEGENDE;
+        if (i == 0) {
+            contexte.setFill(COULEUR_ENTREPOT);
+            contexte.setStroke(COULEUR_CONTOUR_ENTREPOT);
+            contexte.setLineWidth(1.5);
+            double[] xs = {cx, cx + t + 2, cx, cx - t - 2};
+            double[] ys = {cy - t - 2, cy, cy + t + 2, cy};
+            contexte.strokePolygon(xs, ys, 4);
+            contexte.fillPolygon(xs, ys, 4);
+        } else if (i == 1) {
+            contexte.setFill(COULEUR_RUE);
+            contexte.fillRect(cx - t, cy - t, 2 * t, 2 * t);
+        } else if (i == 2) {
+            contexte.setFill(COULEUR_RUE);
+            contexte.fillOval(cx - t, cy - t, 2 * t, 2 * t);
+        } else {
+            contexte.setLineCap(StrokeLineCap.ROUND);
+            contexte.setLineWidth(4);
+            contexte.setStroke(COULEUR_DEBUT_TOURNEE);
+            contexte.strokeLine(cx - 8, cy, cx, cy);
+            contexte.setStroke(COULEUR_FIN_TOURNEE);
+            contexte.strokeLine(cx, cy, cx + 8, cy);
+        }
     }
 
     /** Dessine la collecte (carré) et la livraison (rond) d'une demande. */
