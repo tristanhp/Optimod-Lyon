@@ -90,9 +90,6 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            System.out.println(
-                    grapheDepandance.obtenirCoutArc(sommetDepart, precedent) + " " + grapheDepandance.obtenirCoutArc(
-                            sommetDepart, suivant));
             assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
                     sommetDepart,
                     suivant));
