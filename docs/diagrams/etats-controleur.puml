@@ -60,6 +60,7 @@ EtatDeplacementPoint --> choix : deplacerPoint (annule le déplacement)
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
 tous --> EtatPlanCharge : importerPlan [plan valide]
 tous --> EtatInitial : importerPlan [plan invalide]
+tous --> EtatInitial : erreurDessin [exception pendant le dessin]
 tous --> EtatRestauration : restaurer [fichier choisi]
 EtatRestauration --> EtatTourneeCalculee : succès / vider historique
 EtatRestauration --> tous : erreur / retrouver état précédent
