@@ -9,6 +9,15 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * Aucun plan chargé : importer un plan ou restaurer une tournée est possible.
  */
 final class EtatInitial implements Etat {
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE =
+            "Commencez par importer un plan (bouton « Importer le plan »).";
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
 
     @Override
     public void restaurer(MainController controleur) {
