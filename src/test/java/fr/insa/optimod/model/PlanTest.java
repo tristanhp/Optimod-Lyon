@@ -723,6 +723,117 @@ public class PlanTest {
         assertEquals(memorises, plan.nombreOrdresMemorises());
     }
 
+    // --- Livreurs possibles pour une demande ---
+
+    /** Tournée vide d'un livreur, au départ de l'entrepôt à l'heure donnée. */
+    private static Tournee tourneeVideA(Plan plan, LocalTime heureDepart) {
+        return tourneeImposee(plan, heureDepart, List.of(plan.obtenirNoeud(1)),
+                List.of(0));
+    }
+
+    /** Demande du petit réseau (collecte en 3, livraison en 2) du livreur 1. */
+    private static Demande demandeDuPetitReseau(Plan plan) {
+        return new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60, 60);
+    }
+
+    /**
+     * Le livreur 1 partirait trop tard pour une demande de plus, le livreur 2
+     * a le temps : seul le livreur 2 est proposé.
+     */
+    @Test
+    public void livreursPossiblesContientUnAutreLivreur() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(12, 59)),
+                2, tourneeVideA(plan, LocalTime.of(8, 0)));
+        assertEquals(List.of(2), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /**
+     * Le livreur de la demande est proposé lui aussi s'il peut la prendre :
+     * l'administrateur peut choisir une autre position chez lui. La liste est
+     * dans l'ordre des numéros de livreur.
+     */
+    @Test
+    public void livreursPossiblesContientLeLivreurDeLaDemande()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                2, tourneeVideA(plan, LocalTime.of(8, 0)),
+                1, tourneeVideA(plan, LocalTime.of(9, 0)));
+        assertEquals(List.of(1, 2), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /**
+     * Une tournée qui rentre déjà après 13 h accepterait la demande
+     * ({@link Plan#insererDemande}), mais ne rentrerait pas avant 13 h : son
+     * livreur n'est pas proposé.
+     */
+    @Test
+    public void livreursPossiblesExclutUneTourneeDejaEnRetard()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Tournee enRetard = tourneeImposee(plan, LocalTime.of(12, 59),
+                List.of(entrepot, plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                        entrepot),
+                List.of(0, 60, 60, 0));
+        assertFalse(enRetard.estPossible());
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(8, 0)),
+                2, enRetard);
+        assertEquals(List.of(1), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /** Aucun livreur ne rentre avant 13 h : la liste est vide. */
+    @Test
+    public void livreursPossiblesVideSiPersonneNeRentreAvant13h()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(12, 59)),
+                2, tourneeVideA(plan, LocalTime.of(12, 59)));
+        assertTrue(plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)).isEmpty());
+    }
+
+    /**
+     * Une livraison inaccessible depuis la collecte l'est pour tous les
+     * livreurs : la liste est vide, sans exception.
+     */
+    @Test
+    public void livreursPossiblesVideSiAdresseInaccessible() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(8, 0)),
+                2, tourneeVideA(plan, LocalTime.of(8, 0)));
+        Demande inaccessible = new Demande(plan.obtenirNoeud(4),
+                plan.obtenirNoeud(2), 60, 60);
+        assertTrue(plan.trouverLivreursPossibles(tournees, inaccessible)
+                .isEmpty());
+    }
+
+    /** Chercher les livreurs possibles ne modifie aucune tournée. */
+    @Test
+    public void livreursPossiblesNeModifieAucuneTournee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee premiere = tourneeDeTroisNoeuds(plan);
+        Tournee seconde = tourneeVideA(plan, LocalTime.of(8, 0));
+        Map<Integer, Tournee> tournees = Map.of(1, premiere, 2, seconde);
+        int arretsAvant = premiere.arrets().size();
+        int memorises = plan.nombreOrdresMemorises();
+        plan.trouverLivreursPossibles(tournees, demandeDuPetitReseau(plan));
+        assertEquals(2, tournees.size());
+        assertSame(premiere, tournees.get(1));
+        assertSame(seconde, tournees.get(2));
+        assertEquals(arretsAvant, premiere.arrets().size());
+        assertEquals(1, seconde.arrets().size());
+        assertEquals(memorises, plan.nombreOrdresMemorises());
+    }
+
     // --- Mémoire de l'ordre de passage du voyageur de commerce ---
 
     /**

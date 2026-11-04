@@ -499,6 +499,50 @@ public final class Plan {
     }
 
     /**
+     * Cherche les livreurs qui peuvent prendre une demande de plus et rentrer
+     * à l'entrepôt avant {@link #HEURE_LIMITE_RETOUR}. C'est une aide à la
+     * décision, utilisée quand l'insertion chez le livreur choisi est refusée :
+     * rien n'est inséré, aucune tournée ne change, et l'administrateur choisit
+     * ensuite le livreur puis la position.
+     *
+     * <p>Pour chaque livreur, y compris celui de la demande, on essaie la
+     * position de {@link #trouverPositionMoindreCout}. Elle donne le retour le
+     * plus tôt parmi toutes les positions (les durées sur place sont les mêmes
+     * partout) : si elle ne rentre pas avant 13 h, aucune autre position ne le
+     * peut. Ce n'est donc qu'un test de faisabilité : la position réellement
+     * choisie par l'administrateur peut être une autre. Un livreur dont la
+     * tournée rentre déjà après 13 h n'est pas proposé, de même qu'un livreur
+     * pour lequel une adresse est inaccessible. Le voyageur de commerce n'est
+     * pas lancé.
+     *
+     * @param tournees tournées actuelles, par numéro de livreur, jamais
+     *        modifiées
+     * @param demande demande à ajouter ; son livreur est ignoré
+     * @return numéros des livreurs possibles, dans l'ordre croissant ; vide si
+     *         personne ne peut la prendre avant 13 h
+     */
+    public List<Integer> trouverLivreursPossibles(
+            Map<Integer, Tournee> tournees, Demande demande) {
+        List<Integer> possibles = new ArrayList<>();
+        for (Map.Entry<Integer, Tournee> entree
+                : new TreeMap<>(tournees).entrySet()) {
+            Demande chezLivreur = demande.avecLivreur(entree.getKey());
+            try {
+                int position = trouverPositionMoindreCout(entree.getValue(),
+                        chezLivreur);
+                if (insererDemande(entree.getValue(), chezLivreur, position)
+                        .estPossible()) {
+                    possibles.add(entree.getKey());
+                }
+            } catch (IllegalStateException refus) {
+                // Retour après 13 h ou adresse inaccessible : livreur écarté.
+                continue;
+            }
+        }
+        return Collections.unmodifiableList(possibles);
+    }
+
+    /**
      * Graphe des plus courts chemins : le plus court chemin entre chaque
      * couple d'adresses.
      */

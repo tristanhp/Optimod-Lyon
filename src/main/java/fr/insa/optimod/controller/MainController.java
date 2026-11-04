@@ -330,16 +330,36 @@ public final class MainController {
      * Comme pour la suppression, le calcul se fait avant la commande : annuler
      * et rétablir ne recalculent rien.
      *
+     * <p>Si l'insertion est refusée parce que le livreur rentrerait après
+     * 13 h, l'administrateur se voit proposer les livreurs qui peuvent prendre
+     * la demande ({@link Plan#trouverLivreursPossibles}), y compris celui de
+     * la demande, puisqu'une autre position peut suffire. Le livreur choisi,
+     * il choisit la position dans sa tournée, comme à l'ajout. S'il n'y a
+     * aucun livreur possible, ou s'il annule, l'ajout est abandonné : rien
+     * n'est modifié.
+     *
      * @param demande demande validée
      */
     void ajouterDemande(Demande demande) {
         Map<Integer, Tournee> avant = programme.obtenirTournees();
-        Commande commande = new CommandeAjouterDemande(programme, demande);
-        Tournee tourneeLivreur = avant.get(demande.livreur());
-        if (tourneeLivreur == null) {
-            executer(commande);
+        if (!avant.containsKey(demande.livreur())) {
+            executer(new CommandeAjouterDemande(programme, demande));
             return;
         }
+        placerDemande(demande, avant);
+    }
+
+    /**
+     * Fait choisir la position de la demande dans la tournée de son livreur,
+     * puis l'insère hors du thread de l'interface. Un refus pour cause de
+     * retour après 13 h mène à la proposition d'autres livreurs
+     * ({@link #proposerLivreurs}), qui peut rappeler cette méthode.
+     *
+     * @param demande demande à insérer chez son livreur
+     * @param avant tournées d'avant l'ajout, par livreur
+     */
+    private void placerDemande(Demande demande, Map<Integer, Tournee> avant) {
+        Tournee tourneeLivreur = avant.get(demande.livreur());
         Integer position = ecran.choisirPositionInsertion(tourneeLivreur)
                 .orElse(null);
         if (position == null) {
@@ -354,24 +374,103 @@ public final class MainController {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
                         demande, positionEffective(planCalcule,
                                 tourneeLivreur, demande, position));
-                interfaceUtilisateur.execute(() -> {
-                    ecran.afficherAttente(false);
-                    Map<Integer, Tournee> tournees = new TreeMap<>(avant);
-                    tournees.put(demande.livreur(), apres);
-                    commande.memoriserTourneesAvant(avant);
-                    commande.memoriserTourneesApres(
-                            Collections.unmodifiableMap(tournees));
-                    executer(commande);
-                    afficherConsigneOrdreNonOptimise(demande.livreur());
-                });
+                interfaceUtilisateur.execute(
+                        () -> finirAjout(demande, avant, apres));
+            } catch (IllegalStateException refus) {
+                chercherLivreurs(planCalcule, demande, avant, refus);
             } catch (RuntimeException erreur) {
-                interfaceUtilisateur.execute(() -> {
-                    ecran.afficherAttente(false);
-                    retrouverEtatProgramme();
-                    ecran.afficherErreurCalcul(erreur.getMessage());
-                });
+                interfaceUtilisateur.execute(() -> refuserAjout(erreur));
             }
         });
+    }
+
+    /**
+     * Cherche les livreurs possibles après un refus, hors du thread de
+     * l'interface, puis les propose sur ce thread.
+     *
+     * @param planCalcule plan sur lequel chercher
+     * @param demande demande refusée
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param refus cause du refus chez le livreur de la demande
+     */
+    private void chercherLivreurs(Plan planCalcule, Demande demande,
+            Map<Integer, Tournee> avant, IllegalStateException refus) {
+        List<Integer> possibles;
+        try {
+            possibles = planCalcule.trouverLivreursPossibles(avant, demande);
+        } catch (RuntimeException erreur) {
+            interfaceUtilisateur.execute(() -> refuserAjout(erreur));
+            return;
+        }
+        String raison = refus.getMessage() != null ? refus.getMessage()
+                : "L'ajout de la demande est impossible.";
+        interfaceUtilisateur.execute(
+                () -> proposerLivreurs(demande, avant, raison, possibles));
+    }
+
+    /**
+     * Sur le thread de l'interface, après un refus : sans livreur possible le
+     * refus est expliqué ; sinon l'administrateur choisit un livreur, puis la
+     * position chez lui ({@link #placerDemande}). Sans choix, l'ajout est
+     * abandonné. Dans tous les cas où l'ajout s'arrête, rien n'est modifié,
+     * pas même l'historique.
+     *
+     * @param demande demande refusée
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param raison cause du refus chez le livreur de la demande
+     * @param possibles livreurs qui peuvent prendre la demande avant 13 h
+     */
+    private void proposerLivreurs(Demande demande, Map<Integer, Tournee> avant,
+            String raison, List<Integer> possibles) {
+        ecran.afficherAttente(false);
+        if (possibles.isEmpty()) {
+            retrouverEtatProgramme();
+            ecran.afficherRefusAjout(raison + " Aucun livreur ne peut la "
+                    + "prendre.");
+            return;
+        }
+        Integer livreur = ecran.choisirLivreurPossible(demande.livreur(),
+                possibles, raison).orElse(null);
+        if (livreur == null || !possibles.contains(livreur)) {
+            retrouverEtatProgramme();
+            return;
+        }
+        placerDemande(demande.avecLivreur(livreur), avant);
+    }
+
+    /**
+     * Fin de l'ajout, sur le thread de l'interface : la commande range la
+     * demande et les tournées recalculées. Les tournées des autres livreurs
+     * sont reprises telles quelles.
+     *
+     * @param demande demande ajoutée, chez son livreur définitif
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param apres tournée du livreur de la demande, après l'insertion
+     */
+    private void finirAjout(Demande demande, Map<Integer, Tournee> avant,
+            Tournee apres) {
+        ecran.afficherAttente(false);
+        Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+        tournees.put(demande.livreur(), apres);
+        Commande commande = new CommandeAjouterDemande(programme, demande);
+        commande.memoriserTourneesAvant(avant);
+        commande.memoriserTourneesApres(Collections.unmodifiableMap(tournees));
+        executer(commande);
+        afficherConsigneOrdreNonOptimise(demande.livreur());
+    }
+
+    /**
+     * Fin d'un ajout refusé, sur le thread de l'interface : la raison attendue
+     * est expliquée, une erreur inattendue est signalée et journalisée
+     * ({@link #signalerRefus}). Rien n'est modifié.
+     *
+     * @param erreur cause du refus
+     */
+    private void refuserAjout(RuntimeException erreur) {
+        ecran.afficherAttente(false);
+        retrouverEtatProgramme();
+        signalerRefus(erreur, ecran::afficherRefusAjout,
+                "de l'ajout d'une demande");
     }
 
     /**

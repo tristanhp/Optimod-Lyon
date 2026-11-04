@@ -339,6 +339,33 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+            List<Integer> livreurs, String detail) {
+        ChoiceDialog<Integer> dialogue = new ChoiceDialog<>(livreurs.get(0),
+                livreurs);
+        dialogue.setTitle("Ajout impossible chez ce livreur");
+        dialogue.setHeaderText("Le livreur " + livreurRefuse + " ne peut pas "
+                + "prendre cette demande avant 13 h.\n" + detail);
+        dialogue.setContentText("Affecter la demande au livreur :");
+        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.OK))
+                .setText("Affecter");
+        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.CANCEL))
+                .setText("Annuler");
+        dialogue.initOwner(getScene().getWindow());
+        return dialogue.showAndWait();
+    }
+
+    @Override
+    public void afficherRefusAjout(String detail) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Ajout impossible");
+        alert.setContentText(detail);
+        alert.initOwner(getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    @Override
     public void definirActionAjouterDemande(Runnable action) {
         boutonAjouter.setOnAction(event -> action.run());
     }

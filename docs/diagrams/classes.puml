@@ -16,6 +16,7 @@ package "model" {
     +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
     +insererDemande(tournee, demande, position) : Tournee
     +trouverPositionMoindreCout(tournee, demande) : int
+    +trouverLivreursPossibles(tournees, demande) : List<Integer>
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     +calculerTourneeAvecPointDeplace(tournee : Tournee, rang : int, nouveau : Noeud) : Tournee
@@ -134,6 +135,8 @@ package "controller" {
     +choisirPositionInsertion(tournee) : Optional<Integer>
     +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
     +afficherRefusChangementLivreur(detail)
+    +choisirLivreurPossible(livreurRefuse, livreurs, detail) : Optional<Integer>
+    +afficherRefusAjout(detail)
     +signalerArretsHorsPlage(arrets)
   }
   class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {

@@ -199,7 +199,14 @@ la position qui fait rentrer le livreur le plus tôt (collecte et livraison
 côte à côte) : l'administrateur garde la main, le calcul n'a lieu que s'il
 choisit cette entrée, et Annuler le défait. Le même dialogue sert à l'ajout
 d'une demande et au changement de livreur.
-Un ajout impossible avant 13 h est refusé sans modifier le programme.
+Si l'insertion fait rentrer le livreur après 13 h, l'application cherche les
+livreurs qui peuvent prendre la demande avant 13 h (en essayant la position
+*Moindre coût* chez chacun, sans rien insérer) et les propose, le livreur
+d'origine compris : une autre position chez lui peut suffire. L'administrateur
+choisit un livreur, puis la position dans sa tournée ; un nouveau refus rouvre
+la proposition. S'il annule, ou si aucun livreur ne peut la prendre, l'ajout est
+refusé avec un message et le programme n'est pas modifié. Une tournée qui rentre
+déjà après 13 h accepte une demande de plus, sans proposition.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
