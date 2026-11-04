@@ -136,9 +136,10 @@ de même taille.
    (tronçons en gris, nœuds en points sombres). Molette pour zoomer,
    glisser pour se déplacer, double-clic pour revenir à la vue d'ensemble.
 2. **Importer les demandes** : choisir un fichier de demandes. L'entrepôt
-   (losange), les points de collecte (carrés) et de livraison (ronds)
+   (losange orange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
-   à gauche. Survoler un point met sa demande en évidence.
+   à gauche. Survoler un point met sa demande en évidence, au-dessus de
+   l'entrepôt. Une légende en bas à gauche de la carte explique les symboles.
 3. **Calculer** : l'application calcule la meilleure tournée de chaque
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
