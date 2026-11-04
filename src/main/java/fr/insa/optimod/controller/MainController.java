@@ -1,7 +1,9 @@
 package fr.insa.optimod.controller;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -16,12 +18,12 @@ import java.util.logging.Logger;
 
 import org.xml.sax.SAXException;
 
-import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
-import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -29,18 +31,21 @@ import fr.insa.optimod.model.SauvegardeTournee;
  * puis lance le calcul de la tournée quand l'utilisateur clique sur
  * « Calculer ».
  *
- * <p>Les clics sont délégués à l'état courant ({@link Etat}, design pattern
+ * <p>
+ * Les clics sont délégués à l'état courant ({@link Etat}, design pattern
  * State) : c'est lui qui décide si l'action est permise et quel est l'état
  * suivant. Le contrôleur fournit aux états les opérations élémentaires (lire
  * un fichier, lancer le calcul, mettre à jour l'écran).
  *
- * <p>Les tournées calculées sont rangées dans le programme de livraisons, une
+ * <p>
+ * Les tournées calculées sont rangées dans le programme de livraisons, une
  * par livreur ; la vue les observe. Les modifications des demandes passent
  * par des commandes annulables ({@link Commande}, design pattern Command),
  * qui gardent les tournées d'avant et d'après : annuler ou rétablir une
  * modification remet les tournées correspondantes sans les recalculer.
  *
- * <p>Supprimer une demande quand les tournées sont calculées ne relance pas le
+ * <p>
+ * Supprimer une demande quand les tournées sont calculées ne relance pas le
  * voyageur de commerce : seule la tournée du livreur de la demande est
  * recalculée localement, en gardant l'ordre de ses autres arrêts
  * ({@link #supprimerDemandeEnGardantLOrdre}).
@@ -48,8 +53,7 @@ import fr.insa.optimod.model.SauvegardeTournee;
 public final class MainController {
 
     /** Journal des échecs du recalcul local, pour les retrouver après coup. */
-    private static final Logger JOURNAL =
-            Logger.getLogger(MainController.class.getName());
+    private static final Logger JOURNAL = Logger.getLogger(MainController.class.getName());
 
     /**
      * Consigne affichée quand la tournée ne vient pas du voyageur de commerce
@@ -103,8 +107,7 @@ public final class MainController {
     private final MapScreen ecran;
 
     /** Calcul des tournées ({@link Plan#calculerTournees} hors tests). */
-    private final BiFunction<Plan, ProgrammeLivraisons,
-            Map<Integer, Tournee>> calculTournees;
+    private final BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calculTournees;
 
     /** Exécute le calcul hors du thread de l'interface. */
     private final Executor arrierePlan;
@@ -140,16 +143,16 @@ public final class MainController {
      * Crée le contrôleur, le branche aux boutons de l'écran et le place dans
      * l'état initial (seul l'import d'un plan est possible).
      *
-     * @param ecran écran à piloter
-     * @param calculTournees calcul des tournées d'un programme sur un plan
-     *        ({@code Plan::calculerTournees} ; remplaçable dans les tests)
-     * @param arrierePlan exécute le calcul hors du thread de l'interface
+     * @param ecran                écran à piloter
+     * @param calculTournees       calcul des tournées d'un programme sur un plan
+     *                             ({@code Plan::calculerTournees} ; remplaçable
+     *                             dans les tests)
+     * @param arrierePlan          exécute le calcul hors du thread de l'interface
      * @param interfaceUtilisateur exécute les mises à jour de la vue sur le
-     *        thread de l'interface
+     *                             thread de l'interface
      */
     public MainController(MapScreen ecran,
-            BiFunction<Plan, ProgrammeLivraisons,
-                    Map<Integer, Tournee>> calculTournees,
+            BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calculTournees,
             Executor arrierePlan, Executor interfaceUtilisateur) {
         this.ecran = ecran;
         this.calculTournees = calculTournees;
@@ -163,12 +166,9 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
-        ecran.definirActionMonterArret((livreur, rang) ->
-                etat.changerOrdre(this, livreur, rang, -1));
-        ecran.definirActionDescendreArret((livreur, rang) ->
-                etat.changerOrdre(this, livreur, rang, 1));
-        ecran.definirActionDeplacerPoint((livreur, rang) ->
-                etat.deplacerPoint(this, livreur, rang));
+        ecran.definirActionMonterArret((livreur, rang) -> etat.changerOrdre(this, livreur, rang, -1));
+        ecran.definirActionDescendreArret((livreur, rang) -> etat.changerOrdre(this, livreur, rang, 1));
+        ecran.definirActionDeplacerPoint((livreur, rang) -> etat.deplacerPoint(this, livreur, rang));
         ecran.definirActionChangerLivreur(
                 position -> etat.changerLivreur(this, position));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
@@ -177,6 +177,7 @@ public final class MainController {
         ecran.definirActionRestaurer(() -> etat.restaurer(this));
         ecran.definirActionErreurDessin(
                 detail -> etat.erreurDessin(this, detail));
+        ecran.definirActionGenereFeuilleDeRoute(() -> etat.genererFeuilleDeRoute(this));
         changerEtat(new EtatInitial());
     }
 
@@ -314,7 +315,7 @@ public final class MainController {
     /**
      * Affiche les points choisis sans modifier le programme.
      *
-     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param collecte  point de collecte, ou null pour effacer l'aperçu
      * @param livraison point de livraison, ou null avant le second clic
      */
     void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -383,7 +384,8 @@ public final class MainController {
     private static int positionEffective(Plan plan, Tournee tournee,
             Demande demande, int choix) {
         return choix == MapScreen.POSITION_MOINDRE_COUT
-                ? plan.trouverPositionMoindreCout(tournee, demande) : choix;
+                ? plan.trouverPositionMoindreCout(tournee, demande)
+                : choix;
     }
 
     /**
@@ -399,7 +401,8 @@ public final class MainController {
      * ({@link #finirChangementLivreur}).
      *
      * @param position rang dans le programme de la demande ; une position
-     *        invalide est ignorée, de même que tout appel avec un seul livreur
+     *                 invalide est ignorée, de même que tout appel avec un seul
+     *                 livreur
      */
     void changerLivreurDemande(int position) {
         List<Demande> demandes = programme.obtenirDemandes();
@@ -452,16 +455,17 @@ public final class MainController {
      * modifié, pas même l'historique. Sinon la commande remplace la demande par
      * la même confiée au nouveau livreur et range les tournées recalculées.
      *
-     * <p>Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
+     * <p>
+     * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
      * plus : seul un changement qui rend impossible une tournée possible est
      * refusé ({@link Plan#insererDemande}).
      *
      * @param position rang de la demande dans le programme
      * @param ancienne la demande chez son ancien livreur
      * @param nouvelle la demande chez son nouveau livreur
-     * @param avant tournées d'avant le changement
-     * @param apres tournées d'après, ou {@code null} en cas de refus
-     * @param echec cause du refus, ou {@code null}
+     * @param avant    tournées d'avant le changement
+     * @param apres    tournées d'après, ou {@code null} en cas de refus
+     * @param echec    cause du refus, ou {@code null}
      */
     private void finirChangementLivreur(int position, Demande ancienne,
             Demande nouvelle, Map<Integer, Tournee> avant,
@@ -559,8 +563,7 @@ public final class MainController {
             ecran.afficherAttente(true);
             arrierePlan.execute(() -> {
                 try {
-                    SauvegardeTournee sauvegarde =
-                            SauvegardeTournee.restaurer(fichier.toPath());
+                    SauvegardeTournee sauvegarde = SauvegardeTournee.restaurer(fichier.toPath());
                     interfaceUtilisateur.execute(() -> {
                         plan = sauvegarde.plan();
                         fichierPlan = sauvegarde.fichierPlan();
@@ -594,7 +597,7 @@ public final class MainController {
      * de l'interface ({@link #finirSuppression}).
      *
      * @param position rang dans le programme de la demande à supprimer ; une
-     *        position invalide est ignorée
+     *                 position invalide est ignorée
      */
     void supprimerDemandeEnGardantLOrdre(int position) {
         List<Demande> demandes = programme.obtenirDemandes();
@@ -627,11 +630,11 @@ public final class MainController {
      * sont retirées de l'écran) et l'utilisateur en est informé.
      *
      * @param position rang de la demande à supprimer
-     * @param livreur numéro du livreur de la demande supprimée
-     * @param avant tournées d'avant la suppression
-     * @param locale tournée recalculée du livreur, ou {@code null} en cas
-     *        d'échec
-     * @param echec cause de l'échec, ou {@code null}
+     * @param livreur  numéro du livreur de la demande supprimée
+     * @param avant    tournées d'avant la suppression
+     * @param locale   tournée recalculée du livreur, ou {@code null} en cas
+     *                 d'échec
+     * @param echec    cause de l'échec, ou {@code null}
      */
     private void finirSuppression(int position, int livreur,
             Map<Integer, Tournee> avant, Tournee locale,
@@ -685,7 +688,8 @@ public final class MainController {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue du recalcul local",
                     echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
-                    ? echec.getMessage() : echec.getClass().getSimpleName());
+                    ? echec.getMessage()
+                    : echec.getClass().getSimpleName());
         }
     }
 
@@ -699,10 +703,10 @@ public final class MainController {
      * l'interface ({@link #finirChangementOrdre}). Les tournées des autres
      * livreurs ne changent pas.
      *
-     * @param livreur numéro du livreur de l'arrêt sélectionné
-     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param livreur  numéro du livreur de l'arrêt sélectionné
+     * @param rang     rang de l'arrêt sélectionné dans la tournée de ce livreur
      * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
-     *        descendre
+     *                 descendre
      */
     void changerOrdreTournee(int livreur, int rang, int decalage) {
         Map<Integer, Tournee> avant = programme.obtenirTournees();
@@ -730,16 +734,18 @@ public final class MainController {
      * place des tournées d'avant, les mêmes avec la nouvelle tournée du
      * livreur, et l'arrêt déplacé reste sélectionné.
      *
-     * <p>Un changement qui ne fait que garder une tournée déjà en retard est
+     * <p>
+     * Un changement qui ne fait que garder une tournée déjà en retard est
      * accepté : seul un changement qui rend possible une tournée impossible est
      * refusé.
      *
-     * @param livreur numéro du livreur de la tournée
-     * @param avant tournées d'avant le changement
-     * @param apres tournée du livreur avec le nouvel ordre, ou {@code null} en
-     *        cas de refus
+     * @param livreur     numéro du livreur de la tournée
+     * @param avant       tournées d'avant le changement
+     * @param apres       tournée du livreur avec le nouvel ordre, ou {@code null}
+     *                    en
+     *                    cas de refus
      * @param nouveauRang rang de l'arrêt déplacé dans la nouvelle tournée
-     * @param echec cause du refus, ou {@code null}
+     * @param echec       cause du refus, ou {@code null}
      */
     private void finirChangementOrdre(int livreur,
             Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
@@ -775,8 +781,8 @@ public final class MainController {
      * expliquée à l'utilisateur ; une erreur inattendue est signalée et
      * journalisée, au lieu de laisser les actions bloquées.
      *
-     * @param echec cause du refus
-     * @param afficher affiche la raison attendue
+     * @param echec        cause du refus
+     * @param afficher     affiche la raison attendue
      * @param modification ce qui était demandé, pour le journal
      */
     private void signalerRefus(RuntimeException echec,
@@ -788,7 +794,8 @@ public final class MainController {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue lors "
                     + modification, echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
-                    ? echec.getMessage() : echec.getClass().getSimpleName());
+                    ? echec.getMessage()
+                    : echec.getClass().getSimpleName());
         }
     }
 
@@ -800,9 +807,9 @@ public final class MainController {
      * l'explique.
      *
      * @param livreur numéro du livreur de l'arrêt sélectionné, ou {@code -1}
-     *        si aucun arrêt n'est sélectionné
-     * @param rang rang de l'arrêt dans la tournée de ce livreur, ou
-     *        {@code -1} si aucun arrêt n'est sélectionné
+     *                si aucun arrêt n'est sélectionné
+     * @param rang    rang de l'arrêt dans la tournée de ce livreur, ou
+     *                {@code -1} si aucun arrêt n'est sélectionné
      */
     void choisirPointADeplacer(int livreur, int rang) {
         Tournee tournee = programme.obtenirTournees().get(livreur);
@@ -824,7 +831,7 @@ public final class MainController {
      * ({@link #finirDeplacement}).
      *
      * @param livreur numéro du livreur de l'arrêt à déplacer
-     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     * @param rang    rang de l'arrêt à déplacer dans la tournée de ce livreur
      * @param idNoeud nœud cliqué, nouvelle adresse du point
      */
     void deplacerPoint(int livreur, int rang, long idNoeud) {
@@ -866,13 +873,13 @@ public final class MainController {
      * avec la nouvelle tournée du livreur, et l'arrêt déplacé reste
      * sélectionné.
      *
-     * @param livreur numéro du livreur de la tournée
-     * @param rang rang de l'arrêt déplacé dans la tournée de ce livreur
+     * @param livreur  numéro du livreur de la tournée
+     * @param rang     rang de l'arrêt déplacé dans la tournée de ce livreur
      * @param ancienne demande dont un point est déplacé
-     * @param avant tournées d'avant le déplacement
-     * @param apres tournée du livreur avec le point déplacé, ou {@code null}
-     *        en cas de refus
-     * @param echec cause du refus, ou {@code null}
+     * @param avant    tournées d'avant le déplacement
+     * @param apres    tournée du livreur avec le point déplacé, ou {@code null}
+     *                 en cas de refus
+     * @param echec    cause du refus, ou {@code null}
      */
     private void finirDeplacement(int livreur, int rang, Demande ancienne,
             Map<Integer, Tournee> avant, Tournee apres,
@@ -925,5 +932,25 @@ public final class MainController {
     private void oublierModifications() {
         historique.vider();
         ecran.afficherConsigne("");
+    }
+
+    /**
+     * Genere les feuilles de route de la tournée calculée dans le fichier choisi.
+     */
+    void genererFeuilleDeRoute() {
+        ecran.choisirFichierGenerationFeuilleDeRoute().ifPresent(fichier -> {
+            try {
+                System.out.println("GENERATION!!!");
+                try (FileWriter sortie = new FileWriter(fichier)) {
+                    sortie.write("adda");
+                } catch (FileAlreadyExistsException erreur) {
+                    throw new IOException("Le fichier existe déjà");
+                }
+
+                throw new IOException("IL FAUT IGNORER CE MESSAGE !!!");
+            } catch (IOException erreur) {
+                ecran.afficherErreurXml(erreur.getMessage());
+            }
+        });
     }
 }

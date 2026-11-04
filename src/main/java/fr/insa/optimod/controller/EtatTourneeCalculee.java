@@ -63,6 +63,20 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         controleur.changerLivreurDemande(position);
     }
 
+    /**
+     * Genere les feuilles de route de la tournee en HTML et l'enregistre dans le
+     * dossier choisi par l'utilisateur.
+     * Une feuille de route comprend :
+     * - uméro du livreur,
+     * - heure de départ et de retour ;
+     * - tableau ordonné des arrêts (type, adresse = noms des rues du noeud, plage
+     * annoncee, heure d'arrivee, heure de depart, duree sur place) ;
+     */
+    @Override
+    public void genererFeuilleDeRoute(MainController controleur) {
+        controleur.genererFeuilleDeRoute();
+    }
+
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
@@ -71,6 +85,7 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
         actions.add(Action.SAUVEGARDER);
+        actions.add(Action.GENERER_FEUILLES_ROUTE);
         if (controleur.obtenirProgramme().obtenirNombreLivreurs() > 1) {
             actions.add(Action.CHANGER_LIVREUR);
         }

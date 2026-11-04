@@ -13,27 +13,26 @@ import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.controller.MapScreen;
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
-import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Observable;
 import fr.insa.optimod.model.Observateur;
-import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Plan;
-import fr.insa.optimod.model.Noeud;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.Dialog;
-import javafx.scene.control.ButtonType;
-import javafx.scene.control.TextField;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.ChoiceDialog;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
+import fr.insa.optimod.model.Tournee;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
-import javafx.scene.shape.Rectangle;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.BorderPane;
@@ -41,21 +40,22 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 
 /**
  * Page principale : boutons d'import, de calcul et de modification des
  * demandes, carte du plan, liste des demandes et liste de la tournée calculée.
  *
- * <p>La vue observe les demandes affichées (design pattern Observer) : quand
+ * <p>
+ * La vue observe les demandes affichées (design pattern Observer) : quand
  * elles changent, la liste et la carte se redessinent sans que le contrôleur
  * ait à le demander.
  */
 final class MainView extends BorderPane implements MapScreen, Observateur {
 
     /** Format des heures dans la liste de la tournée. */
-    private static final DateTimeFormatter HEURE =
-            DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HEURE = DateTimeFormatter.ofPattern("HH:mm");
 
     /** Largeur de la liste des demandes. */
     private static final double LARGEUR_DEMANDES = 330;
@@ -67,8 +67,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterDemandes =
-            new Button("Importer les demandes");
+    private final Button boutonImporterDemandes = new Button("Importer les demandes");
     private final Label message = new Label();
 
     private final Button boutonCalculer = new Button("Calculer");
@@ -77,13 +76,13 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     private final Button boutonAjouter = new Button("Ajouter une demande");
     private final Button boutonSupprimer = new Button("Supprimer la demande");
-    private final Button boutonChangerLivreur =
-            new Button("Changer de livreur");
+    private final Button boutonChangerLivreur = new Button("Changer de livreur");
     private final Button boutonMonter = new Button("Monter");
     private final Button boutonDescendre = new Button("Descendre");
     private final Button boutonDeplacer = new Button("Déplacer");
     private final Button boutonAnnuler = new Button("Annuler");
     private final Button boutonRefaire = new Button("Rétablir");
+    private final Button boutonFeuilleDeRoute = new Button("Générer les feuilles de route");
 
     /** Consigne pour l'utilisateur (ex. pendant l'ajout d'une demande). */
     private final Label consigne = new Label();
@@ -111,11 +110,12 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      * livreur ({@code rang} vaut -1) ou l'un de ses arrêts. Refaite avec la
      * liste, pour retrouver le livreur et le rang de la ligne sélectionnée.
      *
-     * @param livreur numéro du livreur de la ligne
-     * @param rang rang de l'arrêt dans la tournée du livreur (0 est le départ
-     *        de l'entrepôt), ou -1 pour un titre
+     * @param livreur     numéro du livreur de la ligne
+     * @param rang        rang de l'arrêt dans la tournée du livreur (0 est le
+     *                    départ
+     *                    de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
-     * @param horsPlage vrai si l'arrivée sort de la plage annoncée
+     * @param horsPlage   vrai si l'arrivée sort de la plage annoncée
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
             boolean horsPlage) {
@@ -134,7 +134,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private Plan planAffiche;
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
-    private File dernierDossier;
+    private File dernierDossier = new File("src\\main\\resources\\data");
 
     /** Construit la page vide. */
     MainView() {
@@ -173,8 +173,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                setGraphic(vide ? null : new Rectangle(10, 10,
-                        MapCanvas.couleurDemande(getIndex())));
+                setGraphic(vide ? null
+                        : new Rectangle(10, 10,
+                                MapCanvas.couleurDemande(getIndex())));
             }
         });
         carte.definirSurSurvol(indice -> {
@@ -205,11 +206,12 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonDeplacer.setMaxWidth(Double.MAX_VALUE);
         boutonDeplacer.setTooltip(new Tooltip("Sélectionnez un arrêt dans la "
                 + "liste, puis cliquez ici et sur sa nouvelle adresse."));
+        boutonFeuilleDeRoute.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(boutonMonter, Priority.ALWAYS);
         HBox.setHgrow(boutonDescendre, Priority.ALWAYS);
         VBox.setVgrow(listeTournee, Priority.ALWAYS);
         VBox panneauTournee = new VBox(4, listeTournee,
-                new HBox(4, boutonMonter, boutonDescendre), boutonDeplacer);
+                new HBox(4, boutonMonter, boutonDescendre), boutonDeplacer, boutonFeuilleDeRoute);
         panneauTournee.visibleProperty().bind(listeTournee.visibleProperty());
         panneauTournee.managedProperty().bind(listeTournee.managedProperty());
         actualiserBoutonsOrdre();
@@ -268,6 +270,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         changementOrdrePermis = actions.contains(Action.CHANGER_ORDRE);
         actualiserBoutonsOrdre();
         boutonDeplacer.setDisable(!actions.contains(Action.DEPLACER_POINT));
+        boutonFeuilleDeRoute.setDisable(!actions.contains(Action.GENERER_FEUILLES_ROUTE));
     }
 
     /**
@@ -288,7 +291,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private LigneTournee ligneSelectionnee() {
         int indice = listeTournee.getSelectionModel().getSelectedIndex();
         return indice >= 0 && indice < lignesTournee.size()
-                ? lignesTournee.get(indice) : null;
+                ? lignesTournee.get(indice)
+                : null;
     }
 
     /** Supprimer demande une action permise et une demande sélectionnée. */
@@ -446,14 +450,16 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 });
         dialogue.setResultConverter(bouton -> bouton == ButtonType.OK
                 ? new SaisieDemande(collecte.getText(), livraison.getText(),
-                        livreurs.getValue()) : null);
+                        livreurs.getValue())
+                : null);
         return dialogue.showAndWait();
     }
 
     @Override
     public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
-        message.setText(arrets.isEmpty() ? "" : arrets.size()
-                + " arrêt(s) hors plage annoncée. Annuler reste possible.");
+        message.setText(arrets.isEmpty() ? ""
+                : arrets.size()
+                        + " arrêt(s) hors plage annoncée. Annuler reste possible.");
     }
 
     @Override
@@ -501,6 +507,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public void definirActionGenereFeuilleDeRoute(Runnable action) {
+        boutonFeuilleDeRoute.setOnAction(e -> action.run());
+    }
+
+    @Override
     public Optional<File> choisirFichierSauvegarde() {
         return choisirFichierXml("Sauvegarder la tournée", true);
     }
@@ -508,6 +519,22 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     @Override
     public Optional<File> choisirFichierRestauration() {
         return choisirFichierXml("Restaurer une tournée");
+    }
+
+    @Override
+    public Optional<File> choisirFichierGenerationFeuilleDeRoute() {
+        FileChooser selecteur = new FileChooser();
+        selecteur.setTitle("Generer les feuilles de route de la tournee");
+        selecteur.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("Fichiers HTML", "*.html"));
+        if (dernierDossier != null && dernierDossier.isDirectory()) {
+            selecteur.setInitialDirectory(dernierDossier);
+        }
+        File fichier = selecteur.showSaveDialog(getScene().getWindow());
+        if (fichier != null) {
+            dernierDossier = fichier.getParentFile();
+        }
+        return Optional.ofNullable(fichier);
     }
 
     private Optional<File> choisirFichierXml(String titre) {

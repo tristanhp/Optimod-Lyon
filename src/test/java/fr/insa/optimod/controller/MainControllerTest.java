@@ -33,12 +33,12 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import fr.insa.optimod.controller.MapScreen.Action;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.TypeArret;
-import fr.insa.optimod.model.Noeud;
-import fr.insa.optimod.model.Plan;
 
 public class MainControllerTest {
 
@@ -56,6 +56,7 @@ public class MainControllerTest {
         private BiConsumer<Integer, Integer> actionDeplacer;
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
+        private Runnable actionGenererFeuilleDeRoute;
         private LongConsumer actionClicNoeud;
         private Consumer<String> actionErreurDessin;
         private String erreurCarte;
@@ -83,7 +84,8 @@ public class MainControllerTest {
         private Optional<Integer> positionInsertion = Optional.of(1);
         private Noeud collecteProvisoire;
         private Noeud livraisonProvisoire;
-        private Runnable pendantSaisie = () -> { };
+        private Runnable pendantSaisie = () -> {
+        };
 
         @Override
         public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -290,6 +292,16 @@ public class MainControllerTest {
             erreurCarte = detail;
             evenements.add("erreur carte");
         }
+
+        @Override
+        public void definirActionGenereFeuilleDeRoute(Runnable action) {
+            actionGenererFeuilleDeRoute = action;
+        }
+
+        @Override
+        public Optional<File> choisirFichierGenerationFeuilleDeRoute() {
+            return Optional.ofNullable(fichierChoisi);
+        }
     }
 
     @Rule
@@ -308,7 +320,8 @@ public class MainControllerTest {
                 new Tournee.Arret(ENTREPOT, LocalTime.of(8, 0),
                         LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
                 new Tournee.Arret(ENTREPOT, retour, retour,
-                        TypeArret.ENTREPOT, null)), List.of());
+                        TypeArret.ENTREPOT, null)),
+                List.of());
     }
 
     private static final Tournee TOURNEE = tourneeRevenantA(
@@ -331,18 +344,18 @@ public class MainControllerTest {
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
             Action.CHANGER_ORDRE, Action.DEPLACER_POINT, Action.RESTAURER,
-            Action.SAUVEGARDER);
+            Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
      * peut annuler.
      */
-    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION =
-            EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME,
-                    Action.CALCULER, Action.AJOUTER_DEMANDE,
-                    Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
-                    Action.DEPLACER_POINT, Action.RESTAURER,
-                    Action.SAUVEGARDER, Action.ANNULER);
+    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION = EnumSet.of(Action.IMPORTER_PLAN,
+            Action.IMPORTER_PROGRAMME,
+            Action.CALCULER, Action.AJOUTER_DEMANDE,
+            Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
+            Action.DEPLACER_POINT, Action.RESTAURER,
+            Action.SAUVEGARDER, Action.ANNULER, Action.GENERER_FEUILLES_ROUTE);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -358,8 +371,7 @@ public class MainControllerTest {
     @Before
     public void creer() {
         ecran = new EcranFactice();
-        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul =
-                (plan, programme) -> {
+        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul = (plan, programme) -> {
             planRecu = plan;
             lotRecu = programme;
             if (erreurDeCalcul != null) {
@@ -1075,7 +1087,7 @@ public class MainControllerTest {
     /** L'ajout après calcul conserve la tournée et ne relance pas le TSP. */
     @Test
     public void insertionLocaleAnnulableSansTsp() throws Exception {
-        int[] appels = {0};
+        int[] appels = { 0 };
         controleur = new MainController(ecran, (plan, programme) -> {
             appels[0]++;
             return plan.calculerTournees(programme);
@@ -1144,8 +1156,7 @@ public class MainControllerTest {
         arrierePlan.remove().run();
         assertEquals(3, demandes().size());
         assertFalse(ecran.horsPlage.isEmpty());
-        assertTrue(ecran.horsPlage.stream().allMatch(arret ->
-                arret.obtenirDecalageSecondes() > 3600));
+        assertTrue(ecran.horsPlage.stream().allMatch(arret -> arret.obtenirDecalageSecondes() > 3600));
         ecran.actionAnnuler.run();
         assertTrue(ecran.horsPlage.isEmpty());
         ecran.actionRefaire.run();
@@ -1992,9 +2003,8 @@ public class MainControllerTest {
         assertEquals(avant.arrets().size(), apres.arrets().size());
         assertNotEquals(demandesAvant, demandes());
         assertEquals(apres.arrets().get(1).demande(),
-                demandes().stream().filter(d -> d.collecte().identifiant()
-                        == NOEUD_AILLEURS || d.livraison().identifiant()
-                        == NOEUD_AILLEURS).findFirst().orElseThrow());
+                demandes().stream().filter(d -> d.collecte().identifiant() == NOEUD_AILLEURS
+                        || d.livraison().identifiant() == NOEUD_AILLEURS).findFirst().orElseThrow());
         assertEquals(1, ecran.livreurSelectionne);
         assertEquals(1, ecran.arretSelectionne);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);

@@ -1,17 +1,17 @@
 package fr.insa.optimod.controller;
 
 import java.io.File;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
-import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.Tournee;
 
 /**
@@ -22,15 +22,17 @@ public interface MapScreen {
 
     /**
      * Saisie des durées en minutes et du livreur choisi.
-     * @param dureeCollecte minutes de collecte saisies
+     *
+     * @param dureeCollecte  minutes de collecte saisies
      * @param dureeLivraison minutes de livraison saisies
-     * @param livreur numéro du livreur
+     * @param livreur        numéro du livreur
      */
     record SaisieDemande(String dureeCollecte, String dureeLivraison,
             int livreur) {
 
         /**
          * Convertit une durée strictement positive en secondes entières.
+         *
          * @param texte minutes saisies
          * @return secondes
          * @throws IllegalArgumentException si la saisie est invalide
@@ -51,13 +53,15 @@ public interface MapScreen {
 
     /**
      * Renvoie saisie des durées et du livreur, ou vide après annulation.
+     *
      * @return saisie des durées et du livreur, ou vide après annulation
      */
     Optional<SaisieDemande> saisirDemande();
 
     /**
      * Affiche les points choisis avant validation de la demande.
-     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     *
+     * @param collecte  point de collecte, ou null pour effacer l'aperçu
      * @param livraison point de livraison, ou null avant le second clic
      */
     void afficherPointsProvisoires(Noeud collecte, Noeud livraison);
@@ -74,6 +78,7 @@ public interface MapScreen {
      * Fait choisir l'intervalle où insérer collecte puis livraison, ou
      * l'entrée « Moindre coût » qui laisse l'application proposer la position
      * (rien n'est calculé tant que l'administrateur ne la choisit pas).
+     *
      * @param tournee arrêts existants dans leur ordre de passage
      * @return rang de collecte (à partir de 1), {@link #POSITION_MOINDRE_COUT},
      *         ou vide après annulation
@@ -82,6 +87,7 @@ public interface MapScreen {
 
     /**
      * Signale les arrêts hors de leur plage sans bloquer l'annulation.
+     *
      * @param arrets arrêts concernés, vide pour retirer le signalement
      */
     void signalerArretsHorsPlage(List<Tournee.Arret> arrets);
@@ -111,17 +117,21 @@ public interface MapScreen {
         /** Sauvegarder la tournée calculée. */
         SAUVEGARDER,
         /** Restaurer une sauvegarde XML. */
-        RESTAURER
+        RESTAURER,
+        /** Generer les feuilles de route des livreurs */
+        GENERER_FEUILLES_ROUTE
     }
 
     /**
      * Définit l'action d'import des demandes.
+     *
      * @param action action au clic
      */
     void definirActionImportProgramme(Runnable action);
 
     /**
      * Renvoie fichier XML de demandes choisi, ou vide après annulation.
+     *
      * @return fichier XML de demandes choisi, ou vide après annulation
      */
     Optional<File> choisirFichierDemandes();
@@ -132,7 +142,6 @@ public interface MapScreen {
      * @param programme programme de livraisons chargé
      */
     void afficherProgramme(ProgrammeLivraisons programme);
-
 
     /**
      * Définit l'action déclenchée par le bouton « Importer ».
@@ -203,8 +212,8 @@ public interface MapScreen {
      * sélectionné dans la liste des tournées).
      *
      * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
-     *        son rang dans la tournée de ce livreur (0 est le départ de
-     *        l'entrepôt)
+     *               son rang dans la tournée de ce livreur (0 est le départ de
+     *               l'entrepôt)
      */
     void definirActionMonterArret(BiConsumer<Integer, Integer> action);
 
@@ -213,8 +222,8 @@ public interface MapScreen {
      * sélectionné dans la liste des tournées).
      *
      * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
-     *        son rang dans la tournée de ce livreur (0 est le départ de
-     *        l'entrepôt)
+     *               son rang dans la tournée de ce livreur (0 est le départ de
+     *               l'entrepôt)
      */
     void definirActionDescendreArret(BiConsumer<Integer, Integer> action);
 
@@ -223,8 +232,9 @@ public interface MapScreen {
      * ou de livraison de la tournée).
      *
      * @param action reçoit le numéro du livreur de l'arrêt sélectionné, puis
-     *        son rang dans la tournée de ce livreur ; {@code -1} et {@code -1}
-     *        si aucun arrêt n'est sélectionné
+     *               son rang dans la tournée de ce livreur ; {@code -1} et
+     *               {@code -1}
+     *               si aucun arrêt n'est sélectionné
      */
     void definirActionDeplacerPoint(BiConsumer<Integer, Integer> action);
 
@@ -233,15 +243,15 @@ public interface MapScreen {
      * sélectionnée dans la liste des demandes à un autre livreur).
      *
      * @param action reçoit le rang de la demande sélectionnée dans le
-     *        programme, ou {@code -1} si aucune n'est sélectionnée
+     *               programme, ou {@code -1} si aucune n'est sélectionnée
      */
     void definirActionChangerLivreur(IntConsumer action);
 
     /**
      * Fait choisir à quel livreur confier une demande.
      *
-     * @param livreurActuel numéro du livreur qui a la demande, à ne pas
-     *        proposer
+     * @param livreurActuel    numéro du livreur qui a la demande, à ne pas
+     *                         proposer
      * @param nombreDeLivreurs nombre de livreurs (numérotés à partir de 1)
      * @return numéro du livreur choisi, ou vide après annulation
      */
@@ -299,8 +309,8 @@ public interface MapScreen {
      * nouvelle place.
      *
      * @param livreur numéro du livreur de la tournée
-     * @param rang rang de l'arrêt dans sa tournée (0 est le départ de
-     *        l'entrepôt)
+     * @param rang    rang de l'arrêt dans sa tournée (0 est le départ de
+     *                l'entrepôt)
      */
     void selectionnerArretTournee(int livreur, int rang);
 
@@ -346,25 +356,43 @@ public interface MapScreen {
 
     /**
      * Définit l'action de sauvegarde de la tournée.
+     *
      * @param action action de sauvegarde
      */
     void definirActionSauvegarder(Runnable action);
 
     /**
      * Définit l'action de restauration de la tournée.
+     *
      * @param action action de restauration
      */
     void definirActionRestaurer(Runnable action);
 
     /**
+     * Définit l'action de generer les feuilles de routes de la tournee.
+     *
+     * @param action action de restauration
+     */
+    void definirActionGenereFeuilleDeRoute(Runnable action);
+
+    /**
      * Renvoie destination XML, ou vide après annulation.
+     *
      * @return destination XML, ou vide après annulation
      */
     Optional<File> choisirFichierSauvegarde();
 
     /**
      * Renvoie sauvegarde XML, ou vide après annulation.
+     *
      * @return sauvegarde XML, ou vide après annulation
      */
     Optional<File> choisirFichierRestauration();
+
+    /**
+     * Renvoie destination XML, ou vide après annulation.
+     *
+     * @return destination XML, ou vide après annulation
+     */
+    Optional<File> choisirFichierGenerationFeuilleDeRoute();
 }
