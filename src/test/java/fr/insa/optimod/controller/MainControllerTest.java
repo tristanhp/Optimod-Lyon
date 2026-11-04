@@ -90,6 +90,8 @@ public class MainControllerTest {
         private final List<Integer> livreursRefuses = new ArrayList<>();
         private String detailProposition;
         private String refusAjout;
+        private IntConsumer actionNombreLivreurs;
+        private int nombreLivreursAffiche = -1;
         private int livreurSelectionne = -1;
         private int arretSelectionne = -1;
         private Optional<SaisieDemande> saisie = Optional.of(
@@ -347,6 +349,17 @@ public class MainControllerTest {
         public Optional<File> choisirDossierFeuillesDeRoute() {
             return Optional.ofNullable(dossierChoisi);
         }
+
+        @Override
+        public void definirActionNombreLivreurs(IntConsumer action) {
+            actionNombreLivreurs = action;
+        }
+
+        @Override
+        public void afficherNombreLivreurs(int nombre) {
+            nombreLivreursAffiche = nombre;
+            evenements.add("nombre de livreurs:" + nombre);
+        }
     }
 
     @Rule
@@ -382,25 +395,29 @@ public class MainControllerTest {
     /** Actions permises avec des demandes chargées, sans historique. */
     private static final Set<Action> MODIFIABLE = EnumSet.of(
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
-            Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE, Action.RESTAURER);
+            Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE, Action.RESTAURER,
+            Action.CHANGER_NOMBRE_LIVREURS);
 
     /** Actions permises avec la tournée affichée : on peut la réordonner. */
     private static final Set<Action> MODIFIABLE_AVEC_TOURNEE = EnumSet.of(
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
             Action.CHANGER_ORDRE, Action.DEPLACER_POINT, Action.RESTAURER,
-            Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE);
+            Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE,
+            Action.CHANGER_NOMBRE_LIVREURS);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
      * peut annuler.
      */
-    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION = EnumSet.of(Action.IMPORTER_PLAN,
-            Action.IMPORTER_PROGRAMME,
-            Action.CALCULER, Action.AJOUTER_DEMANDE,
-            Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
-            Action.DEPLACER_POINT, Action.RESTAURER,
-            Action.SAUVEGARDER, Action.ANNULER, Action.GENERER_FEUILLES_ROUTE);
+    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION =
+            EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME,
+                    Action.CALCULER, Action.AJOUTER_DEMANDE,
+                    Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
+                    Action.DEPLACER_POINT, Action.RESTAURER,
+                    Action.SAUVEGARDER, Action.ANNULER,
+                    Action.GENERER_FEUILLES_ROUTE,
+                    Action.CHANGER_NOMBRE_LIVREURS);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -849,7 +866,8 @@ public class MainControllerTest {
         assertEquals(EnumSet.of(Action.IMPORTER_PLAN,
                 Action.IMPORTER_PROGRAMME, Action.CALCULER,
                 Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
-                Action.ANNULER, Action.RESTAURER), ecran.actions);
+                Action.ANNULER, Action.RESTAURER,
+                Action.CHANGER_NOMBRE_LIVREURS), ecran.actions);
 
         ecran.actionAnnuler.run();
         assertEquals(avant, demandes());
@@ -3214,6 +3232,200 @@ public class MainControllerTest {
         assertTrue(tournees().isEmpty());
     }
 
+    // --- Régler le nombre de livreurs (TIG-55) ---
+
+    /** Charge les deux demandes, au livreur 1, et calcule (vrai calcul). */
+    private void calculerAvecUnLivreur() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+    }
+
+    /** Nombre de livreurs du programme chargé. */
+    private int nombreDeLivreurs() {
+        return controleur.obtenirProgramme().obtenirNombreLivreurs();
+    }
+
+    /** Numéros des livreurs qui ont une tournée, dans l'ordre. */
+    private List<Integer> livreursAvecTournee() {
+        return new ArrayList<>(tournees().keySet());
+    }
+
+    /**
+     * Avant le calcul, augmenter le nombre de livreurs ne touche à aucune
+     * tournée et ne lance aucun calcul ; on peut l'annuler.
+     */
+    @Test
+    public void augmenterLeNombreDeLivreursAvantLeCalcul() throws Exception {
+        chargerDeuxDemandes();
+
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertEquals(2, nombreDeLivreurs());
+        assertTrue(tournees().isEmpty());
+        assertTrue(arrierePlan.isEmpty());
+        assertTrue(controleur.peutAnnuler());
+        assertEquals(EtatProgrammeCharge.class,
+                controleur.obtenirEtat().getClass());
+        assertTrue(ecran.actions.contains(Action.ANNULER));
+    }
+
+    /**
+     * Après le calcul, un livreur ajouté reçoit une tournée vide, prête à
+     * recevoir des demandes : les autres tournées sont les mêmes objets et le
+     * voyageur de commerce n'est pas relancé.
+     */
+    @Test
+    public void augmenterLeNombreDeLivreursApresLeCalcul() throws Exception {
+        calculerAvecUnLivreur();
+        Map<Integer, Tournee> avant = tournees();
+        List<Demande> demandesAvant = List.copyOf(demandes());
+
+        ecran.actionNombreLivreurs.accept(3);
+
+        assertEquals(3, nombreDeLivreurs());
+        assertEquals(List.of(1, 2, 3), livreursAvecTournee());
+        assertSame(avant.get(1), tournees().get(1));
+        assertEquals(1, tournees().get(2).arrets().size());
+        assertEquals(1, tournees().get(3).arrets().size());
+        assertEquals(demandesAvant, demandes());
+        assertEquals(1, nombreDeCalculs);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Un dernier livreur sans demande peut être retiré. */
+    @Test
+    public void diminuerUnLivreurSansDemande() throws Exception {
+        calculerAvecUnLivreur();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.actionNombreLivreurs.accept(2);
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertEquals(1, nombreDeLivreurs());
+        assertEquals(List.of(1), livreursAvecTournee());
+        assertSame(avant.get(1), tournees().get(1));
+        assertEquals(-1, ecran.nombreLivreursAffiche);
+    }
+
+    /**
+     * Retirer un livreur qui a encore des demandes est refusé : un message
+     * explique pourquoi, le champ reprend l'ancienne valeur, et demandes,
+     * tournées et historique ne changent pas.
+     */
+    @Test
+    public void diminuerUnLivreurQuiADesDemandesEstRefuse() throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        Map<Integer, Tournee> avant = tournees();
+        List<Demande> demandesAvant = List.copyOf(demandes());
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertEquals(2, nombreDeLivreurs());
+        assertEquals(demandesAvant, demandes());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertEquals(2, ecran.nombreLivreursAffiche);
+        assertTrue(ecran.consigne.contains("encore des demandes"));
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertTrue(ecran.actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
+    }
+
+    /**
+     * Un refus ne vide pas l'historique : une commande annulée reste à
+     * rétablir.
+     */
+    @Test
+    public void refusDeDiminuerGardeLeRetablirPossible() throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        ecran.actionNombreLivreurs.accept(3);
+        ecran.actionAnnuler.run();
+        assertTrue(controleur.peutRefaire());
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertEquals(2, nombreDeLivreurs());
+        assertTrue(controleur.peutRefaire());
+        assertTrue(ecran.actions.contains(Action.REFAIRE));
+        ecran.actionRefaire.run();
+        assertEquals(3, nombreDeLivreurs());
+    }
+
+    /** Il faut au moins un livreur : 0 et les nombres négatifs sont refusés. */
+    @Test
+    public void zeroLivreurEstRefuse() throws Exception {
+        chargerDeuxDemandes();
+
+        ecran.actionNombreLivreurs.accept(0);
+
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+        assertEquals(1, ecran.nombreLivreursAffiche);
+        assertTrue(ecran.consigne.contains("au moins un livreur"));
+
+        ecran.nombreLivreursAffiche = -1;
+        ecran.actionNombreLivreurs.accept(-3);
+
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+        assertEquals(1, ecran.nombreLivreursAffiche);
+    }
+
+    /**
+     * Redemander le nombre actuel ne fait rien : pas de commande dans
+     * l'historique, pas de message. C'est ce qui arrive quand le champ se remet
+     * lui-même à jour.
+     */
+    @Test
+    public void memeNombreDeLivreursNeFaitRien() throws Exception {
+        chargerDeuxDemandes();
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(ecran.evenements.isEmpty());
+        assertEquals(-1, ecran.nombreLivreursAffiche);
+    }
+
+    /** Annuler puis rétablir le réglage, après le calcul, sans recalcul. */
+    @Test
+    public void annulerEtRetablirLeNombreApresLeCalcul() throws Exception {
+        calculerAvecUnLivreur();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.actionNombreLivreurs.accept(2);
+        Map<Integer, Tournee> apres = tournees();
+
+        ecran.actionAnnuler.run();
+
+        assertEquals(1, nombreDeLivreurs());
+        assertEquals(List.of(1), livreursAvecTournee());
+        assertSame(avant.get(1), tournees().get(1));
+        assertTrue(ecran.actions.contains(Action.REFAIRE));
+
+        ecran.actionRefaire.run();
+
+        assertEquals(2, nombreDeLivreurs());
+        assertEquals(List.of(1, 2), livreursAvecTournee());
+        assertSame(apres.get(2), tournees().get(2));
+        assertEquals(1, nombreDeCalculs);
+    }
+
+    /** Annuler puis rétablir le réglage, avant le calcul. */
+    @Test
+    public void annulerEtRetablirLeNombreAvantLeCalcul() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionNombreLivreurs.accept(2);
+
+        ecran.actionAnnuler.run();
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+
+        ecran.actionRefaire.run();
+        assertEquals(2, nombreDeLivreurs());
+        assertTrue(tournees().isEmpty());
+    }
+
     /**
      * Après Annuler ou Rétablir, la consigne « ordre non optimisé » reste
      * tant qu'une modification faite à la main reste appliquée, et disparaît
@@ -3350,5 +3562,206 @@ public class MainControllerTest {
         ecran.dossierChoisi = new File(dossier.getRoot(), "absent");
         ecran.actionGenererFeuillesDeRoute.run();
         assertTrue(ecran.evenements.contains("invalide"));
+    }
+
+    /**
+     * Une demande ajoutée au livreur 2 se défait avant le réglage : deux
+     * annulations ramènent à un seul livreur, sans erreur.
+     */
+    @Test
+    public void ajouterAuLivreur2PuisAnnulerDeuxFois() throws Exception {
+        calculerAvecUnLivreur();
+        ecran.actionNombreLivreurs.accept(2);
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("2", "3", 2));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(3, demandes().size());
+        assertEquals(2, demandes().get(2).livreur());
+
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        assertEquals(2, nombreDeLivreurs());
+
+        ecran.actionAnnuler.run();
+        assertEquals(1, nombreDeLivreurs());
+        assertEquals(List.of(1), livreursAvecTournee());
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /**
+     * Un « Calculer » fait après le réglage n'est pas écrasé : annuler remet
+     * les tournées d'avant, rétablir celles qui viennent d'être calculées.
+     */
+    @Test
+    public void calculerApresLeReglageEstGardePourAnnulerEtRetablir()
+            throws Exception {
+        calculerAvecUnLivreur();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.actionNombreLivreurs.accept(2);
+        ecran.actionCalculer.run();
+        Map<Integer, Tournee> recalculees = tournees();
+        assertEquals(2, nombreDeCalculs);
+
+        ecran.actionAnnuler.run();
+        assertEquals(1, nombreDeLivreurs());
+        assertSame(avant.get(1), tournees().get(1));
+
+        ecran.actionRefaire.run();
+        assertEquals(2, nombreDeLivreurs());
+        assertSame(recalculees.get(1), tournees().get(1));
+        assertSame(recalculees.get(2), tournees().get(2));
+        assertEquals(2, nombreDeCalculs);
+    }
+
+    /** Le bouton « Changer de livreur » suit le nombre de livreurs. */
+    @Test
+    public void changerLivreurSuitLeNombreDeLivreurs() throws Exception {
+        calculerAvecUnLivreur();
+        assertFalse(ecran.actions.contains(Action.CHANGER_LIVREUR));
+
+        ecran.actionNombreLivreurs.accept(2);
+        assertTrue(ecran.actions.contains(Action.CHANGER_LIVREUR));
+
+        ecran.actionAnnuler.run();
+        assertFalse(ecran.actions.contains(Action.CHANGER_LIVREUR));
+
+        ecran.actionRefaire.run();
+        assertTrue(ecran.actions.contains(Action.CHANGER_LIVREUR));
+
+        ecran.actionNombreLivreurs.accept(1);
+        assertFalse(ecran.actions.contains(Action.CHANGER_LIVREUR));
+    }
+
+    /** Sans programme chargé, le réglage est ignoré et inactif. */
+    @Test
+    public void reglageIgnoreSansProgramme() throws Exception {
+        ecran.actionNombreLivreurs.accept(2);
+        assertFalse(ecran.actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
+
+        importerPlan(ressource("/data/petitPlan.xml"));
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertNull(controleur.obtenirProgramme());
+        assertFalse(ecran.actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
+    }
+
+    /** Pendant le calcul, le réglage est ignoré et inactif. */
+    @Test
+    public void reglageIgnorePendantLeCalcul() throws Exception {
+        utiliserLeVraiCalculEnArrierePlan();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
+        assertFalse(ecran.actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
+
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+        executerArrierePlan();
+        assertEquals(1, nombreDeLivreurs());
+    }
+
+    /** Pendant l'ajout d'une demande, le réglage est ignoré et inactif. */
+    @Test
+    public void reglageIgnorePendantLAjout() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        assertFalse(ecran.actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
+
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /** Un nouvel import de demandes redonne un seul livreur. */
+    @Test
+    public void unNouvelImportRemetUnSeulLivreur() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionNombreLivreurs.accept(2);
+        assertEquals(2, nombreDeLivreurs());
+
+        importerProgramme(ressource("/data/demandePetit1.xml"));
+
+        assertEquals(1, nombreDeLivreurs());
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /**
+     * Guidage (TIG-105) : avec un programme chargé, la consigne invite à
+     * choisir le nombre de livreurs avant de calculer.
+     */
+    @Test
+    public void consigneProgrammeChargeParleDuNombreDeLivreurs()
+            throws Exception {
+        chargerDeuxDemandes();
+
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("nombre de livreurs"));
+        assertTrue(ecran.consigne.contains("Calculer"));
+    }
+
+    /** Après le calcul, la consigne rappelle que le nombre reste réglable. */
+    @Test
+    public void consigneTourneePreteParleDuNombreDeLivreurs()
+            throws Exception {
+        calculerAvecUnLivreur();
+
+        assertTrue(ecran.consigne.contains("nombre de livreurs"));
+    }
+
+    /** Augmenter le nombre de livreurs est confirmé à l'utilisateur. */
+    @Test
+    public void augmenterLeNombreConfirme() throws Exception {
+        chargerDeuxDemandes();
+
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertEquals("Livreur 2 ajouté : il n'a encore aucune demande.",
+                ecran.confirmation);
+    }
+
+    /** Retirer un livreur est confirmé à l'utilisateur. */
+    @Test
+    public void diminuerLeNombreConfirme() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionNombreLivreurs.accept(2);
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertEquals("Il reste 1 livreur.", ecran.confirmation);
+    }
+
+    /** Annuler puis rétablir le réglage nomme la modification. */
+    @Test
+    public void annulerEtRetablirLeNombreConfirment() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionNombreLivreurs.accept(3);
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : réglage du nombre de livreurs à 3.",
+                ecran.confirmation);
+
+        ecran.actionRefaire.run();
+        assertEquals("Rétabli : réglage du nombre de livreurs à 3.",
+                ecran.confirmation);
+    }
+
+    /**
+     * Un refus dit quoi faire (changer les demandes de livreur) et efface la
+     * confirmation précédente, qui n'a plus de sens.
+     */
+    @Test
+    public void refusDeDiminuerDitQuoiFaire() throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        assertFalse(ecran.confirmation.isEmpty());
+
+        ecran.actionNombreLivreurs.accept(1);
+
+        assertEquals("Le livreur 2 a encore des demandes : "
+                + "changez-les de livreur d'abord.", ecran.consigne);
+        assertEquals("", ecran.confirmation);
     }
 }

@@ -69,6 +69,7 @@ package "model" {
     +remplacerDemande(position : int, demande : Demande)
     +remplacerDemandeEtTournees(position : int, demande : Demande, tournees : Map<Integer, Tournee>)
     +obtenirNombreLivreurs() : int
+    +verifierNombreLivreurs(nombre : int)
     +definirNombreLivreurs(nombre : int)
     +obtenirTournees() : Map<Integer, Tournee>
     +definirTournees(tournees : Map<Integer, Tournee>)
@@ -129,6 +130,7 @@ package "controller" {
     ~supprimerDemandeEnGardantLOrdre(position : int)
     ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
     ~changerLivreurDemande(position : int)
+    ~changerNombreLivreurs(nombre : int)
     ~choisirPointADeplacer(livreur : int, rang : int)
     ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
@@ -143,6 +145,8 @@ package "controller" {
     +afficherRefusChangementLivreur(detail)
     +choisirLivreurPossible(livreurRefuse, livreurs, detail) : Optional<Integer>
     +afficherRefusAjout(detail)
+    +definirActionNombreLivreurs(action)
+    +afficherNombreLivreurs(nombre : int)
     +signalerArretsHorsPlage(arrets)
   }
   class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
@@ -178,6 +182,7 @@ package "controller" {
   class CommandeChangerOrdre
   class CommandeDeplacerPoint
   class CommandeChangerLivreur
+  class CommandeChangerNombreLivreurs
 }
 
 package "view" {
@@ -231,6 +236,7 @@ CommandeSupprimerDemande ..|> Commande
 CommandeChangerOrdre ..|> Commande
 CommandeDeplacerPoint ..|> Commande
 CommandeChangerLivreur ..|> Commande
+CommandeChangerNombreLivreurs ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur

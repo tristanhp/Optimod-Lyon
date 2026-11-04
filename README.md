@@ -38,7 +38,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
 | Déplacer un point de collecte ou de livraison | fait |
 | Changer le livreur d'une demande (annulable) | fait |
-| Régler le nombre de livreurs | à faire |
+| Régler le nombre de livreurs (annulable) | fait |
 | Générer les feuilles de route (un fichier HTML par livreur, imprimable) | fait |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
@@ -141,6 +141,8 @@ arrêts et sans relancer le TSP. La restauration réussie vide Annuler/Rétablir
 Un fichier invalide laisse le travail courant intact. Garder le fichier du
 plan à son emplacement ; il n'est pas inclus dans la sauvegarde.
 Le [format XML](docs/sauvegarde-tournee.md) décrit les limites de cette version.
+Avec plusieurs livreurs (champ *Livreurs*), *Sauvegarder* affiche un message et
+n'écrit rien : seule la tournée d'un livreur est gérée pour l'instant.
 
 Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 (`petitPlan.xml`, `moyenPlan.xml`, `grandPlan.xml`) et des fichiers de
@@ -199,7 +201,17 @@ de même taille.
      tournées ne changent pas. Si le nouveau livreur, qui rentrait à l'heure,
      rentrerait après 13 h, ou si une adresse est inaccessible, une fenêtre
      explique le refus et rien ne change. Le bouton n'est actif que s'il y a
-     plusieurs livreurs (le réglage de leur nombre reste à faire, TIG-55) ;
+     plusieurs livreurs (voir le champ *Livreurs*) ;
+   - *Livreurs* (champ de la barre d'outils, flèches haut et bas, de 1 à 20) :
+     règle le nombre de livreurs de la journée, avant ou après le calcul. Un
+     livreur ajouté a une tournée vide, prête à recevoir des demandes (*Ajouter
+     une demande*, *Changer de livreur*) ; les autres tournées ne changent pas
+     et rien n'est recalculé. On ne retire que le dernier livreur, et seulement
+     s'il n'a aucune demande : sinon une consigne explique le refus, le champ
+     reprend l'ancienne valeur et rien ne change. Un message confirme le
+     réglage, et son annulation. Le réglage s'annule et se rétablit comme les
+     autres modifications ; un nouvel import de demandes revient à un seul
+     livreur ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
      réapparaît sans nouveau calcul.

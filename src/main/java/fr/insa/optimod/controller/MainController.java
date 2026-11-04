@@ -172,6 +172,8 @@ public final class MainController {
         ecran.definirActionDeplacerPoint((livreur, rang) -> etat.deplacerPoint(this, livreur, rang));
         ecran.definirActionChangerLivreur(
                 position -> etat.changerLivreur(this, position));
+        ecran.definirActionNombreLivreurs(
+                nombre -> etat.changerNombreLivreurs(this, nombre));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
         ecran.definirActionRefaire(() -> etat.refaire(this));
         ecran.definirActionSauvegarder(() -> etat.sauvegarder(this));
@@ -610,6 +612,31 @@ public final class MainController {
         historique.executer(commande);
         retrouverEtatProgramme();
         ecran.afficherConfirmation(commande.confirmation());
+    }
+
+    /**
+     * Règle le nombre de livreurs. Un réglage refusé (moins d'un livreur, ou
+     * livreur retiré qui a encore des demandes) n'exécute pas la commande :
+     * demandes, tournées et historique restent intacts, le champ reprend
+     * l'ancienne valeur et la consigne explique le refus (la confirmation
+     * précédente est effacée). Un réglage accepté est confirmé par la
+     * commande. Demander le nombre actuel ne fait rien.
+     *
+     * @param nombre nombre de livreurs demandé
+     */
+    void changerNombreLivreurs(int nombre) {
+        if (nombre == programme.obtenirNombreLivreurs()) {
+            return;
+        }
+        try {
+            programme.verifierNombreLivreurs(nombre);
+        } catch (IllegalArgumentException refus) {
+            ecran.afficherNombreLivreurs(programme.obtenirNombreLivreurs());
+            ecran.afficherConfirmation("");
+            ecran.afficherConsigne(refus.getMessage());
+            return;
+        }
+        executer(new CommandeChangerNombreLivreurs(programme, nombre));
     }
 
     /** Annule la dernière modification des demandes. */

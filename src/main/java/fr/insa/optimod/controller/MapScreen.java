@@ -110,6 +110,8 @@ public interface MapScreen {
         DEPLACER_POINT,
         /** Bouton « Changer de livreur » (demande sélectionnée). */
         CHANGER_LIVREUR,
+        /** Champ « Livreurs » (nombre de livreurs de la journée). */
+        CHANGER_NOMBRE_LIVREURS,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -289,6 +291,24 @@ public interface MapScreen {
      * @param detail explication du refus
      */
     void afficherRefusAjout(String detail);
+
+    /**
+     * Définit l'action du champ « Livreurs » (régler le nombre de livreurs de
+     * la journée).
+     *
+     * @param action reçoit le nombre de livreurs demandé par l'utilisateur
+     */
+    void definirActionNombreLivreurs(IntConsumer action);
+
+    /**
+     * Remet le champ « Livreurs » à cette valeur, sans déclencher d'action.
+     * Le contrôleur s'en sert quand il refuse un réglage : le champ reprend le
+     * nombre de livreurs d'avant. Quand un réglage est accepté, l'écran suit
+     * le programme qu'il observe.
+     *
+     * @param nombre nombre de livreurs à afficher
+     */
+    void afficherNombreLivreurs(int nombre);
 
     /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.

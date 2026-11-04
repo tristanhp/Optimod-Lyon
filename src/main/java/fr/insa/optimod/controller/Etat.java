@@ -141,6 +141,17 @@ interface Etat {
     }
 
     /**
+     * Réglage du champ « Livreurs » : change le nombre de livreurs. Ignoré par
+     * défaut.
+     *
+     * @param controleur contrôleur à piloter
+     * @param nombre nombre de livreurs demandé
+     */
+    default void changerNombreLivreurs(MainController controleur,
+            int nombre) {
+    }
+
+    /**
      * Clic sur une intersection de la carte. Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter

@@ -311,6 +311,27 @@ public final class ProgrammeLivraisons extends Observable {
     }
 
     /**
+     * Vérifie qu'on peut régler le nombre de livreurs à cette valeur, sans
+     * rien modifier.
+     *
+     * @param nombre nombre de livreurs demandé
+     * @throws IllegalArgumentException si le nombre est inférieur à 1 ou si
+     *         un livreur retiré a encore des demandes
+     */
+    public void verifierNombreLivreurs(int nombre) {
+        if (nombre < 1) {
+            throw new IllegalArgumentException("Il faut au moins un livreur.");
+        }
+        for (Demande demande : demandes) {
+            if (demande.livreur() > nombre) {
+                throw new IllegalArgumentException("Le livreur "
+                        + demande.livreur() + " a encore des demandes : "
+                        + "changez-les de livreur d'abord.");
+            }
+        }
+    }
+
+    /**
      * Change le nombre de livreurs et prévient les observateurs. Si des
      * tournées existent, un livreur ajouté reçoit une tournée vide et la
      * tournée d'un livreur retiré disparaît. Seuls les derniers livreurs
@@ -321,15 +342,7 @@ public final class ProgrammeLivraisons extends Observable {
      *                                  un livreur retiré a encore des demandes
      */
     public void definirNombreLivreurs(int nombre) {
-        if (nombre < 1) {
-            throw new IllegalArgumentException("Il faut au moins un livreur.");
-        }
-        for (Demande demande : demandes) {
-            if (demande.livreur() > nombre) {
-                throw new IllegalArgumentException("Le livreur "
-                        + demande.livreur() + " a encore des demandes.");
-            }
-        }
+        verifierNombreLivreurs(nombre);
         if (!tournees.isEmpty()) {
             tournees.tailMap(nombre + 1).clear();
             for (int livreur = nombreLivreurs + 1; livreur <= nombre; livreur++) {
