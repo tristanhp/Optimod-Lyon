@@ -329,6 +329,51 @@ public class PlanTest {
         }
     }
 
+    // --- Demande trop importante pour un seul livreur ---
+
+    /**
+     * Les deux demandes du fichier fourni demandent six heures sur place :
+     * avec un seul livreur la tournée revient après 13 h. Elle est renvoyée
+     * quand même, signalée par {@code estPossible()}.
+     */
+    @Test
+    public void demandeTropImportanteDepasse13h() throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream(
+                        "/data/demande_trop_importante.xml"), plan);
+        assertEquals(LocalTime.of(8, 0), programme.obtenirHeureDepart());
+        assertEquals(2, programme.obtenirDemandes().size());
+        assertEquals(21600, programme.obtenirDemandes().stream()
+                .mapToInt(demande -> demande.dureeCollecte()
+                        + demande.dureeLivraison()).sum());
+        Tournee tournee = plan.calculerTournees(programme).get(1);
+        assertFalse(tournee.estPossible());
+        assertTrue(tournee.obtenirHeureRetour().isAfter(
+                Plan.HEURE_LIMITE_RETOUR));
+    }
+
+    /** Une demande par livreur permet deux retours avant 13 h. */
+    @Test
+    public void demandeTropImportanteRepartissableEntreDeuxLivreurs()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream(
+                        "/data/demande_trop_importante.xml"), plan);
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1,
+                programme.obtenirDemandes().get(1).avecLivreur(2));
+        Map<Integer, Tournee> tournees = plan.calculerTournees(programme);
+        assertEquals(2, tournees.size());
+        for (Tournee tournee : tournees.values()) {
+            assertTrue(tournee.estPossible());
+            assertEquals(4, tournee.arrets().size());
+        }
+    }
+
     // --- Plusieurs livreurs (TIG-95) ---
 
     /** Chaque arrêt connaît son type et sa demande. */
