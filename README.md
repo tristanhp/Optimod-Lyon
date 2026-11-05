@@ -167,7 +167,11 @@ heures sur place imposent un retour après 20 h.
    sa tournée est affichée quand même, sans message d'erreur. Les arrêts dont
    l'arrivée dépasse 13 h sont rouges dans la liste et le popup, avec la
    mention « Après 13 h » sur sa propre ligne, même s'ils respectent leur
-   plage annoncée ; sur la carte, leur numéro est sur fond rouge.
+   plage annoncée ; sur la carte, leur numéro est sur fond rouge. Si la
+   limite de calcul de 10 s est atteinte, la meilleure tournée trouvée est
+   affichée avec la consigne « Solution non prouvée optimale » (elle nomme
+   les livreurs concernés s'il y en a plusieurs) ; la consigne revient après
+   *Annuler* et *Rétablir*.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
@@ -299,6 +303,7 @@ Termes principaux et leur traduction dans le code :
 | Séparation et évaluation, borne | Recherche complète qui abandonne les pistes sans espoir | `TemplateTSP` |
 | Patron de méthode | Une méthode fixe les étapes, les sous-classes les détails | `TemplateTSP` |
 | Limite de temps | Durée maximale du calcul ; on garde le meilleur trouvé | 10 s dans `Plan` |
+| Solution prouvée optimale | Le voyageur de commerce a fini avant la limite de temps ; sinon la consigne « Solution non prouvée optimale » s'affiche après *Calculer* | `Tournee.prouveeOptimale()` |
 | Fichier de plan / de demandes | Les fichiers XML d'entrée | `src/main/resources/data/` |
 | Heure de départ | Écrite `8:0:0` ou `08:00` dans le fichier de demandes | `obtenirHeureDepart()` |
 

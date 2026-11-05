@@ -15,8 +15,13 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
  *
  * @param arrets  arrêts dans l'ordre de passage
  * @param chemins chemin entre l'arrêt {@code i} et l'arrêt {@code i + 1}
+ * @param prouveeOptimale vrai si l'ordre de passage vient du voyageur de
+ *                        commerce, qui a prouvé qu'il est le plus court ; faux
+ *                        si la limite de temps a coupé la recherche, ou si
+ *                        l'ordre a été gardé ou changé après le calcul
  */
-public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
+public record Tournee(List<Arret> arrets, List<Chemin> chemins,
+        boolean prouveeOptimale) {
 
     /** Ce que le livreur fait à un arrêt. */
     public enum TypeArret {
@@ -142,7 +147,7 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      */
     static Tournee vide(Noeud entrepot, LocalTime heureDepart) {
         return new Tournee(List.of(new Arret(entrepot, heureDepart,
-                heureDepart, TypeArret.ENTREPOT, null)), List.of());
+                heureDepart, TypeArret.ENTREPOT, null)), List.of(), true);
     }
 
     /** @return heure de retour à l'entrepôt (arrivée au dernier arrêt) */

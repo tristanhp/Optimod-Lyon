@@ -25,10 +25,10 @@ group Thread d'arrière-plan
     else Premier calcul de ces sommets
       P -> T : chercherSolution(10 s / livreurs occupés, GrapheDepandance)
       note right of T : séparation et évaluation,\ncollecte avant livraison
-      T --> P : ordre de passage
+      T --> P : ordre de passage (prouvé optimal, ou limite atteinte)
     end
-    P -> P : calculerHeuresDePassage(...)
-    note right of P : 15 km/h, durées sur place ;\nchaque arrêt garde son type et sa demande
+    P -> P : calculerHeuresDePassage(..., prouveeOptimale)
+    note right of P : 15 km/h, durées sur place ;\nchaque arrêt garde son type et sa demande ;\nprouveeOptimale faux si la limite de temps a coupé le TSP
     opt Ordre trouvé par le TSP et tournée obtenue
       P -> P : ordresMemorises.put(sommets, ordre)
     end

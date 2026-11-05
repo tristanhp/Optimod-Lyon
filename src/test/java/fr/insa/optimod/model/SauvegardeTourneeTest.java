@@ -1,6 +1,7 @@
 package fr.insa.optimod.model;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -26,6 +27,17 @@ public class SauvegardeTourneeTest {
     @Rule
     public TemporaryFolder dossier = new TemporaryFolder();
 
+    /**
+     * La tournée restaurée a les mêmes arrêts et chemins ; le fichier ne dit
+     * pas si l'ordre était prouvé optimal, elle ne l'est donc plus.
+     */
+    private static void assertMemeTourneeNonProuvee(Tournee attendue,
+            Tournee restauree) {
+        assertEquals(attendue.arrets(), restauree.arrets());
+        assertEquals(attendue.chemins(), restauree.chemins());
+        assertFalse(restauree.prouveeOptimale());
+    }
+
     /** Une sauvegarde conserve demandes, ordre, trajets et horaires. */
     @Test
     public void allerRetourConserveProgrammeEtTournee() throws Exception {
@@ -45,7 +57,7 @@ public class SauvegardeTourneeTest {
                 restauree.programme().obtenirDemandes());
         assertEquals(programme.obtenirHeureDepart(),
                 restauree.programme().obtenirHeureDepart());
-        assertEquals(tournee, restauree.tournee());
+        assertMemeTourneeNonProuvee(tournee, restauree.tournee());
         assertTrue(Files.readString(fichier).contains("nombreLivreurs=\"1\""));
         Element racine = Plan.creerLecteurXml().parse(fichier.toFile())
                 .getDocumentElement();
@@ -89,11 +101,12 @@ public class SauvegardeTourneeTest {
                         arret.depart(), arret.type(), arret.demande(),
                         LocalTime.of(6, 0), LocalTime.of(7, 0)))
                 .toList();
-        Tournee annoncee = new Tournee(arrets, avant.chemins());
+        Tournee annoncee = new Tournee(arrets, avant.chemins(), true);
         programme.definirTournees(Map.of(1, annoncee));
         Path fichier = dossier.newFile("plages.xml").toPath();
         SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
-        assertEquals(annoncee, SauvegardeTournee.restaurer(fichier).tournee());
+        assertMemeTourneeNonProuvee(annoncee,
+                SauvegardeTournee.restaurer(fichier).tournee());
         String contenu = Files.readString(fichier);
         Files.writeString(fichier, contenu.replace(" finPlage=\"07:00\"", ""));
         assertThrows(SAXException.class,
@@ -157,7 +170,7 @@ public class SauvegardeTourneeTest {
         programme.definirTournees(plan.calculerTournees(programme));
         Tournee tournee = programme.obtenirTournees().get(1);
         SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
-        assertEquals(tournee,
+        assertMemeTourneeNonProuvee(tournee,
                 SauvegardeTournee.restaurer(fichier).tournee());
     }
 

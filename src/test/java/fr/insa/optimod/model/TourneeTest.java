@@ -33,7 +33,7 @@ public class TourneeTest {
                 new Arret(B, depart, depart, TypeArret.LIVRAISON, DEMANDE),
                 new Arret(ENTREPOT, retour, retour, TypeArret.ENTREPOT,
                         null)),
-                List.of());
+                List.of(), true);
     }
 
     /** Une tournée vide part de l'entrepôt et n'a aucun chemin. */
@@ -87,7 +87,7 @@ public class TourneeTest {
                         TypeArret.LIVRAISON, DEMANDE),
                 new Arret(ENTREPOT, LocalTime.of(13, 30),
                         LocalTime.of(13, 30), TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
         List<Boolean> marques = tournee.arrets().stream()
                 .map(Arret::estApresHeureLimite).toList();
         assertEquals(List.of(false, false, true, true), marques);

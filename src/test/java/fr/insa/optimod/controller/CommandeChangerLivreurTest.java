@@ -44,7 +44,7 @@ public class CommandeChangerLivreurTest {
 
     /** Tournée d'un livreur sans demande : le seul départ de l'entrepôt. */
     private static Tournee tourneeVide() {
-        return new Tournee(List.of(entrepot(DEPART)), List.of());
+        return new Tournee(List.of(entrepot(DEPART)), List.of(), true);
     }
 
     /** Tournée d'un livreur qui sert cette demande et rentre à l'heure dite. */
@@ -54,7 +54,7 @@ public class CommandeChangerLivreurTest {
                         TypeArret.COLLECTE, demande),
                 new Tournee.Arret(demande.livraison(), DEPART, DEPART,
                         TypeArret.LIVRAISON, demande),
-                entrepot(retour)), List.of());
+                entrepot(retour)), List.of(), true);
     }
 
     /** La seconde demande, confiée au livreur 2. */

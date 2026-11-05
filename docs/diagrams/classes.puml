@@ -92,6 +92,7 @@ package "model" {
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
+    prouveeOptimale : boolean
     +obtenirHeureRetour() : LocalTime
     +estPossible() : boolean
   }

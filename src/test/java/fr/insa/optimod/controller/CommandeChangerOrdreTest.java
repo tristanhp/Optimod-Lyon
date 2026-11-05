@@ -40,7 +40,7 @@ public class CommandeChangerOrdreTest {
                         TypeArret.LIVRAISON, demande),
                 new Tournee.Arret(noeud(0), retour, retour,
                         TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
     }
 
     private final Map<Integer, Tournee> avant = Map.of(1,
