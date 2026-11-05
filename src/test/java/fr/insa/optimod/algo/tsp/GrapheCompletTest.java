@@ -7,7 +7,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 /** Tests de {@link GrapheComplet}. */
-public class GrapheCompleTest {
+public class GrapheCompletTest {
     GrapheComplet grapheComplet;
 
     /** Construit le graphe utilisé par les tests. */

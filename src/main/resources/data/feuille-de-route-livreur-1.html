@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Feuille de route du livreur 1</title>
+<style>
+body { font-family: "Segoe UI", Arial, sans-serif; color: #222;
+       margin: 0; background: #fff; }
+main { max-width: 1000px; margin: 0 auto; padding: 24px; }
+h1 { margin: 0 0 4px; font-size: 1.8em; }
+.resume { margin: 0 0 20px; color: #444; }
+.resume p { margin: 2px 0; }
+table { border-collapse: collapse; width: 100%;
+        table-layout: fixed; }
+caption { text-align: left; font-weight: 600;
+          padding-bottom: 6px; }
+th { background: #2f4858; color: #fff; text-align: left;
+     padding: 8px; font-size: 0.9em; }
+td { border-bottom: 1px solid #ccc; padding: 8px;
+     vertical-align: top; overflow-wrap: anywhere; }
+col.type { width: 13%; } col.adresse { width: 27%; }
+col.plan { width: 16%; } col.heure { width: 11%; }
+col.duree { width: 11%; }
+td.centre, th.centre { text-align: center; }
+tr.entrepot td { font-weight: 600; background: #eef3f6; }
+tr.itineraire td { border-bottom: 1px solid #ccc;
+                   color: #555; font-size: 0.85em;
+                   padding: 4px 8px 8px 24px; }
+.trajet { font-weight: 600; margin-right: 6px; }
+a { color: #1a5f8a; }
+@media print {
+  main { max-width: none; padding: 0; }
+  th { background: #ddd; color: #000;
+       -webkit-print-color-adjust: exact; }
+  tr { break-inside: avoid; }
+  a { color: black; text-decoration: none; }
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Livreur n°1</h1>
+<div class="resume">
+<p>Heure de départ prévue de l'entrepôt : 08:00</p>
+<p>Heure de retour prévue à l'entrepôt : 12:09</p>
+</div>
+<table>
+<caption>Arrêts de la tournée</caption>
+<colgroup><col class="type"><col class="adresse"><col class="plan"><col class="heure"><col class="heure"><col class="heure"><col class="duree"></colgroup>
+<thead>
+<tr><th>Type d'arrêt</th><th>Adresse</th><th>Plan</th><th class="centre">Plage annoncée</th><th class="centre">Heure d'arrivée</th><th class="centre">Heure de départ</th><th class="centre">Durée sur place</th></tr>
+</thead>
+<tbody>
+<tr class="entrepot"><td>Entrepôt</td><td>Rue Paul-Michel Perret, Rue Sully</td><td><a href="https://maps.google.com/?q=45.771343,4.850953">45.771343, 4.850953</a></td><td class="centre">08:00</td><td class="centre">--</td><td class="centre">08:00</td><td class="centre">--</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Sully (182 m) → Rue Boileau (428 m) → Boulevard des Belges (376 m) → Avenue de Grande-Bretagne (147 m) → rue sans nom (23 m) → Pont Winston Churchill (255 m) → rue sans nom (19 m) → Place Adrien Godien (41 m) → Rue Eugène Pons (17 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue Joséphin Soulary, Rue Eugène Pons Rue des Actionnaires, Rue Eugène Pons</td><td><a href="https://maps.google.com/?q=45.779064,4.840833">45.779064, 4.840833</a></td><td class="centre">07:05 - 09:05</td><td class="centre">08:05</td><td class="centre">08:09</td><td class="centre">4 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Eugène Pons (17 m) → Cours d'Herbouville (602 m) → Quai André Lassagne Cours d'Herbouville (438 m) → Quai André Lassagne (133 m) → Quai André Lassagne Quai Jean Moulin (61 m) → Quai Jean Moulin (526 m) → Quai Jules Courmont (22 m) → Pont Lafayette Quai Jules Courmont (231 m) → Cours Lafayette (355 m) → Rue Vendôme (152 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue Le Royer, Rue Vendôme</td><td><a href="https://maps.google.com/?q=45.762245,4.846268">45.762245, 4.846268</a></td><td class="centre">07:20 - 09:20</td><td class="centre">08:20</td><td class="centre">08:30</td><td class="centre">10 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Vendôme (62 m) → Rue de Bonnel (872 m) → Boulevard Vivier-Merle (119 m) → Cours Lafayette (58 m) → Boulevard Jules Favre (113 m) → rue sans nom (31 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue Waldeck-Rousseau</td><td><a href="https://maps.google.com/?q=45.764660,4.858194">45.764660, 4.858194</a></td><td class="centre">07:35 - 09:35</td><td class="centre">08:35</td><td class="centre">08:43</td><td class="centre">8 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Waldeck-Rousseau (54 m) → Boulevard Jules Favre (184 m) → Place Jules Ferry Boulevard Jules Favre (48 m) → Place Jules Ferry (234 m) → Rue des Émeraudes (392 m) → Rue Gabriel Péri (289 m) → Rond-Point des Charpennes (32 m) → Rue Gabriel Péri (157 m) → Place Wilson (76 m) → rue sans nom (28 m) → Avenue Roger Salengro (1034 m) → Rue Édouard Vaillant (108 m) → Rue de la Filature (335 m) → Rue Château-Gaillard (186 m) → Rue René (532 m) → Rue du 8 Mai 1945 (90 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue du 8 Mai 1945, Rue du Professeur Émile Bouvier</td><td><a href="https://maps.google.com/?q=45.779490,4.891787">45.779490, 4.891787</a></td><td class="centre">07:58 - 09:58</td><td class="centre">08:58</td><td class="centre">09:01</td><td class="centre">3 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue du 8 Mai 1945 (594 m) → rue sans nom (24 m) → Rue Greuze (502 m) → rue sans nom (13 m) → Rue Greuze (302 m) → Cours Émile Zola (164 m) → Rue Victor Subit (151 m) → Rue du 4 Août 1789 (37 m) → Rue Charles Robin (146 m) → Rue Victor Basch (62 m) → Rue Chevreul (280 m) → Rue Pierre Baratin (326 m) → Rue Émile Decorps (773 m)</td></tr>
+<tr><td>Point de livraison</td><td>Rue Émile Decorps</td><td><a href="https://maps.google.com/?q=45.753563,4.898676">45.753563, 4.898676</a></td><td class="centre">08:14 - 10:14</td><td class="centre">09:14</td><td class="centre">09:16</td><td class="centre">2 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Émile Decorps (78 m) → Route de Genas (242 m) → Boulevard Pinel (63 m) → Cours Richard Vitton (3 m) → Boulevard Pinel (971 m) → Rue Trarieux (113 m) → Rue des Mobiles (126 m) → Place Jules Hottin (27 m) → Rue Coignet (63 m) → Rue Pascal (101 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue Claude Farrère, Rue Pascal</td><td><a href="https://maps.google.com/?q=45.743000,4.892474">45.743000, 4.892474</a></td><td class="centre">08:23 - 10:23</td><td class="centre">09:23</td><td class="centre">09:23</td><td class="centre">--</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Pascal (149 m) → Avenue Lacassagne (198 m) → Boulevard Pinel (813 m) → Rue du Vinatier (276 m) → Cours Richard Vitton (65 m) → Route de Genas (241 m)</td></tr>
+<tr><td>Point de livraison</td><td>Route de Genas, Rue des Genêts</td><td><a href="https://maps.google.com/?q=45.752098,4.902107">45.752098, 4.902107</a></td><td class="centre">08:30 - 10:30</td><td class="centre">09:30</td><td class="centre">09:40</td><td class="centre">10 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Route de Genas (365 m) → rue sans nom (871 m) → Boulevard Laurent Bonnevay (931 m) → Avenue Franklin Roosevelt (288 m) → Rue des Iris (312 m) → Rue de la Paix (222 m) → Rue Jean Jaurès (183 m) → Rue Jean Voillot (83 m) → Avenue Édouard Herriot (294 m) → rue sans nom (12 m) → Rue Léon Bourgeois (174 m) → Rue du Quartier Neuf (96 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue Marcel Sembat, Rue du Quartier Neuf</td><td><a href="https://maps.google.com/?q=45.727646,4.899392">45.727646, 4.899392</a></td><td class="centre">08:56 - 10:56</td><td class="centre">09:56</td><td class="centre">10:03</td><td class="centre">7 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue du Quartier Neuf (104 m) → Rue Léon Bourgeois (169 m) → rue sans nom (15 m) → Avenue Édouard Herriot (297 m) → Rue Jean Voillot (83 m) → Rue Jean Jaurès (183 m) → Rue de la Paix (686 m) → Rue des Essarts (128 m) → Rue Laennec (481 m) → Rue Thomas Blanchet (420 m) → Rue Bataille (715 m) → Boulevard Jean XXIII (242 m) → Avenue Paul Santy (131 m)</td></tr>
+<tr><td>Point de livraison</td><td>Avenue du Général Frère, Avenue Paul Santy</td><td><a href="https://maps.google.com/?q=45.735382,4.870195">45.735382, 4.870195</a></td><td class="centre">09:17 - 11:17</td><td class="centre">10:17</td><td class="centre">10:22</td><td class="centre">5 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Avenue Paul Santy (113 m) → Rue Jean Sarrazin (773 m) → Rue Denis Père et Fils (287 m) → Rue Paul Cazeneuve (98 m) → Rue Pierre Delore (102 m) → Rue Garon-Duret (168 m)</td></tr>
+<tr><td>Point de collecte</td><td>Place Julien Duret, Rue Garon-Duret</td><td><a href="https://maps.google.com/?q=45.731430,4.857120">45.731430, 4.857120</a></td><td class="centre">09:28 - 11:28</td><td class="centre">10:28</td><td class="centre">10:29</td><td class="centre">1 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Garon-Duret (181 m) → Rue de Montagny (185 m) → Route de Vienne (482 m) → Impasse Caton (146 m)</td></tr>
+<tr><td>Point de livraison</td><td>Impasse Caton</td><td><a href="https://maps.google.com/?q=45.736053,4.851141">45.736053, 4.851141</a></td><td class="centre">09:33 - 11:33</td><td class="centre">10:33</td><td class="centre">10:42</td><td class="centre">9 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Impasse Caton (146 m) → Route de Vienne (174 m) → Rue du Général Gouraud (226 m)</td></tr>
+<tr><td>Point de collecte</td><td>Rue de Montagny, Rue du Général Gouraud</td><td><a href="https://maps.google.com/?q=45.734623,4.850396">45.734623, 4.850396</a></td><td class="centre">09:45 - 11:45</td><td class="centre">10:45</td><td class="centre">10:47</td><td class="centre">2 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue de Montagny (277 m) → Rue Croix Barret (827 m) → Rue de Gerland (166 m) → Rue André Bollier (37 m) → Rue Hector Malot (234 m) → Avenue Jean-François Raclet (95 m) → Avenue Jean Jaurès (352 m)</td></tr>
+<tr><td>Point de livraison</td><td>Avenue Debourg, Avenue Jean Jaurès</td><td><a href="https://maps.google.com/?q=45.731358,4.833629">45.731358, 4.833629</a></td><td class="centre">09:55 - 11:55</td><td class="centre">10:55</td><td class="centre">11:05</td><td class="centre">10 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Avenue Debourg (160 m) → Allée de Fontenay (345 m) → Rue André Bollier (11 m) → Allée Léopold Sédar Senghor (236 m)</td></tr>
+<tr><td>Point de collecte</td><td>Allée du Bon Lait, Allée Léopold Sédar Senghor</td><td><a href="https://maps.google.com/?q=45.736630,4.832806">45.736630, 4.832806</a></td><td class="centre">10:08 - 12:08</td><td class="centre">11:08</td><td class="centre">11:15</td><td class="centre">7 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Allée Léopold Sédar Senghor (18 m) → Place du Traité de Rome (90 m) → Rue Simone de Beauvoir (32 m) → Rue Clément Marot (198 m) → Avenue Jean Jaurès (1098 m) → Avenue Berthelot (76 m) → Rue Saint-Lazare (168 m)</td></tr>
+<tr><td>Point de livraison</td><td>Rue Saint-Lazare, Rue Jaboulay</td><td><a href="https://maps.google.com/?q=45.745983,4.844381">45.745983, 4.844381</a></td><td class="centre">10:21 - 12:21</td><td class="centre">11:21</td><td class="centre">11:23</td><td class="centre">2 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Saint-Lazare (141 m) → Rue Domer (752 m) → Grande Rue de la Guillotière (334 m) → Boulevard des Tchécoslovaques (245 m) → Rue du Général Mouton-Duvernet Cours Albert Thomas (54 m) → Rue du Général Mouton-Duvernet (62 m) → Rue du Dauphiné (1470 m)</td></tr>
+<tr><td>Point de livraison</td><td>Rue du Dauphiné</td><td><a href="https://maps.google.com/?q=45.754920,4.875300">45.754920, 4.875300</a></td><td class="centre">10:36 - 12:36</td><td class="centre">11:36</td><td class="centre">11:44</td><td class="centre">8 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue du Dauphiné (103 m) → Route de Genas (36 m) → Place des Maisons Neuves (95 m) → Rue Frédéric Mistral (219 m) → Rue Sainte-Anne de Baraban (693 m) → Rue Baraban (83 m) → Rue des Petites Sœurs (196 m) → Rue Gandolière (134 m) → Rue d'Aubigny (63 m) → Rue Ternois (177 m) → Rue Saint-Antoine (141 m) → Rue Maurice Flandin (84 m) → Rue des Droits de l'Homme (165 m) → Rue Germain (68 m) → Avenue Thiers (127 m) → Rue de la Viabert (180 m) → Rue Vauban (278 m) → Place René Deroudille (19 m) → Rue Vauban (72 m) → Rue Masséna (162 m)</td></tr>
+<tr><td>Point de livraison</td><td>Rue Robert, Rue Masséna</td><td><a href="https://maps.google.com/?q=45.764496,4.855101">45.764496, 4.855101</a></td><td class="centre">10:56 - 12:56</td><td class="centre">11:56</td><td class="centre">12:00</td><td class="centre">4 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Robert (218 m) → Rue Barrier (146 m) → Rue Vauban (250 m) → Rue Dussaussoy (114 m) → Rue Bugeaud (167 m) → Rue de Créqui (82 m)</td></tr>
+<tr><td>Point de livraison</td><td>Rue Cuvier, Rue de Créqui</td><td><a href="https://maps.google.com/?q=45.766940,4.846414">45.766940, 4.846414</a></td><td class="centre">11:04 - 13:04</td><td class="centre">12:04</td><td class="centre">12:05</td><td class="centre">1 min</td></tr>
+<tr class="itineraire"><td colspan="7"><span class="trajet">Itinéraire :</span>Rue Cuvier (231 m) → Rue Boileau (131 m) → Rue de Sèze (265 m) → Rue Tête d'Or (306 m) → Rue Sully (80 m)</td></tr>
+<tr class="entrepot"><td>Entrepôt</td><td>Rue Paul-Michel Perret, Rue Sully</td><td><a href="https://maps.google.com/?q=45.771343,4.850953">45.771343, 4.850953</a></td><td class="centre">12:09</td><td class="centre">12:09</td><td class="centre">--</td><td class="centre">--</td></tr>
+</tbody>
+</table>
+</main>
+</body>
+</html>

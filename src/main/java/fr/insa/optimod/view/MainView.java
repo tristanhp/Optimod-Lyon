@@ -68,8 +68,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterDemandes =
-            new Button("Importer les demandes");
+    private final Button boutonImporterDemandes = new Button("Importer les demandes");
 
     /** Ce qui vient d'être fait, en bas de la fenêtre. */
     private final Label message = new Label();
@@ -144,7 +143,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private Plan planAffiche;
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
-    private File dernierDossier;
+    private File dernierDossier = new File("src\\main\\resources\\data");
 
     /** Construit la page vide. */
     MainView() {
@@ -507,8 +506,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
-        texteHorsPlage = arrets.isEmpty() ? "" : arrets.size()
-                + " arrêt(s) hors plage annoncée. Annuler reste possible.";
+        texteHorsPlage = arrets.isEmpty() ? ""
+                : arrets.size()
+                        + " arrêt(s) hors plage annoncée. Annuler reste possible.";
         actualiserMessage();
     }
 
@@ -522,7 +522,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void actualiserMessage() {
         message.setText(texteConfirmation.isEmpty() ? texteHorsPlage
                 : texteHorsPlage.isEmpty() ? texteConfirmation
-                : texteConfirmation + " " + texteHorsPlage);
+                        : texteConfirmation + " " + texteHorsPlage);
     }
 
     @Override
