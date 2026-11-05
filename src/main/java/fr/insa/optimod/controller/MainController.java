@@ -1100,6 +1100,6 @@ public final class MainController {
         }
         fileOutpuWriter.write("  </tbody>\r\n" + //
                 "</table>\r\n" + //
-                "  </body>");
+                "  </body>\n");
     }
 }
