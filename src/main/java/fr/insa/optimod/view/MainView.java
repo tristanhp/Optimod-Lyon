@@ -848,6 +848,43 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public void afficherErreurEcriture(String detail) {
+        afficherAlerte(Alert.AlertType.ERROR, "Écriture impossible", detail);
+    }
+
+    @Override
+    public void afficherRefusSauvegarde(String detail) {
+        afficherAlerte(Alert.AlertType.WARNING, "Sauvegarde impossible",
+                detail);
+    }
+
+    @Override
+    public void afficherErreurInattendue(String detail) {
+        afficherAlerte(Alert.AlertType.ERROR,
+                GestionnaireErreursInattendues.MESSAGE,
+                "Détail technique : " + detail);
+    }
+
+    /**
+     * Ouvre une fenêtre d'alerte modale au-dessus de la fenêtre principale.
+     *
+     * @param type    type d'alerte (erreur, avertissement…)
+     * @param entete  titre en gras de l'alerte
+     * @param detail  explication
+     */
+    private void afficherAlerte(Alert.AlertType type, String entete,
+            String detail) {
+        Alert alert = new Alert(type);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText(entete);
+        alert.setContentText(detail);
+        if (getScene() != null) {
+            alert.initOwner(getScene().getWindow());
+        }
+        alert.showAndWait();
+    }
+
+    @Override
     public void reinitialiser() {
         planAffiche = null;
         effacerListeTournee();

@@ -2205,7 +2205,7 @@ public class PlanTest {
                 StandardCharsets.ISO_8859_1)));
     }
 
-    /** Un XML imbriqué sur 100 000 niveaux est refusé vite, sans débordement. */
+    /** Un XML imbriqué sur 100 000 niveaux est refusé vite. */
     @Test(timeout = 10000)
     public void imbricationProfondeRefusee() {
         StringBuilder xml = new StringBuilder("<reseau>");

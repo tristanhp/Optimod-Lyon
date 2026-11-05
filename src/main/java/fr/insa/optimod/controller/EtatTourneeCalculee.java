@@ -12,8 +12,9 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * rétablir. Ajouter ou supprimer une demande met à jour la tournée de son
  * livreur (recalcul local). On peut en plus changer l'ordre des arrêts d'un
  * livreur (« Monter », « Descendre »), déplacer un point de collecte ou de
- * livraison (« Déplacer »), changer le livreur d'une demande et sauvegarder
- * les tournées. Un livreur qui rentre après 13 h n'est pas bloqué : la
+ * livraison (« Déplacer »), changer le livreur d'une demande (plusieurs
+ * livreurs) et sauvegarder la tournée (un seul livreur, seul cas que le
+ * format de sauvegarde gère). Un livreur qui rentre après 13 h n'est pas bloqué : la
  * consigne le signale.
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
@@ -114,10 +115,12 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         actions.add(Action.RECALCULER);
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
-        actions.add(Action.SAUVEGARDER);
         actions.add(Action.GENERER_FEUILLES_ROUTE);
         if (controleur.obtenirProgramme().obtenirNombreLivreurs() > 1) {
             actions.add(Action.CHANGER_LIVREUR);
+        } else {
+            // Le format de sauvegarde ne gère qu'un livreur.
+            actions.add(Action.SAUVEGARDER);
         }
         return actions;
     }

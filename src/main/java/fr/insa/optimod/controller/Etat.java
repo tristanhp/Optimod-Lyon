@@ -37,31 +37,26 @@ interface Etat {
     }
 
     /**
-     * Clic sur « Importer le plan » : un plan valide mène à
-     * {@link EtatPlanCharge}, un plan invalide vide la page
-     * ({@link EtatInitial}), une annulation ne change rien.
+     * Clic sur « Importer le plan » : le fichier choisi est lu hors du thread
+     * de l'interface ({@link EtatLectureFichier}). Un plan valide mène à
+     * {@link EtatPlanCharge} ; un plan invalide ou une annulation ne change
+     * rien : le plan, le programme et l'historique courants sont gardés.
      *
      * @param controleur contrôleur à piloter
      */
     default void importerPlan(MainController controleur) {
-        switch (controleur.lirePlan()) {
-            case REUSSIE -> controleur.changerEtat(new EtatPlanCharge());
-            case ECHOUEE -> controleur.changerEtat(new EtatInitial());
-            case ANNULEE -> {
-            }
-        }
+        controleur.lirePlan();
     }
 
     /**
-     * Clic sur « Importer les demandes » : un programme valide mène à
-     * {@link EtatProgrammeCharge} ; sinon l'état ne change pas.
+     * Clic sur « Importer les demandes » : le fichier choisi est lu hors du
+     * thread de l'interface ({@link EtatLectureFichier}). Un programme valide
+     * mène à {@link EtatProgrammeCharge} ; sinon rien ne change.
      *
      * @param controleur contrôleur à piloter
      */
     default void importerProgramme(MainController controleur) {
-        if (controleur.lireProgramme() == MainController.Lecture.REUSSIE) {
-            controleur.changerEtat(new EtatProgrammeCharge());
-        }
+        controleur.lireProgramme();
     }
 
     /**

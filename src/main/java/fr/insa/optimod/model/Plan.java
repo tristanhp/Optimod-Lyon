@@ -211,7 +211,8 @@ public final class Plan {
             DocumentBuilder lecteur = fabrique.newDocumentBuilder();
             lecteur.setErrorHandler(new DefaultHandler()); // pas de trace
             return lecteur;
-        } catch (ParserConfigurationException | IllegalArgumentException erreur) {
+        } catch (ParserConfigurationException
+                | IllegalArgumentException erreur) {
             throw new IllegalStateException(erreur);
         }
     }

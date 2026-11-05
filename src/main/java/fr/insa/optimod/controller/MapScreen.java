@@ -185,6 +185,31 @@ public interface MapScreen {
     void afficherErreurXml(String detail);
 
     /**
+     * Signale qu'un fichier n'a pas pu être écrit (sauvegarde, feuilles de
+     * route) : dossier protégé, introuvable, disque plein.
+     *
+     * @param detail explication en français, avec le fichier concerné
+     */
+    void afficherErreurEcriture(String detail);
+
+    /**
+     * Explique pourquoi la sauvegarde est refusée avant toute écriture (par
+     * exemple : le fichier choisi est celui du plan chargé).
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusSauvegarde(String detail);
+
+    /**
+     * Signale une erreur inattendue (un défaut de l'application, pas une
+     * erreur de l'utilisateur). Le travail en cours est conservé et
+     * l'application reste utilisable.
+     *
+     * @param detail explication technique, journalisée par ailleurs
+     */
+    void afficherErreurInattendue(String detail);
+
+    /**
      * Retire de la page les informations du plan et de la tournée (carte
      * vide).
      */

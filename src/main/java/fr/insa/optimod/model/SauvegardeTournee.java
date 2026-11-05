@@ -122,6 +122,9 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
     private static String referencePlan(Path fichier, Path fichierPlan) {
         Path plan = fichierPlan.toAbsolutePath().normalize();
         Path dossier = fichier.toAbsolutePath().normalize().getParent();
+        if (dossier == null) {
+            return plan.toString();
+        }
         try {
             return dossier.relativize(plan).toString()
                     .replace(File.separatorChar, '/');
@@ -244,7 +247,9 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
      */
     private static Path trouverPlan(Path fichier, String reference)
             throws SAXException {
-        Path dossier = fichier.toAbsolutePath().normalize().getParent();
+        Path absolu = fichier.toAbsolutePath().normalize();
+        Path dossier = absolu.getParent() != null ? absolu.getParent()
+                : absolu;
         String nom = reference.substring(Math.max(reference.lastIndexOf('/'),
                 reference.lastIndexOf('\\')) + 1);
         List<String> candidats = List.of(reference, nom);

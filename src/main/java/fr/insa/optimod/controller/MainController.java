@@ -3,7 +3,10 @@ package fr.insa.optimod.controller;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +16,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -140,24 +144,11 @@ public final class MainController {
             + "gère qu'un livreur pour l'instant : revenez à 1 livreur pour "
             + "sauvegarder.";
 
-    /** Message d'une erreur inattendue pendant la restauration. */
-    static final String ERREUR_RESTAURATION = "La sauvegarde n'a pas pu être "
-            + "restaurée.";
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
             + "arrêts de la demande n'ont pas pu être identifiés. Cliquez sur "
             + "Calculer pour recalculer les tournées.";
-
-    /** Issue de la lecture d'un fichier choisi par l'utilisateur. */
-    enum Lecture {
-        /** L'utilisateur a annulé le choix du fichier. */
-        ANNULEE,
-        /** Le fichier a été lu et le modèle mis à jour. */
-        REUSSIE,
-        /** Le fichier est invalide ; l'erreur a été affichée. */
-        ECHOUEE
-    }
 
     /** Écran piloté. */
     private final MapScreen ecran;
@@ -182,6 +173,9 @@ public final class MainController {
 
     /** Programme de livraisons actuellement chargé, ou {@code null}. */
     private ProgrammeLivraisons programme;
+
+    /** Fichier du programme courant, ou {@code null} (restauration). */
+    private Path fichierProgramme;
 
     /** Modifications des demandes, pour annuler et rétablir. */
     private final ListeDeCommandes historique = new ListeDeCommandes();
@@ -268,64 +262,173 @@ public final class MainController {
     }
 
     /**
-     * Fait choisir un fichier de plan et l'affiche. Un nouveau plan rend le
-     * programme précédent caduc ; un plan invalide ouvre la fenêtre d'erreur
-     * et vide la page.
-     *
-     * @return l'issue de la lecture
+     * Fait choisir un fichier de plan et le lit hors du thread de
+     * l'interface, avec l'attente affichée et les actions bloquées
+     * ({@link EtatLectureFichier}). Un plan valide remplace le plan, rend le
+     * programme précédent caduc et vide l'historique
+     * ({@link EtatPlanCharge}). Un plan invalide ouvre la fenêtre d'erreur et
+     * ne change rien : plan, programme, tournées et historique sont gardés.
+     * Une annulation ne fait rien.
      */
-    Lecture lirePlan() {
+    void lirePlan() {
         File fichier = ecran.choisirFichierPlan().orElse(null);
         if (fichier == null) {
-            return Lecture.ANNULEE;
+            return;
         }
-        programme = null;
-        oublierModifications();
-        try {
-            Plan nouveauPlan = new Plan(fichier.getPath());
-            if (nouveauPlan.obtenirNoeuds().isEmpty()
-                    && nouveauPlan.obtenirTroncons().isEmpty()) {
-                throw new SAXException("Le plan ne contient ni nœud ni "
-                        + "tronçon : il n'y a rien à afficher.");
+        changerEtat(new EtatLectureFichier());
+        ecran.afficherAttente(true);
+        enArrierePlan(() -> {
+            try {
+                Plan nouveauPlan = new Plan(fichier.getPath());
+                if (nouveauPlan.obtenirNoeuds().isEmpty()) {
+                    throw new SAXException("Le plan ne contient aucun nœud : "
+                            + "il n'y a rien à afficher.");
+                }
+                return () -> finirLecturePlan(nouveauPlan, fichier.toPath());
+            } catch (IOException | SAXException erreur) {
+                return () -> refuserFichier(erreur.getMessage());
             }
-            plan = nouveauPlan;
-            fichierPlan = fichier.toPath();
-            ecran.afficherPlan(plan);
-            ecran.afficherConfirmation("Plan chargé.");
-            return Lecture.REUSSIE;
-        } catch (IOException | SAXException | IllegalArgumentException e) {
-            plan = null;
-            ecran.afficherErreurXml(e.getMessage());
-            ecran.reinitialiser();
-            return Lecture.ECHOUEE;
+        });
+    }
+
+    /**
+     * Fin de la lecture d'un plan valide, sur le thread de l'interface : le
+     * nouveau plan remplace l'ancien, le programme et l'historique sont
+     * oubliés.
+     */
+    private void finirLecturePlan(Plan nouveauPlan, Path fichier) {
+        ecran.afficherAttente(false);
+        plan = nouveauPlan;
+        fichierPlan = fichier;
+        programme = null;
+        fichierProgramme = null;
+        oublierModifications();
+        ecran.afficherPlan(plan);
+        changerEtat(new EtatPlanCharge());
+        ecran.afficherConfirmation("Plan chargé.");
+    }
+
+    /**
+     * Fait choisir un fichier de demandes et le lit hors du thread de
+     * l'interface ({@link EtatLectureFichier}), sans modifier le plan. Un
+     * fichier invalide ou une adresse absente du plan ouvre la fenêtre
+     * d'erreur ; le programme précédent est conservé.
+     */
+    void lireProgramme() {
+        File fichier = ecran.choisirFichierDemandes().orElse(null);
+        if (fichier == null) {
+            return;
+        }
+        Plan planLu = plan;
+        changerEtat(new EtatLectureFichier());
+        ecran.afficherAttente(true);
+        enArrierePlan(() -> {
+            try {
+                ProgrammeLivraisons lu = new ProgrammeLivraisons(
+                        fichier.getPath(), planLu);
+                return () -> finirLectureProgramme(lu, fichier.toPath());
+            } catch (IOException | SAXException erreur) {
+                return () -> refuserFichier(erreur.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Fin de la lecture d'un programme valide, sur le thread de l'interface :
+     * il remplace le programme précédent et l'historique est oublié.
+     */
+    private void finirLectureProgramme(ProgrammeLivraisons lu, Path fichier) {
+        ecran.afficherAttente(false);
+        programme = lu;
+        fichierProgramme = fichier;
+        oublierModifications();
+        ecran.afficherProgramme(programme);
+        ecran.signalerArretsHorsPlage(List.of());
+        changerEtat(new EtatProgrammeCharge());
+        int nombre = programme.obtenirDemandes().size();
+        ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
+                : nombre + " demandes chargées.");
+    }
+
+    /**
+     * Fichier refusé (plan, demandes ou sauvegarde), sur le thread de
+     * l'interface : rien n'a changé, on revient à l'état d'avant la lecture
+     * et la fenêtre d'erreur explique pourquoi.
+     *
+     * @param detail explication en français
+     */
+    private void refuserFichier(String detail) {
+        ecran.afficherAttente(false);
+        retrouverEtatStable();
+        ecran.afficherErreurXml(detail);
+    }
+
+    /**
+     * Revient à l'état qui correspond aux données chargées :
+     * {@link EtatInitial} sans plan, {@link EtatPlanCharge} sans programme,
+     * sinon l'état du programme ({@link #retrouverEtatProgramme}). Sert après
+     * un refus ou une erreur pendant un travail en arrière-plan.
+     */
+    void retrouverEtatStable() {
+        if (plan == null) {
+            changerEtat(new EtatInitial());
+        } else if (programme == null) {
+            changerEtat(new EtatPlanCharge());
+        } else {
+            retrouverEtatProgramme();
         }
     }
 
     /**
-     * Fait choisir un fichier de demandes et affiche le programme, sans
-     * modifier le plan. Un fichier invalide ou une adresse absente du plan
-     * ouvre la fenêtre d'erreur ; le programme précédent est conservé.
+     * Exécute un travail hors du thread de l'interface, puis la suite qu'il
+     * renvoie sur le thread de l'interface. Quoi qu'il arrive, l'interface
+     * ne reste pas bloquée : une exception ou une erreur imprévue, pendant
+     * le travail ou pendant la suite, éteint l'attente, ramène à un état
+     * stable et est signalée ({@link #signalerErreurInattendue}). Si l'état a
+     * changé entre-temps (page vidée après une erreur de dessin), la suite
+     * est abandonnée : elle porterait sur des données oubliées.
      *
-     * @return l'issue de la lecture
+     * @param travail calcul à faire en arrière-plan ; renvoie la suite à
+     *                exécuter sur le thread de l'interface
      */
-    Lecture lireProgramme() {
-        File fichier = ecran.choisirFichierDemandes().orElse(null);
-        if (fichier == null) {
-            return Lecture.ANNULEE;
-        }
-        try {
-            programme = new ProgrammeLivraisons(fichier.getPath(), plan);
-            oublierModifications();
-            ecran.afficherProgramme(programme);
-            ecran.signalerArretsHorsPlage(List.of());
-            int nombre = programme.obtenirDemandes().size();
-            ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
-                    : nombre + " demandes chargées.");
-            return Lecture.REUSSIE;
-        } catch (IOException | SAXException e) {
-            ecran.afficherErreurXml(e.getMessage());
-            return Lecture.ECHOUEE;
-        }
+    private void enArrierePlan(Supplier<Runnable> travail) {
+        Etat etatAuLancement = etat;
+        arrierePlan.execute(() -> {
+            Runnable suite;
+            try {
+                suite = travail.get();
+            } catch (RuntimeException | StackOverflowError
+                    | OutOfMemoryError erreur) {
+                suite = () -> signalerErreurInattendue(erreur);
+            }
+            Runnable suiteRetenue = suite;
+            interfaceUtilisateur.execute(() -> {
+                if (etat != etatAuLancement) {
+                    return;
+                }
+                try {
+                    suiteRetenue.run();
+                } catch (RuntimeException erreur) {
+                    signalerErreurInattendue(erreur);
+                }
+            });
+        });
+    }
+
+    /**
+     * Erreur imprévue (défaut de l'application) : elle est journalisée,
+     * l'attente est retirée, l'état revient à celui des données chargées et
+     * l'utilisateur est prévenu que son travail est conservé.
+     *
+     * @param erreur erreur survenue
+     */
+    private void signalerErreurInattendue(Throwable erreur) {
+        JOURNAL.log(Level.SEVERE, "Erreur inattendue", erreur);
+        ecran.afficherAttente(false);
+        retrouverEtatStable();
+        ecran.afficherConfirmation("");
+        ecran.afficherErreurInattendue(erreur.getMessage() != null
+                ? erreur.getMessage() : erreur.getClass().getSimpleName());
     }
 
     /**
@@ -338,17 +441,15 @@ public final class MainController {
         ProgrammeLivraisons programmeCalcule = programme;
         ecran.afficherConfirmation("");
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Map<Integer, Tournee> tournees = calculTournees.apply(
                         planCalcule, programmeCalcule);
-                interfaceUtilisateur.execute(
-                        () -> etat.finirCalcul(this, tournees, null));
+                return () -> etat.finirCalcul(this, tournees, null);
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
-                interfaceUtilisateur.execute(
-                        () -> etat.finirCalcul(this, null, detail));
+                return () -> etat.finirCalcul(this, null, detail);
             }
         });
     }
@@ -448,23 +549,20 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
                         demande, positionEffective(planCalcule,
                                 tourneeLivreur, demande, position));
                 if (apres.estPossible()) {
-                    interfaceUtilisateur.execute(
-                            () -> finirAjout(demande, avant, apres));
-                } else {
-                    List<Integer> possibles =
-                            planCalcule.trouverLivreursPossibles(avant,
-                                    demande);
-                    interfaceUtilisateur.execute(() -> proposerLivreurs(
-                            demande, avant, apres, possibles));
+                    return () -> finirAjout(demande, avant, apres);
                 }
+                List<Integer> possibles =
+                        planCalcule.trouverLivreursPossibles(avant, demande);
+                return () -> proposerLivreurs(demande, avant, apres,
+                        possibles);
             } catch (RuntimeException erreur) {
-                interfaceUtilisateur.execute(() -> refuserAjout(erreur));
+                return () -> refuserAjout(erreur);
             }
         });
     }
@@ -588,7 +686,7 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee sans = planCalcule.calculerTourneeSansDemande(
                         avant.get(ancienne.livreur()), ancienne);
@@ -598,12 +696,12 @@ public final class MainController {
                 Map<Integer, Tournee> apres = new TreeMap<>(avant);
                 apres.put(ancienne.livreur(), sans);
                 apres.put(livreur, avec);
-                interfaceUtilisateur.execute(() -> finirChangementLivreur(
-                        position, ancienne, nouvelle, avant,
-                        Collections.unmodifiableMap(apres), null));
+                return () -> finirChangementLivreur(position, ancienne,
+                        nouvelle, avant, Collections.unmodifiableMap(apres),
+                        null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirChangementLivreur(
-                        position, ancienne, nouvelle, avant, null, e));
+                return () -> finirChangementLivreur(position, ancienne,
+                        nouvelle, avant, null, e);
             }
         });
     }
@@ -783,9 +881,11 @@ public final class MainController {
     }
 
     /**
-     * Sauvegarde les tournées calculées dans le fichier choisi. Le format ne
-     * gère qu'un livreur : avec plusieurs livreurs, la sauvegarde est
-     * refusée par une consigne, avant de choisir un fichier.
+     * Sauvegarde les tournées calculées dans le fichier choisi. Refusée avec
+     * plusieurs livreurs (le format n'en gère qu'un) ou si le fichier choisi
+     * est celui du plan ou du programme chargé, qu'elle détruirait. Une
+     * écriture impossible (dossier protégé, introuvable) est signalée comme
+     * telle.
      */
     void sauvegarderTournee() {
         if (programme.obtenirNombreLivreurs() != 1) {
@@ -794,56 +894,107 @@ public final class MainController {
             return;
         }
         ecran.choisirFichierSauvegarde().ifPresent(fichier -> {
+            Path destination = fichier.toPath();
+            if (estLeMemeFichier(destination, fichierPlan)
+                    || estLeMemeFichier(destination, fichierProgramme)) {
+                ecran.afficherConfirmation("");
+                ecran.afficherRefusSauvegarde("Le fichier "
+                        + fichier.getName() + " est celui du plan ou des "
+                        + "demandes chargés : la sauvegarde l'écraserait. "
+                        + "Choisissez un autre nom de fichier.");
+                return;
+            }
             try {
-                SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
+                SauvegardeTournee.sauvegarder(destination, fichierPlan,
                         programme);
                 ecran.afficherConfirmation("Tournée sauvegardée.");
             } catch (IOException erreur) {
                 ecran.afficherConfirmation("");
-                ecran.afficherErreurXml(erreur.getMessage());
+                ecran.afficherErreurEcriture(decrireErreurEcriture(erreur,
+                        destination));
             }
         });
     }
 
     /**
-     * Restaure intégralement avant de remplacer l'état courant. Si la
-     * restauration échoue, fichier invalide ou erreur inattendue,
-     * l'application revient à l'état d'avant et affiche l'erreur.
+     * Vrai si les deux chemins désignent le même fichier, y compris par un
+     * autre chemin (lien, « .. »). Faux si l'un est {@code null}.
+     */
+    private static boolean estLeMemeFichier(Path premier, Path second) {
+        if (premier == null || second == null) {
+            return false;
+        }
+        if (premier.toAbsolutePath().normalize().equals(
+                second.toAbsolutePath().normalize())) {
+            return true;
+        }
+        try {
+            return Files.exists(premier) && Files.exists(second)
+                    && Files.isSameFile(premier, second);
+        } catch (IOException illisible) {
+            return false;
+        }
+    }
+
+    /**
+     * Explique en français pourquoi un fichier n'a pas pu être écrit.
+     *
+     * @param erreur  erreur d'écriture
+     * @param fichier fichier ou dossier visé
+     * @return message pour l'utilisateur
+     */
+    static String decrireErreurEcriture(IOException erreur, Path fichier) {
+        if (erreur instanceof AccessDeniedException) {
+            return "Accès refusé : l'application n'a pas le droit d'écrire "
+                    + "dans " + fichier + ". Choisissez un autre dossier.";
+        }
+        if (erreur instanceof NoSuchFileException) {
+            return "Dossier introuvable : " + fichier + ". Il a peut-être "
+                    + "été déplacé ou supprimé.";
+        }
+        if (erreur instanceof FileSystemException) {
+            return "Impossible d'écrire " + fichier + " (fichier protégé, "
+                    + "ouvert ailleurs ou disque plein).";
+        }
+        return "Impossible d'écrire " + fichier + " : "
+                + erreur.getMessage();
+    }
+
+    /**
+     * Fait choisir une sauvegarde, puis la lit et recalcule ses trajets hors
+     * du thread de l'interface ({@link EtatRestauration}). Rien n'est
+     * remplacé avant que tout soit relu : une sauvegarde invalide, ou toute
+     * erreur pendant la lecture, laisse l'état courant intact.
      */
     void restaurerSauvegarde() {
         ecran.choisirFichierRestauration().ifPresent(fichier -> {
-            Etat ancienEtat = etat;
             changerEtat(new EtatRestauration());
             ecran.afficherAttente(true);
-            arrierePlan.execute(() -> {
+            enArrierePlan(() -> {
                 try {
-                    SauvegardeTournee sauvegarde = SauvegardeTournee.restaurer(fichier.toPath());
-                    interfaceUtilisateur.execute(() -> {
-                        plan = sauvegarde.plan();
-                        fichierPlan = sauvegarde.fichierPlan();
-                        programme = sauvegarde.programme();
-                        oublierModifications();
-                        ecran.afficherPlan(plan);
-                        ecran.afficherProgramme(programme);
-                        rangerTournees(Map.of(1, sauvegarde.tournee()));
-                        ecran.afficherAttente(false);
-                        retrouverEtatProgramme();
-                        ecran.afficherConfirmation("Tournée restaurée.");
-                    });
-                } catch (SAXException | RuntimeException erreur) {
-                    // Une erreur inattendue ne doit pas laisser l'application
-                    // bloquée sur « Restauration en cours ».
-                    String detail = erreur instanceof SAXException
-                            ? erreur.getMessage()
-                            : ERREUR_RESTAURATION;
-                    interfaceUtilisateur.execute(() -> {
-                        ecran.afficherAttente(false);
-                        changerEtat(ancienEtat);
-                        ecran.afficherErreurXml(detail);
-                    });
+                    SauvegardeTournee sauvegarde = SauvegardeTournee
+                            .restaurer(fichier.toPath());
+                    return () -> finirRestauration(sauvegarde);
+                } catch (SAXException erreur) {
+                    return () -> refuserFichier(erreur.getMessage());
                 }
             });
         });
+    }
+
+    /** Fin de la restauration, sur le thread de l'interface. */
+    private void finirRestauration(SauvegardeTournee sauvegarde) {
+        plan = sauvegarde.plan();
+        fichierPlan = sauvegarde.fichierPlan();
+        programme = sauvegarde.programme();
+        fichierProgramme = null;
+        oublierModifications();
+        ecran.afficherPlan(plan);
+        ecran.afficherProgramme(programme);
+        rangerTournees(Map.of(1, sauvegarde.tournee()));
+        ecran.afficherAttente(false);
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Tournée restaurée.");
     }
 
     /**
@@ -869,15 +1020,15 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee locale = planCalcule.calculerTourneeSansDemande(
                         avant.get(retiree.livreur()), retiree);
-                interfaceUtilisateur.execute(() -> finirSuppression(position,
-                        retiree.livreur(), avant, locale, null));
+                return () -> finirSuppression(position, retiree.livreur(),
+                        avant, locale, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirSuppression(position,
-                        retiree.livreur(), avant, null, e));
+                return () -> finirSuppression(position, retiree.livreur(),
+                        avant, null, e);
             }
         });
     }
@@ -1022,15 +1173,15 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.calculerTourneeOrdreChange(
                         avant.get(livreur), rang, decalage);
-                interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        livreur, avant, apres, rang + decalage, null));
+                return () -> finirChangementOrdre(livreur, avant, apres,
+                        rang + decalage, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        livreur, avant, null, rang + decalage, e));
+                return () -> finirChangementOrdre(livreur, avant, null,
+                        rang + decalage, e);
             }
         });
     }
@@ -1158,15 +1309,15 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.calculerTourneeAvecPointDeplace(
                         actuelle, rang, nouveau);
-                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
-                        rang, demande, avant, apres, null));
+                return () -> finirDeplacement(livreur, rang, demande, avant,
+                        apres, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
-                        rang, demande, avant, null, e));
+                return () -> finirDeplacement(livreur, rang, demande, avant,
+                        null, e);
             }
         });
     }
@@ -1219,8 +1370,11 @@ public final class MainController {
      * @param detail explication de l'erreur
      */
     void abandonnerAffichage(String detail) {
+        ecran.afficherAttente(false);
         plan = null;
+        fichierPlan = null;
         programme = null;
+        fichierProgramme = null;
         oublierModifications();
         ecran.reinitialiser();
         ecran.afficherErreurCarte(detail);
@@ -1253,8 +1407,17 @@ public final class MainController {
                         ? "Feuille de route générée dans " + dossier + "."
                         : tournees.size() + " feuilles de route générées dans "
                                 + dossier + ".");
-            } catch (IOException | IllegalArgumentException erreur) {
-                ecran.afficherErreurXml(erreur.getMessage());
+            } catch (IOException erreur) {
+                ecran.afficherConfirmation("");
+                ecran.afficherErreurEcriture(decrireErreurEcriture(erreur,
+                        dossier.toPath()));
+            } catch (RuntimeException erreur) {
+                JOURNAL.log(Level.SEVERE,
+                        "Erreur inattendue des feuilles de route", erreur);
+                ecran.afficherConfirmation("");
+                ecran.afficherErreurInattendue(erreur.getMessage() != null
+                        ? erreur.getMessage()
+                        : erreur.getClass().getSimpleName());
             }
         });
     }
