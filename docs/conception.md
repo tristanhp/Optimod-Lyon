@@ -1,8 +1,8 @@
 # Conception d'Optimod'Lyon
 
-État du code : version à un livreur. Cette description porte sur le dépôt
-livré ; le modèle multi-livreurs et les documents d'autres membres de
-l'équipe ne sont pas encore intégrés.
+Cette description porte sur le dépôt livré : une tournée par livreur,
+rangée dans le modèle (voir
+[ADR 0006](adr/0006-plusieurs-livreurs.md)).
 
 ## Architecture MVC
 
@@ -25,16 +25,16 @@ Les tests remplacent l'écran et ces exécuteurs sans ouvrir JavaFX.
 - **Observer** : `ProgrammeLivraisons` notifie après chaque modification.
   La vue retire son inscription au programme précédent. Voir
   [ADR 0003](adr/0003-design-pattern-observer-modele-vue.md).
-- **Command** : ajout et suppression sont réversibles, avec historique et
-  cache des tournées pour retrouver les horaires et plages sans recalcul.
-  Voir [ADR 0004](adr/0004-design-pattern-command-annulation.md).
+- **Command** : chaque modification du programme est réversible, avec
+  historique. Une commande garde les tournées d'avant et d'après, rangées dans
+  `ProgrammeLivraisons`, pour qu'Annuler et Rétablir ne recalculent rien. Voir [ADR 0004](adr/0004-design-pattern-command-annulation.md).
 - **Template Method** : `TemplateTSP` fixe la recherche par séparation et
   évaluation ; `TSP3` spécialise l'exploration et sa borne. Le graphe impose
   la collecte avant la livraison. L'intégration du calcul dans `Plan` est
   décrite par [ADR 0005](adr/0005-nettoyage-du-code-et-glossaire.md).
 
-Les ADR 0001 à 0005 sont présents. L'ADR 0006 prévu pour les évolutions
-multi-livreurs n'est pas disponible : aucun contrat futur n'est supposé ici.
+Les ADR 0001 à 0006 sont présents ; l'ADR 0006 décrit le modèle à plusieurs
+livreurs et le rangement des tournées dans `ProgrammeLivraisons`.
 
 ## Algorithmes
 
@@ -50,8 +50,8 @@ de tournée lisible si elle doit être desservie.
 
 ### Calcul global
 
-`Plan.calculerTournee` construit le graphe des plus courts chemins entre
-les adresses, cherche l'ordre avec `TSP3`, puis calcule les heures.
+`Plan.calculerTournees` construit, pour chaque livreur, le graphe des plus
+courts chemins entre les adresses, cherche l'ordre avec `TSP3`, puis calcule les heures.
 La limite de recherche est de 10 secondes : la meilleure solution trouvée
 est utilisée ; elle n'est pas déclarée optimale si la recherche est coupée.
 Les distances transmises au TSP sont arrondies au mètre. La vitesse est
@@ -155,7 +155,8 @@ La restauration a introduit un recalcul sans TSP réutilisé pour l'insertion.
 Les durées deviennent saisissables et les plages annoncées restent stables
 lors d'un ajout, afin de conserver les engagements déjà affichés.
 
-Les limites actuelles sont explicites : un livreur, pas de réassignation,
-suppression encore suivie d'un calcul global à la demande, déplacement et
-changement d'ordre interactifs non intégrés. La relecture humaine et les
+Depuis, le modèle gère plusieurs livreurs (une tournée chacun), le changement
+de livreur d'une demande est une commande annulable, et la suppression, le
+déplacement d'un point et le changement d'ordre passent par le recalcul local,
+sans relancer le TSP. La relecture humaine et les
 validations après gel du code restent nécessaires pour les tickets finaux.
