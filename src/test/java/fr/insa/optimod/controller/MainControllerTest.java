@@ -3764,4 +3764,17 @@ public class MainControllerTest {
                 + "changez-les de livreur d'abord.", ecran.consigne);
         assertEquals("", ecran.confirmation);
     }
+
+    /** Avec deux livreurs, Sauvegarder signale l'erreur et n'écrit rien. */
+    @Test
+    public void sauvegarderAvecDeuxLivreursSignaleSansEcrire() throws Exception {
+        calculerAvecUnLivreur();
+        ecran.actionNombreLivreurs.accept(2);
+        File fichier = dossier.newFile("deux.xml");
+        ecran.fichierChoisi = fichier;
+        ecran.evenements.clear();
+        ecran.actionSauvegarder.run();
+        assertTrue(ecran.evenements.contains("invalide"));
+        assertEquals(0, fichier.length());
+    }
 }

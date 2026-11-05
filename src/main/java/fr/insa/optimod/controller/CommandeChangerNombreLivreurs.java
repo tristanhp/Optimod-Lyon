@@ -14,8 +14,10 @@ import fr.insa.optimod.model.Tournee;
 final class CommandeChangerNombreLivreurs implements Commande {
 
     private final ProgrammeLivraisons programme;
-    private final int nombreAvant;
     private final int nombreApres;
+
+    /** Nombre de livreurs d'avant le réglage, lu à la première exécution. */
+    private int nombreAvant;
 
     /** Tournées d'avant le réglage, remises par l'annulation. */
     private Map<Integer, Tournee> tourneesAvant;
@@ -33,25 +35,25 @@ final class CommandeChangerNombreLivreurs implements Commande {
      */
     CommandeChangerNombreLivreurs(ProgrammeLivraisons programme, int nombre) {
         this.programme = programme;
-        this.nombreAvant = programme.obtenirNombreLivreurs();
         this.nombreApres = nombre;
-        this.tourneesAvant = programme.obtenirTournees();
     }
 
     @Override
     public void executer() {
-        programme.definirNombreLivreurs(nombreApres);
         if (tourneesApres == null) {
+            nombreAvant = programme.obtenirNombreLivreurs();
+            tourneesAvant = programme.obtenirTournees();
+            programme.definirNombreLivreurs(nombreApres);
             tourneesApres = programme.obtenirTournees();
         } else {
-            programme.definirTournees(tourneesApres);
+            programme.definirNombreLivreursEtTournees(nombreApres,
+                    tourneesApres);
         }
     }
 
     @Override
     public void annuler() {
-        programme.definirNombreLivreurs(nombreAvant);
-        programme.definirTournees(tourneesAvant);
+        programme.definirNombreLivreursEtTournees(nombreAvant, tourneesAvant);
     }
 
     @Override

@@ -71,6 +71,7 @@ package "model" {
     +obtenirNombreLivreurs() : int
     +verifierNombreLivreurs(nombre : int)
     +definirNombreLivreurs(nombre : int)
+    +definirNombreLivreursEtTournees(nombre : int, tournees : Map<Integer, Tournee>)
     +obtenirTournees() : Map<Integer, Tournee>
     +definirTournees(tournees : Map<Integer, Tournee>)
     +definirTournee(livreur : int, tournee : Tournee)

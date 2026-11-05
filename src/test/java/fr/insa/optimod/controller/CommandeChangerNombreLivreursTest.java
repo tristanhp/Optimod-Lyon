@@ -8,6 +8,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
 
 import org.junit.Test;
@@ -187,5 +188,45 @@ public class CommandeChangerNombreLivreursTest {
         commande.executer();
         assertEquals("réglage du nombre de livreurs à 3",
                 commande.description());
+    }
+
+    /** Rétablir ne prévient les observateurs qu'une fois, sans état mixte. */
+    @Test
+    public void retablirNeNotifieQuUneFoisAvecDesTourneesCoherentes() {
+        programme.definirTournees(tourneesVides(1));
+        Commande commande = new CommandeChangerNombreLivreurs(programme, 2);
+        commande.executer();
+        Map<Integer, Tournee> apres = programme.obtenirTournees();
+        commande.annuler();
+        AtomicInteger notifications = new AtomicInteger();
+        programme.ajouterObservateur(source -> {
+            notifications.incrementAndGet();
+            assertEquals(2, programme.obtenirNombreLivreurs());
+            assertSame(apres.get(2), programme.obtenirTournees().get(2));
+        });
+        commande.executer();
+        assertEquals(1, notifications.get());
+    }
+
+    /** Annuler ne prévient les observateurs qu'une fois. */
+    @Test
+    public void annulerNeNotifieQuUneFois() {
+        programme.definirTournees(tourneesVides(1));
+        Commande commande = new CommandeChangerNombreLivreurs(programme, 2);
+        commande.executer();
+        AtomicInteger notifications = new AtomicInteger();
+        programme.ajouterObservateur(source -> notifications.incrementAndGet());
+        commande.annuler();
+        assertEquals(1, notifications.get());
+    }
+
+    /** Le nombre « d'avant » est celui de l'exécution, pas de la création. */
+    @Test
+    public void annulerRemetLeNombreVuALExecution() {
+        Commande commande = new CommandeChangerNombreLivreurs(programme, 3);
+        programme.definirNombreLivreurs(2);
+        commande.executer();
+        commande.annuler();
+        assertEquals(2, programme.obtenirNombreLivreurs());
     }
 }

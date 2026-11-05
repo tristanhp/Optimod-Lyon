@@ -65,9 +65,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /** Largeur de la liste de la tournée. */
     private static final double LARGEUR_TOURNEE = 280;
 
-    /** Plus grand nombre de livreurs proposé par le champ « Livreurs ». */
-    private static final int MAXIMUM_LIVREURS = 20;
-
     /** Bouton de chargement du fichier XML. */
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
@@ -103,10 +100,13 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     /** Nombre de livreurs de la journée, réglé par les flèches seulement. */
     private final Spinner<Integer> champLivreurs =
-            new Spinner<>(1, MAXIMUM_LIVREURS, 1);
+            new Spinner<>(1, ProgrammeLivraisons.MAXIMUM_LIVREURS, 1);
 
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
+
+    /** Action du champ « Livreurs » ; ne fait rien tant qu'elle est nulle. */
+    private IntConsumer actionNombreLivreurs;
 
     /** Vrai si l'état du contrôleur permet de changer le livreur. */
     private boolean changementLivreurPermis;
@@ -169,6 +169,15 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         consigne.setWrapText(true);
         consigne.setMaxWidth(Double.MAX_VALUE);
         definirInfobulles();
+        champLivreurs.valueProperty().addListener(
+                (observable, ancienne, nouvelle) -> {
+                    if (actionNombreLivreurs != null && nouvelle != null
+                            && programmeObserve != null
+                            && nouvelle
+                            != programmeObserve.obtenirNombreLivreurs()) {
+                        actionNombreLivreurs.accept(nouvelle);
+                    }
+                });
         champLivreurs.setEditable(false);
         champLivreurs.setPrefWidth(70);
         champLivreurs.setDisable(true);
@@ -418,14 +427,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      */
     @Override
     public void definirActionNombreLivreurs(IntConsumer action) {
-        champLivreurs.valueProperty().addListener(
-                (observable, ancienne, nouvelle) -> {
-                    if (nouvelle != null && programmeObserve != null
-                            && nouvelle
-                            != programmeObserve.obtenirNombreLivreurs()) {
-                        action.accept(nouvelle);
-                    }
-                });
+        actionNombreLivreurs = action;
     }
 
     @Override
