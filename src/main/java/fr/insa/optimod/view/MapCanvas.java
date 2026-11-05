@@ -72,7 +72,7 @@ final class MapCanvas extends Pane {
 
     /**
      * Renvoie la couleur commune à la carte et à la liste pour une demande.
-     * 
+     *
      * @param indice rang de la demande
      * @return couleur de la demande
      */
@@ -132,7 +132,7 @@ final class MapCanvas extends Pane {
 
     /**
      * Redessine les points choisis avant validation de la demande.
-     * 
+     *
      * @param collecte  point de collecte, ou null pour effacer l'aperçu
      * @param livraison point de livraison, ou null avant le second clic
      */
