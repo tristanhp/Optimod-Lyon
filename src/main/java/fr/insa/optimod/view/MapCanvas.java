@@ -101,6 +101,13 @@ final class MapCanvas extends Pane {
     /** Couleur de la tournée au retour à l'entrepôt (foncé). */
     private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
 
+    /** Fond du numéro d'un arrêt dont l'arrivée dépasse 13 h (rouge). */
+    private static final Color COULEUR_APRES_13H = Color.web("#d93025");
+
+    /** Contour du numéro d'un arrêt dont l'arrivée dépasse 13 h. */
+    private static final Color COULEUR_APRES_13H_CONTOUR =
+            Color.web("#8c1c13");
+
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
 
@@ -115,11 +122,6 @@ final class MapCanvas extends Pane {
      * plus long tronçon repassé.
      */
     private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
-
-    /** Rouge d'un arrêt hors plage ou après l'heure limite. */
-    private static final Color COULEUR_ARRET_TARDIF = Color.web("#c62828");
-
-    private static final Color COULEUR_FOND_ARRET_TARDIF = Color.web("#fce8e6");
 
     /** Demi-longueur d'une flèche de sens, en pixels. */
     private static final double TAILLE_FLECHE = 5;
@@ -332,6 +334,7 @@ final class MapCanvas extends Pane {
                     surClicArret.accept(entree.getKey(), rang);
                     detailsArret.setText(
                             LibellesArrets.decrire(plan, arret));
+                    detailsArret.setStyle(LibellesArrets.style(arret));
                     detailsArret.show(this, ecranXSouris + 12,
                             ecranYSouris + 12);
                     return;
@@ -720,13 +723,14 @@ final class MapCanvas extends Pane {
                 double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
                 boolean tardif = estTardif(arrets.get(rang));
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
-                        : tardif ? COULEUR_FOND_ARRET_TARDIF : Color.WHITE);
-                contexte.setStroke(tardif ? COULEUR_ARRET_TARDIF
+                        : tardif ? COULEUR_APRES_13H : Color.WHITE);
+                contexte.setStroke(tardif ? COULEUR_APRES_13H_CONTOUR
                         : COULEUR_FIN_TOURNEE);
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
-                contexte.setFill(tardif ? COULEUR_ARRET_TARDIF : Color.BLACK);
+                contexte.setFill(tardif && !selectionne ? Color.WHITE
+                        : Color.BLACK);
                 contexte.fillText(String.valueOf(rang), x, y);
             }
         }
@@ -784,7 +788,7 @@ final class MapCanvas extends Pane {
         double[] ordonnees = { y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y };
         boolean retourTardif = existeRetourTardif();
         contexte.setFill(COULEUR_ENTREPOT);
-        contexte.setStroke(retourTardif ? COULEUR_ARRET_TARDIF
+        contexte.setStroke(retourTardif ? COULEUR_APRES_13H_CONTOUR
                 : COULEUR_CONTOUR_ENTREPOT);
         contexte.setLineWidth(retourTardif ? 5 : 3);
         contexte.strokePolygon(abscisses, ordonnees, 4);
@@ -919,8 +923,8 @@ final class MapCanvas extends Pane {
             contexte.setStroke(COULEUR_FIN_TOURNEE);
             contexte.strokeLine(cx, cy, cx + 8, cy);
         } else if (i == 5) {
-            contexte.setFill(COULEUR_FOND_ARRET_TARDIF);
-            contexte.setStroke(COULEUR_ARRET_TARDIF);
+            contexte.setFill(COULEUR_APRES_13H);
+            contexte.setStroke(COULEUR_APRES_13H_CONTOUR);
             contexte.setLineWidth(2);
             contexte.fillOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
             contexte.strokeOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
