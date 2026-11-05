@@ -231,17 +231,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                                 MapCanvas.couleurDemande(getIndex())));
             }
         });
-        carte.definirSurSurvol(indice -> {
-            if (indice >= 0) {
-                listeDemandes.getSelectionModel().select(indice);
-                listeDemandes.scrollTo(indice);
-            } else {
-                listeDemandes.getSelectionModel().clearSelection();
-            }
-        });
         listeDemandes.getSelectionModel().selectedIndexProperty().addListener(
                 (observable, ancien, nouveau) -> {
-                    carte.mettreEnEvidence(nouveau.intValue());
+                    carte.selectionnerDemande(nouveau.intValue());
                     actualiserBoutonSupprimer();
                     actualiserBoutonChangerLivreur();
                 });
