@@ -161,12 +161,11 @@ public class TSPTest {
     public void testDepandanceSolution() {
         ArrayList<Integer> vus = new ArrayList<>();
         for (int i = 0; i < NB_SOMMETS; ++i) {
-            for (int indiceDejaVu = 0; indiceDejaVu
-                    < vus.size(); indiceDejaVu++) {
+            for (int indiceDejaVu = 0; indiceDejaVu < vus.size(); indiceDejaVu++) {
                 // i n'est pas une depandance d'un indice deja vus
                 assertTrue(grapheDepandance.getDepandance(
                         tsp5.obtenirSommetSolution(indiceDejaVu)) != tsp5
-                        .obtenirSommetSolution(i));
+                                .obtenirSommetSolution(i));
             }
             vus.add(tsp5.obtenirSommetSolution(i));
             // System.out.print(tsp5.obtenirSommetSolution(i) + "["
@@ -185,8 +184,7 @@ public class TSPTest {
             e.printStackTrace();
         }
         try {
-            livraisons =
-                    new ProgrammeLivraisons(
+            livraisons = new ProgrammeLivraisons(
                     "src/main/resources/data/demandeGrand9.xml", plan);
         } catch (IOException | SAXException e) {
             e.printStackTrace();
@@ -203,8 +201,7 @@ public class TSPTest {
             e.printStackTrace();
         }
         try {
-            livraisons =
-                    new ProgrammeLivraisons(
+            livraisons = new ProgrammeLivraisons(
                     "src/main/resources/data/demandeMoyen5.xml", plan);
         } catch (IOException | SAXException e) {
             e.printStackTrace();
@@ -218,7 +215,7 @@ public class TSPTest {
         System.out.println();
         System.out.println(
                 "4150019167 26155372 26317393 25610684 21717915 60755991 "
-                + "21992645 1400900990 1036842078 208769083 55444215 "
-                + "4150019167");
+                        + "21992645 1400900990 1036842078 208769083 55444215 "
+                        + "4150019167");
     }
 }

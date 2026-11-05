@@ -39,12 +39,14 @@ import fr.insa.optimod.model.Tournee.TypeArret;
 /**
  * Plan de la ville lu dans un fichier de plan : des nœuds et des tronçons.
  *
- * <p>Le plan calcule aussi les tournées d'un programme de livraisons, une par
+ * <p>
+ * Le plan calcule aussi les tournées d'un programme de livraisons, une par
  * livreur ({@link #calculerTournees}) : plus courts chemins entre les
  * adresses (A*), meilleur ordre de passage avec la contrainte d'ordre
  * (voyageur de commerce, {@link TSP5}), puis heures de passage.
  *
- * <p>Le voyageur de commerce ne sert qu'au calcul complet. Quand l'utilisateur
+ * <p>
+ * Le voyageur de commerce ne sert qu'au calcul complet. Quand l'utilisateur
  * supprime une demande, l'ordre des autres arrêts du livreur est gardé, seuls
  * les trajets des jonctions créées sont recalculés et les heures sont
  * refaites ({@link #calculerTourneeSansDemande}) : c'est le recalcul local.
@@ -95,7 +97,7 @@ public final class Plan {
      *
      * @param sommets les sommets dans l'ordre de passage, en commençant par 0
      * @param optimal vrai si l'ordre est prouvé optimal, faux si la limite de
-     *        temps a coupé la recherche
+     *                temps a coupé la recherche
      */
     private record OrdreDePassage(List<Integer> sommets, boolean optimal) {
     }
@@ -111,12 +113,10 @@ public final class Plan {
      * avec lui. Le calcul tourne hors du thread de l'interface : la table est
      * concurrente.
      */
-    private final Map<List<Sommet>, List<Integer>> ordresMemorises =
-            new ConcurrentHashMap<>();
+    private final Map<List<Sommet>, List<Integer>> ordresMemorises = new ConcurrentHashMap<>();
 
     private final Map<Long, Noeud> noeuds = new LinkedHashMap<>();
-    private final Map<Noeud, List<Troncon>> tronconsSortants =
-            new LinkedHashMap<>();
+    private final Map<Noeud, List<Troncon>> tronconsSortants = new LinkedHashMap<>();
     private final List<Troncon> troncons = new ArrayList<>();
 
     /**
@@ -145,8 +145,7 @@ public final class Plan {
         documentXml.getDocumentElement().normalize();
         try {
             NodeList elementsNoeuds = documentXml.getElementsByTagName("noeud");
-            for (int indice = 0; indice
-                    < elementsNoeuds.getLength(); indice++) {
+            for (int indice = 0; indice < elementsNoeuds.getLength(); indice++) {
                 Element element = (Element) elementsNoeuds.item(indice);
                 Noeud noeud = new Noeud(
                         Long.parseLong(element.getAttribute("id")),
@@ -155,10 +154,8 @@ public final class Plan {
                 noeuds.put(noeud.identifiant(), noeud);
                 tronconsSortants.put(noeud, new ArrayList<>());
             }
-            NodeList elementsTroncons =
-                    documentXml.getElementsByTagName("troncon");
-            for (int indice = 0; indice
-                    < elementsTroncons.getLength(); indice++) {
+            NodeList elementsTroncons = documentXml.getElementsByTagName("troncon");
+            for (int indice = 0; indice < elementsTroncons.getLength(); indice++) {
                 Element element = (Element) elementsTroncons.item(indice);
                 Noeud origine = trouverNoeud(element.getAttribute("origine"));
                 Troncon troncon = new Troncon(origine,
@@ -182,8 +179,7 @@ public final class Plan {
      */
     static DocumentBuilder creerLecteurXml() {
         try {
-            DocumentBuilderFactory fabrique =
-                    DocumentBuilderFactory.newInstance();
+            DocumentBuilderFactory fabrique = DocumentBuilderFactory.newInstance();
             fabrique.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             fabrique.setFeature(
                     "http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -206,6 +202,7 @@ public final class Plan {
 
     /**
      * Renvoie nœuds du plan (non modifiable).
+     *
      * @return nœuds du plan (non modifiable)
      */
     public Collection<Noeud> obtenirNoeuds() {
@@ -224,6 +221,7 @@ public final class Plan {
 
     /**
      * Renvoie tronçons du plan (non modifiable).
+     *
      * @return tronçons du plan (non modifiable)
      */
     public List<Troncon> obtenirTroncons() {
@@ -241,14 +239,16 @@ public final class Plan {
      * voyageur de commerce est partagée à parts égales entre les livreurs qui
      * ont des demandes.
      *
-     * <p>Une tournée qui revient à l'entrepôt après
+     * <p>
+     * Une tournée qui revient à l'entrepôt après
      * {@link #HEURE_LIMITE_RETOUR} est renvoyée quand même : elle est
      * signalée par {@link Tournee#estPossible()}.
      *
      * @param programme entrepôt, heure de départ, livreurs et demandes
      * @return une tournée par numéro de livreur, triées (non modifiable)
      * @throws IllegalStateException si une adresse est inaccessible ou si
-     *         aucun ordre de passage n'a été trouvé dans la limite de temps
+     *                               aucun ordre de passage n'a été trouvé dans la
+     *                               limite de temps
      */
     public Map<Integer, Tournee> calculerTournees(
             ProgrammeLivraisons programme) {
@@ -321,13 +321,13 @@ public final class Plan {
      * Recalcule les trajets et les heures pour un ordre imposé, sans TSP.
      *
      * @param heureDepart heure de départ
-     * @param adresses arrêts ordonnés, entrepôt au début et à la fin
-     * @param durees durées sur place en secondes
-     * @param types ce que le livreur fait à chaque arrêt
-     * @param demandes demande servie à chaque arrêt, {@code null} à l'entrepôt
+     * @param adresses    arrêts ordonnés, entrepôt au début et à la fin
+     * @param durees      durées sur place en secondes
+     * @param types       ce que le livreur fait à chaque arrêt
+     * @param demandes    demande servie à chaque arrêt, {@code null} à l'entrepôt
      * @return tournée dans l'ordre fourni
      * @throws IllegalArgumentException si l'ordre est invalide
-     * @throws IllegalStateException si la tournée est impossible
+     * @throws IllegalStateException    si la tournée est impossible
      */
     public Tournee recalculerTournee(LocalTime heureDepart,
             List<Noeud> adresses, List<Integer> durees,
@@ -362,14 +362,15 @@ public final class Plan {
      * Seuls les trois nouveaux chemins entre les arrêts voisins sont calculés.
      * Les autres chemins et les plages annoncées restent inchangés.
      *
-     * @param tournee tournée de départ, jamais modifiée
-     * @param demande demande à insérer
+     * @param tournee  tournée de départ, jamais modifiée
+     * @param demande  demande à insérer
      * @param position rang de collecte, entre 1 et le rang du retour inclus
      * @return nouvelle tournée sans recherche de position ni appel au TSP
      * @throws IllegalArgumentException si la position est invalide
-     * @throws IllegalStateException si un nouveau chemin est inaccessible ou
-     *         si l'insertion rend le retour impossible (après 13 h, alors que
-     *         la tournée d'avant rentrait à l'heure)
+     * @throws IllegalStateException    si un nouveau chemin est inaccessible ou
+     *                                  si l'insertion rend le retour impossible
+     *                                  (après 13 h, alors que
+     *                                  la tournée d'avant rentrait à l'heure)
      */
     public Tournee insererDemande(Tournee tournee, Demande demande,
             int position) {
@@ -442,7 +443,8 @@ public final class Plan {
      * décision : rien n'est inséré, et l'administrateur reste libre de choisir
      * une autre position.
      *
-     * <p>Les durées sur place sont les mêmes à toute position : seul compte le
+     * <p>
+     * Les durées sur place sont les mêmes à toute position : seul compte le
      * temps de trajet ajouté, c'est-à-dire les deux trajets qui entourent la
      * demande moins le trajet direct qu'ils remplacent (repris de la tournée).
      * Le voyageur de commerce n'est pas lancé. En cas d'égalité, la première
@@ -466,8 +468,7 @@ public final class Plan {
         }
         int meilleurePosition = -1;
         long meilleurAjout = Long.MAX_VALUE;
-        for (int position = 1; position <= Math.max(1, arrets.size() - 1);
-                position++) {
+        for (int position = 1; position <= Math.max(1, arrets.size() - 1); position++) {
             Noeud precedent = arrets.get(position - 1).noeud();
             Noeud suivant = arrets.get(Math.min(position,
                     arrets.size() - 1)).noeud();
@@ -549,7 +550,7 @@ public final class Plan {
         switch (res) {
             case PAS_DE_SOLUTION:
                 throw new IllegalStateException(
-                "Au moins un sommet du graphe est inaccessible.");
+                        "Au moins un sommet du graphe est inaccessible.");
             case CALCUL_TROP_LONG_SANS_RESULTAT:
                 throw new IllegalStateException(
                         "Aucune tournée possible trouvée dans la limite de "
@@ -592,8 +593,7 @@ public final class Plan {
             Sommet sommet = sommets.get(parcours.get(rang));
             long trajet = 0;
             if (rang > 0) {
-                Chemin chemin = chemins[parcours.get(rang - 1)]
-                        [parcours.get(rang)];
+                Chemin chemin = chemins[parcours.get(rang - 1)][parcours.get(rang)];
                 if (!chemin.estAccessible()) {
                     throw new IllegalStateException("Adresse "
                             + sommet.adresse().identifiant()
@@ -635,13 +635,15 @@ public final class Plan {
      * plus deux) ; les autres trajets sont repris de la tournée actuelle. La
      * réponse est donc immédiate, même sur le grand plan.
      *
-     * <p>Chaque arrêt de la tournée connaît sa demande : les deux arrêts à
+     * <p>
+     * Chaque arrêt de la tournée connaît sa demande : les deux arrêts à
      * retirer sont ceux de cette demande. Si le programme contient deux
      * demandes identiques, on retire la première collecte et la première
      * livraison : celles qui restent forment une demande identique, et sa
      * collecte précède toujours sa livraison.
      *
-     * <p>Mêmes règles que {@link #calculerTournees} : {@value #VITESSE_KMH}
+     * <p>
+     * Mêmes règles que {@link #calculerTournees} : {@value #VITESSE_KMH}
      * km/h, départ à l'heure de départ de la tournée actuelle. Retirer des
      * arrêts ne rallonge jamais une tournée : si elle était possible, elle le
      * reste.
@@ -650,8 +652,8 @@ public final class Plan {
      * @param demande demande à retirer
      * @return la nouvelle tournée, sans les deux arrêts de la demande
      * @throws IllegalArgumentException si la collecte ou la livraison de la
-     *         demande est introuvable dans la tournée
-     * @throws IllegalStateException si une jonction est inaccessible
+     *                                  demande est introuvable dans la tournée
+     * @throws IllegalStateException    si une jonction est inaccessible
      */
     public Tournee calculerTourneeSansDemande(Tournee tournee,
             Demande demande) {
@@ -678,10 +680,11 @@ public final class Plan {
      * tel quel ; seuls les trajets des jonctions créées par le changement sont
      * calculés par A*.
      *
-     * @param tournee tournée actuelle
+     * @param tournee     tournée actuelle
      * @param rangsGardes rangs dans la tournée actuelle des arrêts de la
-     *        nouvelle tournée, dans leur nouvel ordre : le premier est le
-     *        départ de l'entrepôt, le dernier le retour à l'entrepôt
+     *                    nouvelle tournée, dans leur nouvel ordre : le premier est
+     *                    le
+     *                    départ de l'entrepôt, le dernier le retour à l'entrepôt
      */
     private Tournee recalculerDansLOrdre(Tournee tournee,
             List<Integer> rangsGardes) {
@@ -740,27 +743,30 @@ public final class Plan {
      * les autres trajets sont repris de la tournée actuelle, puis les heures
      * sont recalculées.
      *
-     * <p>La contrainte d'ordre est vérifiée <b>avant</b> le recalcul. Échanger
+     * <p>
+     * La contrainte d'ordre est vérifiée <b>avant</b> le recalcul. Échanger
      * deux arrêts voisins ne change que leur ordre mutuel : l'échange n'est
      * donc interdit que si ces deux arrêts sont le point de collecte (en
      * premier) et le point de livraison (en second) d'une même demande, que
      * chaque arrêt connaît. Avec deux demandes identiques, l'échange est aussi
      * refusé : c'est prudent, sans ambiguïté sur les arrêts.
      *
-     * <p>Comme le calcul complet, la méthode renvoie la tournée même si elle
+     * <p>
+     * Comme le calcul complet, la méthode renvoie la tournée même si elle
      * finit après {@link #HEURE_LIMITE_RETOUR} : c'est à l'appelant de la
      * refuser avec {@link Tournee#estPossible()}.
      *
-     * @param tournee tournée actuelle d'un livreur
-     * @param rang rang de l'arrêt à déplacer dans la tournée (0 est le départ
-     *        de l'entrepôt, le dernier rang le retour à l'entrepôt)
+     * @param tournee  tournée actuelle d'un livreur
+     * @param rang     rang de l'arrêt à déplacer dans la tournée (0 est le départ
+     *                 de l'entrepôt, le dernier rang le retour à l'entrepôt)
      * @param decalage {@code -1} pour monter l'arrêt (le faire passer plus
-     *        tôt), {@code 1} pour le descendre (plus tard)
+     *                 tôt), {@code 1} pour le descendre (plus tard)
      * @return la nouvelle tournée, avec ses heures de passage
      * @throws IllegalArgumentException si l'arrêt est l'entrepôt, s'il n'a pas
-     *         de voisin dans ce sens, ou si l'échange ferait passer un point de
-     *         livraison avant son point de collecte
-     * @throws IllegalStateException si une jonction est inaccessible
+     *                                  de voisin dans ce sens, ou si l'échange
+     *                                  ferait passer un point de
+     *                                  livraison avant son point de collecte
+     * @throws IllegalStateException    si une jonction est inaccessible
      */
     public Tournee calculerTourneeOrdreChange(Tournee tournee, int rang,
             int decalage) {
@@ -812,18 +818,21 @@ public final class Plan {
      * de la tournée actuelle, puis les heures de passage sont refaites. Les
      * deux arrêts de la demande reçoivent la demande déplacée.
      *
-     * <p>Comme le calcul complet, la méthode renvoie la tournée même si elle
+     * <p>
+     * Comme le calcul complet, la méthode renvoie la tournée même si elle
      * finit après {@link #HEURE_LIMITE_RETOUR} : c'est à l'appelant de la
      * refuser avec {@link Tournee#estPossible()}.
      *
-     * @param tournee tournée actuelle d'un livreur
-     * @param rang rang, dans cette tournée, de l'arrêt à déplacer (0 est le
-     *        départ de l'entrepôt, le dernier rang le retour à l'entrepôt)
+     * @param tournee      tournée actuelle d'un livreur
+     * @param rang         rang, dans cette tournée, de l'arrêt à déplacer (0 est le
+     *                     départ de l'entrepôt, le dernier rang le retour à
+     *                     l'entrepôt)
      * @param nouveauNoeud nouvelle adresse du point
      * @return la nouvelle tournée, avec ses heures de passage
      * @throws IllegalArgumentException si l'arrêt est l'entrepôt, ou si la
-     *         demande n'est pas identifiable (deux demandes identiques)
-     * @throws IllegalStateException si un trajet est inaccessible
+     *                                  demande n'est pas identifiable (deux
+     *                                  demandes identiques)
+     * @throws IllegalStateException    si un trajet est inaccessible
      */
     public Tournee calculerTourneeAvecPointDeplace(Tournee tournee, int rang,
             Noeud nouveauNoeud) {

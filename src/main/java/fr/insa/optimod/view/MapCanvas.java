@@ -7,19 +7,19 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
-import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.Chemin;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
-import fr.insa.optimod.model.Chemin;
-import fr.insa.optimod.model.Troncon;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Troncon;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
-import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
@@ -65,13 +65,14 @@ final class MapCanvas extends Pane {
 
     /** Une couleur par demande, réutilisées en boucle. */
     private static final Color[] COULEURS_DEMANDES = {
-        Color.web("#d93025"), Color.web("#1a73e8"), Color.web("#188038"),
-        Color.web("#e37400"), Color.web("#9334e6"), Color.web("#129eaf"),
-        Color.web("#c2185b"), Color.web("#5f6368")
+            Color.web("#d93025"), Color.web("#1a73e8"), Color.web("#188038"),
+            Color.web("#e37400"), Color.web("#9334e6"), Color.web("#129eaf"),
+            Color.web("#c2185b"), Color.web("#5f6368")
     };
 
     /**
      * Renvoie la couleur commune à la carte et à la liste pour une demande.
+     *
      * @param indice rang de la demande
      * @return couleur de la demande
      */
@@ -131,7 +132,8 @@ final class MapCanvas extends Pane {
 
     /**
      * Redessine les points choisis avant validation de la demande.
-     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     *
+     * @param collecte  point de collecte, ou null pour effacer l'aperçu
      * @param livraison point de livraison, ou null avant le second clic
      */
     void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -158,17 +160,20 @@ final class MapCanvas extends Pane {
     private int demandeEnEvidence = -1;
 
     /** Prévenu de l'indice de la demande survolée (-1 hors d'un point). */
-    private IntConsumer surSurvol = indice -> { };
+    private IntConsumer surSurvol = indice -> {
+    };
 
     /** Prévenu de l'identifiant de l'intersection cliquée. */
-    private LongConsumer surClicNoeud = idNoeud -> { };
+    private LongConsumer surClicNoeud = idNoeud -> {
+    };
 
     /** Prévenu du livreur et du rang de l'arrêt cliqué. */
-    private BiConsumer<Integer, Integer> surClicArret =
-            (livreur, rang) -> { };
+    private BiConsumer<Integer, Integer> surClicArret = (livreur, rang) -> {
+    };
 
     /** Prévenu de l'explication quand le dessin lève une exception. */
-    private Consumer<String> surErreurDessin = detail -> { };
+    private Consumer<String> surErreurDessin = detail -> {
+    };
 
     /** Crée une carte vide. */
     MapCanvas() {
@@ -180,8 +185,9 @@ final class MapCanvas extends Pane {
         getChildren().addAll(canevas, messageErreur);
         setOnScroll(evenement -> {
             if (evenement.getDeltaY() != 0) {
-                zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1
-                        / FACTEUR_MOLETTE,
+                zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE
+                        : 1
+                                / FACTEUR_MOLETTE,
                         evenement.getX(), evenement.getY());
             }
         });
@@ -222,7 +228,7 @@ final class MapCanvas extends Pane {
      * arrêts.
      *
      * @param nouvellesTournees tournées par numéro de livreur, vide pour les
-     *        effacer
+     *                          effacer
      */
     void afficherTournees(Map<Integer, Tournee> nouvellesTournees) {
         tournees = Map.copyOf(nouvellesTournees);
@@ -236,7 +242,7 @@ final class MapCanvas extends Pane {
      * Met en évidence un arrêt, sans prévenir personne (la liste l'a choisi).
      *
      * @param livreur numéro du livreur, ou -1 pour aucun
-     * @param rang rang de l'arrêt dans sa tournée, ou -1 pour aucun
+     * @param rang    rang de l'arrêt dans sa tournée, ou -1 pour aucun
      */
     void selectionnerArret(int livreur, int rang) {
         if (livreur != livreurSelectionne || rang != rangSelectionne) {
@@ -438,7 +444,7 @@ final class MapCanvas extends Pane {
      * Superpose les demandes au plan : collectes en carré, livraisons en rond.
      *
      * @param nouveauProgramme demandes à dessiner, ou {@code null} pour les
-     *        retirer
+     *                         retirer
      */
     void afficherProgramme(ProgrammeLivraisons nouveauProgramme) {
         programme = nouveauProgramme;
@@ -572,12 +578,12 @@ final class MapCanvas extends Pane {
         double uy = (y2 - y1) / longueur;
         double mx = (x1 + x2) / 2;
         double my = (y1 + y2) / 2;
-        double[] abscisses = {mx + ux * TAILLE_FLECHE,
-            mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
-            mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8};
-        double[] ordonnees = {my + uy * TAILLE_FLECHE,
-            my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
-            my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8};
+        double[] abscisses = { mx + ux * TAILLE_FLECHE,
+                mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
+                mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8 };
+        double[] ordonnees = { my + uy * TAILLE_FLECHE,
+                my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
+                my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8 };
         contexte.setFill(Color.WHITE);
         contexte.fillPolygon(abscisses, ordonnees, 3);
     }
@@ -654,8 +660,8 @@ final class MapCanvas extends Pane {
         }
         double x = ecranX(depot.longitude());
         double y = ecranY(depot.latitude());
-        double[] abscisses = {x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT};
-        double[] ordonnees = {y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y};
+        double[] abscisses = { x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT };
+        double[] ordonnees = { y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y };
         contexte.setFill(COULEUR_ENTREPOT);
         contexte.setStroke(COULEUR_FOND);
         contexte.setLineWidth(2);

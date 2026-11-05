@@ -26,8 +26,7 @@ public class TSP5 extends TSP3 {
         }
 
         int borne = 0;
-        java.util.List<Integer> sommetsRestants =
-                new java.util.ArrayList<>(nonVus);
+        java.util.List<Integer> sommetsRestants = new java.util.ArrayList<>(nonVus);
         int n = g.obtenirNombreSommets();
 
         // Tableaux pour l'algorithme de Prim sur les sommets non vus

@@ -29,18 +29,15 @@ public abstract class TemplateTSP implements TSP {
         this.tpsLimite = tpsLimite;
         this.g = g;
         meilleureSolution = new Integer[g.obtenirNombreSommets()];
-        Collection<Integer> nonVus =
-                new ArrayList<Integer>(g.obtenirNombreSommets() - 1);
-        Collection<Integer> accessible =
-                new ArrayList<Integer>(g.obtenirNombreSommets() - 1);
+        Collection<Integer> nonVus = new ArrayList<Integer>(g.obtenirNombreSommets() - 1);
+        Collection<Integer> accessible = new ArrayList<Integer>(g.obtenirNombreSommets() - 1);
         for (int i = 1; i < g.obtenirNombreSommets(); i++) {
             if (g.getDepandance(i) == -1) {
                 accessible.add(i);
             }
             nonVus.add(i);
         }
-        Collection<Integer> vus =
-                new ArrayList<Integer>(g.obtenirNombreSommets());
+        Collection<Integer> vus = new ArrayList<Integer>(g.obtenirNombreSommets());
         vus.add(0); // le premier sommet visite est 0
         coutMeilleureSolution = Integer.MAX_VALUE;
         branchAndBound(0, nonVus, accessible, vus, 0);
@@ -90,7 +87,7 @@ public abstract class TemplateTSP implements TSP {
      * @param sommetCourant
      * @param nonVus
      * @return une borne inferieure du cout des chemins de <code>g</code>
-     *        partant de
+     *         partant de
      *         <code>sommetCourant</code>, visitant
      *         tous les sommets de <code>nonVus</code> exactement une fois, puis
      *         retournant sur le sommet <code>0</code>.
@@ -119,7 +116,7 @@ public abstract class TemplateTSP implements TSP {
      * @param nonVus
      * @param g
      * @return true s'il y a un croisement d'arc sans inversion de dependance,
-     *        false
+     *         false
      *         sinon
      */
     protected abstract Boolean croisementArc(Integer sommetCrt,
@@ -136,7 +133,7 @@ public abstract class TemplateTSP implements TSP {
      * @param nonVus    la liste des sommets qui n'ont pas encore ete visites
      * @param vus       la liste des sommets deja visites (y compris sommetCrt)
      * @param coutVus   la somme des couts des arcs du chemin passant par tous
-     *        les
+     *                  les
      *                  sommets de vus dans l'ordre ou ils ont ete visites
      */
     private void branchAndBound(int sommetCrt, Collection<Integer> nonVus,
@@ -150,16 +147,14 @@ public abstract class TemplateTSP implements TSP {
             // on peut retourner au sommet de depart (0)
             if (g.estArc(sommetCrt, 0)) {
                 // on a trouve une solution
-                if (coutVus + g.obtenirCoutArc(sommetCrt, 0)
-                        < coutMeilleureSolution) {
+                if (coutVus + g.obtenirCoutArc(sommetCrt, 0) < coutMeilleureSolution) {
                     // meilleure que meilleureSolution
                     vus.toArray(meilleureSolution);
                     coutMeilleureSolution = coutVus
                             + g.obtenirCoutArc(sommetCrt, 0);
                 }
             }
-        } else if (coutVus + calculerBorneInferieure(sommetCrt, nonVus)
-                < coutMeilleureSolution) {
+        } else if (coutVus + calculerBorneInferieure(sommetCrt, nonVus) < coutMeilleureSolution) {
             Iterator<Integer> it = creerIterateurSuccesseurs(sommetCrt,
                     accessible, g);
             while (it.hasNext()) {

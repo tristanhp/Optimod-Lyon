@@ -32,9 +32,9 @@ final class MapProjection {
     /**
      * Calcule la projection qui fait tenir les noeuds dans la zone donnée.
      *
-     * @param noeuds noeuds du plan à afficher (au moins un)
-     * @param largeur largeur disponible, en pixels
-     * @param hauteur hauteur disponible, en pixels
+     * @param noeuds          noeuds du plan à afficher (au moins un)
+     * @param largeur         largeur disponible, en pixels
+     * @param hauteur         hauteur disponible, en pixels
      * @param margeInterieure marge intérieure, en pixels
      */
     MapProjection(Collection<Noeud> noeuds, double largeur, double hauteur,

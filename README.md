@@ -39,6 +39,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Déplacer un point de collecte ou de livraison | fait |
 | Changer le livreur d'une demande (annulable) | fait |
 | Régler le nombre de livreurs | à faire |
+| Générer les feuilles de route (un fichier HTML par livreur, imprimable) | fait |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
 ## Installer le projet
@@ -125,6 +126,12 @@ En bas de la fenêtre, une phrase en vert confirme ce qui vient d'être fait
 (« Demande ajoutée au livreur 2. », « Annulé : suppression d'une demande du
 livreur 1. »). Survoler un bouton affiche une infobulle ; un bouton grisé n'en
 affiche pas, c'est la consigne qui dit alors quoi faire d'abord.
+
+**Feuilles de route** : une fois la tournée calculée, *Générer les feuilles de
+route* demande un dossier et y écrit un fichier `feuille-de-route-livreur-N.html`
+par livreur : heures de départ et de retour, arrêts dans l'ordre (type, adresse,
+plage annoncée, heures, durée sur place) et itinéraire rue par rue entre deux
+arrêts. La page s'imprime depuis le navigateur.
 
 **Sauvegarde et restauration (modèle actuel : un livreur)** : après un calcul,
 cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
@@ -251,6 +258,7 @@ Termes principaux et leur traduction dans le code :
 | Durée sur place | Temps passé à récupérer ou déposer, en secondes | `dureeCollecte`, `dureeLivraison` |
 | Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h ; une par livreur | `Tournee`, `ProgrammeLivraisons.obtenirTournees()` |
 | Arrêt, heure de passage | Un point de la tournée (entrepôt, collecte ou livraison) et ses heures d'arrivée et de départ | `Tournee.Arret` |
+| Feuille de route | Page HTML imprimable d'un livreur : arrêts dans l'ordre, heures de passage et itinéraire rue par rue | `FeuilleDeRoute` |
 | Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
 | Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
 | Tournée possible | Tournée qui respecte toutes les règles, dont le retour avant 13 h | `Tournee.estPossible()` |

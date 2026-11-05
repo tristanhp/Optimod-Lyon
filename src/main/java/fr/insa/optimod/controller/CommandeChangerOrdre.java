@@ -27,8 +27,8 @@ final class CommandeChangerOrdre implements Commande {
     private Map<Integer, Tournee> tourneesApres;
 
     /**
-     * @param programme programme dont les tournées changent
-     * @param livreur numéro du livreur dont la tournée change
+     * @param programme     programme dont les tournées changent
+     * @param livreur       numéro du livreur dont la tournée change
      * @param tourneesAvant tournées par numéro de livreur avant le changement
      * @param tourneesApres les mêmes, avec la nouvelle tournée du livreur
      */

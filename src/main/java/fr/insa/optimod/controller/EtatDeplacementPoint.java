@@ -25,7 +25,7 @@ final class EtatDeplacementPoint implements Etat {
 
     /**
      * @param livreur numéro du livreur de l'arrêt à déplacer
-     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     * @param rang    rang de l'arrêt à déplacer dans la tournée de ce livreur
      */
     EtatDeplacementPoint(int livreur, int rang) {
         this.livreur = livreur;

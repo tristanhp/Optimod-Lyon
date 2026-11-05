@@ -16,7 +16,7 @@ public class TSP3 extends TSP2 {
      * @param nonVus
      * @param g
      * @return un iterateur de <code>nonVus</code> trie par ordre croissant de
-     *        la
+     *         la
      *         distance de <code>sommetCrt</code>
      */
     @Override

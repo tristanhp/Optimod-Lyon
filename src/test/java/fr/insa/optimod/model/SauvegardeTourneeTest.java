@@ -84,10 +84,11 @@ public class SauvegardeTourneeTest {
                 List.of(new Demande(plan.obtenirNoeud(3),
                         plan.obtenirNoeud(2), 120, 240)));
         Tournee avant = plan.calculerTournees(programme).get(1);
-        List<Tournee.Arret> arrets = avant.arrets().stream().map(arret ->
-                new Tournee.Arret(arret.noeud(), arret.arrivee(),
+        List<Tournee.Arret> arrets = avant.arrets().stream()
+                .map(arret -> new Tournee.Arret(arret.noeud(), arret.arrivee(),
                         arret.depart(), arret.type(), arret.demande(),
-                        LocalTime.of(6, 0), LocalTime.of(7, 0))).toList();
+                        LocalTime.of(6, 0), LocalTime.of(7, 0)))
+                .toList();
         Tournee annoncee = new Tournee(arrets, avant.chemins());
         programme.definirTournees(Map.of(1, annoncee));
         Path fichier = dossier.newFile("plages.xml").toPath();
@@ -129,7 +130,7 @@ public class SauvegardeTourneeTest {
         Path fichier = dossier.newFile().toPath();
         Files.writeString(fichier,
                 "<sauvegardeTournee version=\"1\" nombreLivreurs=\"1\" "
-                + "plan=\"absent.xml\"/>");
+                        + "plan=\"absent.xml\"/>");
         assertThrows(SAXException.class,
                 () -> SauvegardeTournee.restaurer(fichier));
     }
