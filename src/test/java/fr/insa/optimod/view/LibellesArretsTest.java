@@ -1,6 +1,7 @@
 package fr.insa.optimod.view;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -95,6 +96,22 @@ public class LibellesArretsTest {
         assertTrue(texte, texte.startsWith("Point de collecte — Rue Pasteur"));
         assertTrue(texte, texte.contains("Arrivée 08:30 → départ 08:35"));
         assertTrue(texte, texte.contains("Plage : 07:30 – 09:30"));
+    }
+
+    /** Un arrêt après 13 h le dit dans son texte, pas un arrêt à 13 h pile. */
+    @Test
+    public void decritUnArretApres13h() throws Exception {
+        Plan plan = planDeTest();
+        Demande demande = new Demande(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(1), 300, 300);
+        Arret apres = new Arret(plan.obtenirNoeud(1), LocalTime.of(13, 1),
+                LocalTime.of(13, 6), TypeArret.LIVRAISON, demande);
+        Arret pile = new Arret(plan.obtenirNoeud(1), LocalTime.of(13, 0),
+                LocalTime.of(13, 5), TypeArret.LIVRAISON, demande);
+        assertTrue(LibellesArrets.decrire(plan, apres)
+                .endsWith("\nAprès 13 h"));
+        assertFalse(LibellesArrets.decrire(plan, pile)
+                .contains("Après 13 h"));
     }
 
     /** Les trois types d'arrêt ont un libellé du glossaire. */

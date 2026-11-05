@@ -166,7 +166,8 @@ heures sur place imposent un retour après 20 h.
    inaccessible, un message l'explique ; si un livreur revient après 13 h,
    sa tournée est affichée quand même, sans message d'erreur. Les arrêts dont
    l'arrivée dépasse 13 h sont rouges dans la liste et le popup, avec la
-   mention « Après 13 h », même s'ils respectent leur plage annoncée.
+   mention « Après 13 h » sur sa propre ligne, même s'ils respectent leur
+   plage annoncée ; sur la carte, leur numéro est sur fond rouge.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
