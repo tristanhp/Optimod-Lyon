@@ -22,6 +22,17 @@ final class LibellesArrets {
     }
 
     /**
+     * Style commun à la liste et au popup pour signaler un arrêt en alerte.
+     *
+     * @param arret arrêt à afficher
+     * @return texte rouge hors plage ou après 13 h, style normal sinon
+     */
+    static String style(Arret arret) {
+        return arret.estHorsPlage() || arret.estApresHeureLimite()
+                ? "-fx-text-fill: #c62828;" : "";
+    }
+
+    /**
      * Donne le type d'un arrêt en toutes lettres.
      *
      * @param type type de l'arrêt

@@ -19,6 +19,36 @@ import fr.insa.optimod.model.Tournee.TypeArret;
 /** Tests des textes d'un arrêt (liste de la tournée et popup de la carte). */
 public class LibellesArretsTest {
 
+    /** Après 13 h, même dans sa plage, l'arrêt est rouge et explicite. */
+    @Test
+    public void apres13hDansLaPlageAfficheEnRouge() {
+        Arret arret = new Arret(new Noeud(1, 4, 45),
+                LocalTime.of(13, 0, 1), LocalTime.of(13, 0, 1),
+                TypeArret.ENTREPOT, null);
+        assertTrue(LibellesArrets.style(arret).contains("#c62828"));
+        assertTrue(LibellesArrets.decrire(null, arret).contains("Après 13 h"));
+    }
+
+    /** À 13 h pile et avant, le style normal est rétabli. */
+    @Test
+    public void a13hSansDepassementAfficheNormalement() {
+        for (LocalTime heure : new LocalTime[] {
+                LocalTime.of(12, 59, 59), LocalTime.of(13, 0)}) {
+            Arret arret = new Arret(new Noeud(1, 4, 45), heure, heure,
+                    TypeArret.ENTREPOT, null);
+            assertEquals("", LibellesArrets.style(arret));
+        }
+    }
+
+    /** Un arrêt hors plage reste rouge même avant 13 h. */
+    @Test
+    public void horsPlageAvant13hAfficheEnRouge() {
+        Arret arret = new Arret(new Noeud(1, 4, 45), LocalTime.of(11, 1),
+                LocalTime.of(11, 1), TypeArret.ENTREPOT, null,
+                LocalTime.of(9, 0), LocalTime.of(11, 0));
+        assertTrue(LibellesArrets.style(arret).contains("#c62828"));
+    }
+
     /** Trois nœuds : le nœud 2 touche deux rues, le nœud 3 une rue sans nom. */
     private static Plan planDeTest() throws Exception {
         String xml = "<reseau>"

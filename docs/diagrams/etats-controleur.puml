@@ -7,7 +7,7 @@ EtatInitial : boutons : Plan, Restaurer
 EtatPlanCharge : boutons : Plan, Demandes, Restaurer
 EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
-EtatProgrammeCharge : Restaurer
+EtatProgrammeCharge : Restaurer, champ Livreurs
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
 EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
@@ -32,6 +32,10 @@ EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valide
 state "Choix de l'état selon les tournées du programme" as choix <<choice>>
 EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> choix : annuler / refaire
+EtatProgrammeCharge --> choix : changerNombreLivreurs [réglage permis] / CommandeChangerNombreLivreurs
+EtatTourneeCalculee --> choix : changerNombreLivreurs [réglage permis] / CommandeChangerNombreLivreurs
+EtatProgrammeCharge --> EtatProgrammeCharge : changerNombreLivreurs [refusé] / consigne
+EtatTourneeCalculee --> EtatTourneeCalculee : changerNombreLivreurs [refusé] / consigne
 EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
 EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
 EtatTourneeCalculee --> EtatCalculEnCours : changerOrdre (livreur, rang)

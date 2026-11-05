@@ -33,6 +33,9 @@ import org.xml.sax.SAXException;
  */
 public final class ProgrammeLivraisons extends Observable {
 
+    /** Plus grand nombre de livreurs de la journée. */
+    public static final int MAXIMUM_LIVREURS = 20;
+
     /**
      * Demande de livraison : un colis à récupérer au point de collecte puis à
      * déposer au point de livraison, par un livreur.
@@ -311,6 +314,32 @@ public final class ProgrammeLivraisons extends Observable {
     }
 
     /**
+     * Vérifie qu'on peut régler le nombre de livreurs à cette valeur, sans
+     * rien modifier.
+     *
+     * @param nombre nombre de livreurs demandé
+     * @throws IllegalArgumentException si le nombre est inférieur à 1 ou
+     *         supérieur à {@link #MAXIMUM_LIVREURS}, ou si un livreur retiré
+     *         a encore des demandes
+     */
+    public void verifierNombreLivreurs(int nombre) {
+        if (nombre < 1) {
+            throw new IllegalArgumentException("Il faut au moins un livreur.");
+        }
+        if (nombre > MAXIMUM_LIVREURS) {
+            throw new IllegalArgumentException("Il ne peut pas y avoir plus de "
+                    + MAXIMUM_LIVREURS + " livreurs.");
+        }
+        for (Demande demande : demandes) {
+            if (demande.livreur() > nombre) {
+                throw new IllegalArgumentException("Le livreur "
+                        + demande.livreur() + " a encore des demandes : "
+                        + "changez-les de livreur d'abord.");
+            }
+        }
+    }
+
+    /**
      * Change le nombre de livreurs et prévient les observateurs. Si des
      * tournées existent, un livreur ajouté reçoit une tournée vide et la
      * tournée d'un livreur retiré disparaît. Seuls les derniers livreurs
@@ -321,15 +350,7 @@ public final class ProgrammeLivraisons extends Observable {
      *                                  un livreur retiré a encore des demandes
      */
     public void definirNombreLivreurs(int nombre) {
-        if (nombre < 1) {
-            throw new IllegalArgumentException("Il faut au moins un livreur.");
-        }
-        for (Demande demande : demandes) {
-            if (demande.livreur() > nombre) {
-                throw new IllegalArgumentException("Le livreur "
-                        + demande.livreur() + " a encore des demandes.");
-            }
-        }
+        verifierNombreLivreurs(nombre);
         if (!tournees.isEmpty()) {
             tournees.tailMap(nombre + 1).clear();
             for (int livreur = nombreLivreurs + 1; livreur <= nombre; livreur++) {
@@ -337,6 +358,29 @@ public final class ProgrammeLivraisons extends Observable {
             }
         }
         nombreLivreurs = nombre;
+        notifierObservateurs();
+    }
+
+    /**
+     * Change le nombre de livreurs et range les tournées qui vont avec, en ne
+     * prévenant les observateurs qu'<b>une fois</b>, quand le nombre et les
+     * tournées sont cohérents. Si le réglage ou les tournées sont refusés,
+     * rien n'est modifié.
+     *
+     * @param nombre            nouveau nombre de livreurs
+     * @param nouvellesTournees une tournée par livreur, de 1 à ce nombre, ou
+     *                          aucune
+     * @throws IllegalArgumentException si le nombre est refusé (voir
+     *         {@link #verifierNombreLivreurs}) ou s'il manque ou s'il y a en
+     *         trop une tournée de livreur
+     */
+    public void definirNombreLivreursEtTournees(int nombre,
+            Map<Integer, Tournee> nouvellesTournees) {
+        verifierNombreLivreurs(nombre);
+        verifierTournees(nouvellesTournees, nombre);
+        nombreLivreurs = nombre;
+        tournees.clear();
+        tournees.putAll(nouvellesTournees);
         notifierObservateurs();
     }
 
@@ -362,7 +406,7 @@ public final class ProgrammeLivraisons extends Observable {
      *                                  une tournée de livreur
      */
     public void definirTournees(Map<Integer, Tournee> nouvellesTournees) {
-        verifierTournees(nouvellesTournees);
+        verifierTournees(nouvellesTournees, nombreLivreurs);
         tournees.clear();
         tournees.putAll(nouvellesTournees);
         notifierObservateurs();
@@ -388,7 +432,7 @@ public final class ProgrammeLivraisons extends Observable {
             Map<Integer, Tournee> nouvellesTournees) {
         Objects.checkIndex(position, demandes.size());
         verifierLivreur(demande);
-        verifierTournees(nouvellesTournees);
+        verifierTournees(nouvellesTournees, nombreLivreurs);
         Demande remplacee = demandes.set(position, demande);
         tournees.clear();
         tournees.putAll(nouvellesTournees);
@@ -396,17 +440,18 @@ public final class ProgrammeLivraisons extends Observable {
         return remplacee;
     }
 
-    private void verifierTournees(Map<Integer, Tournee> nouvellesTournees) {
+    private static void verifierTournees(
+            Map<Integer, Tournee> nouvellesTournees, int nombre) {
         if (nouvellesTournees.isEmpty()) {
             return;
         }
-        boolean complet = nouvellesTournees.size() == nombreLivreurs;
-        for (int livreur = 1; livreur <= nombreLivreurs; livreur++) {
+        boolean complet = nouvellesTournees.size() == nombre;
+        for (int livreur = 1; livreur <= nombre; livreur++) {
             complet &= nouvellesTournees.get(livreur) != null;
         }
         if (!complet) {
             throw new IllegalArgumentException("Il faut une tournée par "
-                    + "livreur, de 1 à " + nombreLivreurs + ".");
+                    + "livreur, de 1 à " + nombre + ".");
         }
     }
 

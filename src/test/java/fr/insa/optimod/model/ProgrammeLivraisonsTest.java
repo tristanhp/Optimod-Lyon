@@ -267,6 +267,77 @@ public class ProgrammeLivraisonsTest {
         assertEquals(2, programme.obtenirNombreLivreurs());
     }
 
+    /** Le contrôle du nombre de livreurs refuse 0 et un nombre négatif. */
+    @Test
+    public void verifierNombreLivreursRefuseMoinsDUn() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.verifierNombreLivreurs(0));
+        assertThrows(IllegalArgumentException.class,
+                () -> programme.verifierNombreLivreurs(-1));
+    }
+
+    /**
+     * Le contrôle refuse de retirer un livreur qui a encore des demandes, et
+     * le message dit quoi faire.
+     */
+    @Test
+    public void verifierNombreLivreursRefuseUnLivreurRetireAvecDemandes() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.ajouterDemande(0, new Demande(A, B, 0, 0, 2));
+        IllegalArgumentException refus = assertThrows(
+                IllegalArgumentException.class,
+                () -> programme.verifierNombreLivreurs(1));
+        assertEquals("Le livreur 2 a encore des demandes : "
+                + "changez-les de livreur d'abord.", refus.getMessage());
+    }
+
+    /** Un nombre permis est accepté, et le contrôle ne modifie rien. */
+    @Test
+    public void verifierNombreLivreursAccepteSansRienModifier() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        List<Integer> appels = new ArrayList<>();
+        programme.ajouterObservateur(source -> appels.add(1));
+        programme.verifierNombreLivreurs(1);
+        programme.verifierNombreLivreurs(2);
+        programme.verifierNombreLivreurs(5);
+        assertEquals(2, programme.obtenirNombreLivreurs());
+        assertTrue(appels.isEmpty());
+    }
+
+    /** Au-delà du maximum, le nombre de livreurs est refusé. */
+    @Test
+    public void plusDeVingtLivreursRefuse() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.definirNombreLivreurs(ProgrammeLivraisons.MAXIMUM_LIVREURS);
+        assertThrows(IllegalArgumentException.class, () -> programme
+                .definirNombreLivreurs(ProgrammeLivraisons.MAXIMUM_LIVREURS + 1));
+        assertEquals(ProgrammeLivraisons.MAXIMUM_LIVREURS,
+                programme.obtenirNombreLivreurs());
+    }
+
+    /** Régler le nombre et les tournées ensemble ne notifie qu'une fois. */
+    @Test
+    public void definirNombreLivreursEtTourneesNotifieUneFois() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        programme.definirTournees(tourneesVides(2));
+        List<Integer> appels = new ArrayList<>();
+        programme.ajouterObservateur(source -> appels.add(1));
+        programme.definirNombreLivreursEtTournees(3, tourneesVides(3));
+        assertEquals(3, programme.obtenirNombreLivreurs());
+        assertEquals(3, programme.obtenirTournees().size());
+        assertEquals(1, appels.size());
+    }
+
+    /** Des tournées incomplètes sont refusées sans rien modifier. */
+    @Test
+    public void definirNombreLivreursEtTourneesIncompletesRefuse() {
+        ProgrammeLivraisons programme = deuxLivreurs();
+        assertThrows(IllegalArgumentException.class, () -> programme
+                .definirNombreLivreursEtTournees(3, tourneesVides(2)));
+        assertEquals(2, programme.obtenirNombreLivreurs());
+    }
+
     /** Une demande pour un livreur qui n'existe pas est refusée. */
     @Test
     public void demandePourUnLivreurInconnuRefusee() {
