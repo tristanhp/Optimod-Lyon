@@ -15,6 +15,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import org.xml.sax.SAXException;
 
@@ -79,6 +80,22 @@ public final class MainController {
      */
     static final String CONSIGNE_ORDRE_GARDE_LIVREURS = "Livreurs %d et %d : "
             + "ordre non optimisé, il n'est peut-être plus le plus court.";
+
+    /**
+     * Consigne après un calcul complet dont la limite de temps a coupé la
+     * recherche (un seul livreur) : la tournée affichée est la meilleure
+     * trouvée, pas une tournée prouvée la plus courte.
+     */
+    static final String CONSIGNE_NON_PROUVEE = "Solution non prouvée optimale "
+            + "(limite de 10 s atteinte).";
+
+    /**
+     * Même consigne avec plusieurs livreurs : {@code %s} liste les livreurs
+     * dont la tournée n'est pas prouvée optimale (la limite est partagée
+     * entre les livreurs ayant des demandes).
+     */
+    static final String CONSIGNE_NON_PROUVEE_LIVREURS = "Livreur(s) %s : "
+            + "solution non prouvée optimale (limite de temps atteinte).";
 
     /** Consigne quand aucun point de collecte ou de livraison est choisi. */
     static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
@@ -321,6 +338,15 @@ public final class MainController {
      */
     Optional<MapScreen.SaisieDemande> saisirDemande() {
         return ecran.saisirDemande();
+    }
+
+    /**
+     * Fait confirmer un nouveau calcul complet par l'administrateur.
+     *
+     * @return vrai si le calcul peut être relancé
+     */
+    boolean confirmerRecalcul() {
+        return ecran.confirmerRecalcul();
     }
 
     /**
@@ -691,6 +717,29 @@ public final class MainController {
         ecran.afficherConfirmation(tournees.size() > 1
                 ? "Tournées calculées pour " + tournees.size() + " livreurs."
                 : "Tournée calculée.");
+    }
+
+    /**
+     * Retient, pour l'état actuel de l'historique, la consigne « solution non
+     * prouvée optimale » si la limite de temps a coupé le calcul d'au moins un
+     * livreur. L'état qui suit l'affiche en entrant ; Annuler et Rétablir la
+     * retrouvent tant que les tournées affichées sont celles du calcul. À
+     * appeler après {@link #rangerTournees} et avant le changement d'état.
+     *
+     * @param tournees tournées qui viennent d'être calculées
+     */
+    void retenirConsigneNonProuvee(Map<Integer, Tournee> tournees) {
+        List<Integer> livreurs = tournees.entrySet().stream()
+                .filter(entree -> !entree.getValue().prouveeOptimale())
+                .map(Map.Entry::getKey).sorted().toList();
+        if (livreurs.isEmpty()) {
+            return;
+        }
+        historique.definirConsigneOrdre(tournees.size() > 1
+                ? CONSIGNE_NON_PROUVEE_LIVREURS.formatted(livreurs.stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.joining(", ")))
+                : CONSIGNE_NON_PROUVEE);
     }
 
     /**

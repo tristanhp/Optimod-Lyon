@@ -24,6 +24,7 @@ import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ComboBox;
@@ -298,8 +299,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setTooltip(new Tooltip("Choisissez le fichier "
                 + "XML du programme de livraisons (les demandes de collecte "
                 + "et de livraison). Il faut d'abord importer un plan."));
-        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée du "
-                + "programme de livraisons chargé."));
+        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée de chaque "
+                + "livreur. Une fois calculées, les tournées ne sont "
+                + "recalculées qu'après votre confirmation."));
         champLivreurs.setTooltip(new Tooltip("Nombre de livreurs de la "
                 + "journée (1 par défaut). Les flèches ajoutent ou retirent "
                 + "un livreur ; on ne retire que le dernier, et seulement "
@@ -336,6 +338,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setDisable(
                 !actions.contains(Action.IMPORTER_PROGRAMME));
         boutonCalculer.setDisable(!actions.contains(Action.CALCULER));
+        boutonCalculer.setText(actions.contains(Action.RECALCULER)
+                ? "Recalculer" : "Calculer");
         boutonAjouter.setDisable(!actions.contains(Action.AJOUTER_DEMANDE));
         champLivreurs.setDisable(
                 !actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
@@ -458,6 +462,38 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 .setText("Annuler");
         dialogue.initOwner(getScene().getWindow());
         return dialogue.showAndWait();
+    }
+
+    /** Bouton « Oui » de la confirmation du recalcul. */
+    static final ButtonType OUI = new ButtonType("Oui",
+            ButtonBar.ButtonData.YES);
+
+    /**
+     * Bouton « Non » de la confirmation du recalcul : c'est le bouton
+     * d'annulation, donc Échap et la croix valent un refus.
+     */
+    static final ButtonType NON = new ButtonType("Non",
+            ButtonBar.ButtonData.CANCEL_CLOSE);
+
+    /**
+     * Traduit la réponse de la fenêtre de confirmation.
+     *
+     * @param reponse bouton choisi, vide si la fenêtre est fermée
+     * @return vrai seulement si l'administrateur a cliqué sur « Oui »
+     */
+    static boolean recalculAccepte(Optional<ButtonType> reponse) {
+        return reponse.filter(OUI::equals).isPresent();
+    }
+
+    @Override
+    public boolean confirmerRecalcul() {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "Les modifications manuelles et les plages horaires annoncées "
+                        + "seront perdues. Continuer ?", OUI, NON);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Recalculer les tournées");
+        alert.initOwner(getScene().getWindow());
+        return recalculAccepte(alert.showAndWait());
     }
 
     @Override

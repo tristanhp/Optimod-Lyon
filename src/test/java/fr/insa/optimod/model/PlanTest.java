@@ -353,6 +353,44 @@ public class PlanTest {
                 Plan.HEURE_LIMITE_RETOUR));
     }
 
+    /**
+     * Sur les jeux fournis le voyageur de commerce termine avant la limite :
+     * la tournée est prouvée optimale. Une tournée sans demande l'est aussi.
+     */
+    @Test
+    public void tourneeCalculeeSurLesJeuxFournisEstProuveeOptimale()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
+                plan);
+        assertTrue(premiereTournee(plan, programme).prouveeOptimale());
+        programme.definirNombreLivreurs(3);
+        plan.calculerTournees(programme).values().forEach(
+                tournee -> assertTrue(tournee.prouveeOptimale()));
+    }
+
+    /**
+     * Un ordre gardé après le calcul (suppression d'une demande) n'est plus
+     * prouvé optimal.
+     */
+    @Test
+    public void tourneeRecalculeeLocalementNEstPlusProuveeOptimale()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
+                plan);
+        Tournee tournee = premiereTournee(plan, programme);
+        assertTrue(tournee.prouveeOptimale());
+        Demande supprimee = programme.obtenirDemandes().get(0);
+        Tournee sansDemande = plan.calculerTourneeSansDemande(tournee,
+                supprimee);
+        assertFalse(sansDemande.prouveeOptimale());
+    }
+
     /** Une demande par livreur permet deux retours avant 13 h. */
     @Test
     public void demandeTropImportanteRepartissableEntreDeuxLivreurs()
@@ -1027,7 +1065,8 @@ public class PlanTest {
             arrets.add(new Tournee.Arret(prevu.noeud(), arrivee, heure,
                     prevu.type(), prevu.demande()));
         }
-        return new Tournee(arrets, chemins);
+        // Ordre imposé, pas trouvé par le voyageur de commerce : non prouvé.
+        return new Tournee(arrets, chemins, false);
     }
 
     /** Les arrêts d'une tournée, sauf ceux d'une demande. */
@@ -1189,7 +1228,7 @@ public class PlanTest {
         arrets.add(new Tournee.Arret(entrepot, heure, heure,
                 TypeArret.ENTREPOT, null));
         Tournee actuelle = new Tournee(arrets,
-                Collections.nCopies(5, Chemin.INACCESSIBLE));
+                Collections.nCopies(5, Chemin.INACCESSIBLE), true);
         IllegalStateException erreur = assertThrows(
                 IllegalStateException.class,
                 () -> plan.calculerTourneeSansDemande(actuelle, demande));
@@ -1236,8 +1275,11 @@ public class PlanTest {
         Tournee sans = plan.calculerTourneeSansDemande(
                 premiereTournee(plan, programme),
                 programme.obtenirDemandes().get(0));
-        assertEquals(premiereTournee(plan, new ProgrammeLivraisons(
-                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of())), sans);
+        Tournee attendue = premiereTournee(plan, new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of()));
+        assertEquals(attendue.arrets(), sans.arrets());
+        assertEquals(attendue.chemins(), sans.chemins());
+        assertFalse(sans.prouveeOptimale());
     }
 
     /** Une demande dont les arrêts ne sont pas dans la tournée est refusée. */
@@ -1424,8 +1466,12 @@ public class PlanTest {
             long nouveaux = descendue.chemins().stream()
                     .filter(chemin -> !anciens.contains(chemin)).count();
             assertEquals(3, nouveaux);
-            assertEquals(tournee, plan.calculerTourneeOrdreChange(descendue,
-                    rang + 1, -1));
+            Tournee remontee = plan.calculerTourneeOrdreChange(descendue,
+                    rang + 1, -1);
+            assertEquals(tournee.arrets(), remontee.arrets());
+            assertEquals(tournee.chemins(), remontee.chemins());
+            assertFalse("ordre changé : plus prouvé optimal",
+                    remontee.prouveeOptimale());
             acceptes++;
         }
         assertTrue(acceptes > 0);

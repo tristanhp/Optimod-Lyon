@@ -35,7 +35,7 @@ public class TourneeTest {
                 new Arret(B, depart, depart, TypeArret.LIVRAISON, DEMANDE),
                 new Arret(ENTREPOT, retour, retour, TypeArret.ENTREPOT,
                         null)),
-                List.of());
+                List.of(), true);
     }
 
     /** Une tournée vide part de l'entrepôt et n'a aucun chemin. */
@@ -89,7 +89,7 @@ public class TourneeTest {
                         TypeArret.LIVRAISON, DEMANDE),
                 new Arret(ENTREPOT, LocalTime.of(13, 30),
                         LocalTime.of(13, 30), TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
         List<Boolean> marques = tournee.arrets().stream()
                 .map(Arret::estApresHeureLimite).toList();
         assertEquals(List.of(false, false, true, true), marques);
@@ -148,7 +148,7 @@ public class TourneeTest {
         Tournee tournee = new Tournee(tourneeRevenantA(
                 LocalTime.of(9, 0)).arrets(), List.of(
                 new Chemin(200, List.of(allerAB, allerBE)),
-                new Chemin(200, List.of(allerBE, allerAB))));
+                new Chemin(200, List.of(allerBE, allerAB))), true);
         Map<Set<Noeud>, Integer> passages =
                 tournee.compterPassagesParTroncon();
         assertEquals(Integer.valueOf(2), passages.get(Set.of(A, B)));
@@ -164,7 +164,7 @@ public class TourneeTest {
         Tournee tournee = new Tournee(tourneeRevenantA(
                 LocalTime.of(9, 0)).arrets(), List.of(
                 new Chemin(100, List.of(allerAB)),
-                new Chemin(100, List.of(retourBA))));
+                new Chemin(100, List.of(retourBA))), true);
         Map<Set<Noeud>, Integer> passages =
                 tournee.compterPassagesParTroncon();
         assertEquals(Integer.valueOf(2), passages.get(Set.of(A, B)));
@@ -179,7 +179,7 @@ public class TourneeTest {
         Troncon allerBE = new Troncon(B, ENTREPOT, 100, "rue B");
         Tournee tournee = new Tournee(tourneeRevenantA(
                 LocalTime.of(9, 0)).arrets(), List.of(
-                new Chemin(200, List.of(allerAB, allerBE))));
+                new Chemin(200, List.of(allerAB, allerBE))), true);
         Map<Set<Noeud>, Integer> passages =
                 tournee.compterPassagesParTroncon();
         assertEquals(Integer.valueOf(1), passages.get(Set.of(A, B)));
