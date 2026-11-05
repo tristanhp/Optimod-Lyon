@@ -7,8 +7,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 
 import fr.insa.optimod.model.Tournee.Arret;
@@ -61,7 +61,8 @@ public final class FeuilleDeRoute {
             """;
 
     /** Format des heures : les secondes n'aident pas le livreur. */
-    private static final DateTimeFormatter HEURE = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HEURE =
+            DateTimeFormatter.ofPattern("HH:mm");
 
     private FeuilleDeRoute() {
     }
@@ -101,9 +102,9 @@ public final class FeuilleDeRoute {
                 .append("<h1>Livreur n°").append(livreur).append("</h1>\n")
                 .append("<div class=\"resume\">\n")
                 .append("<p>Heure de départ prévue de l'entrepôt : ")
-                .append(heure(arrets.get(0).depart())).append("</p>\n")
+                .append(heure(arrets.getFirst().depart())).append("</p>\n")
                 .append("<p>Heure de retour prévue à l'entrepôt : ")
-                .append(heure(arrets.get(arrets.size() - 1).arrivee())).append("</p>\n")
+                .append(heure(arrets.getLast().arrivee())).append("</p>\n")
                 .append("</div>\n")
                 .append("<table>\n<caption>Arrêts de la tournée</caption>\n"
                         + "<colgroup><col class=\"type\">"
@@ -151,8 +152,7 @@ public final class FeuilleDeRoute {
         String coordonnees = String.format(Locale.ROOT, "%f, %f",
                 noeud.latitude(), noeud.longitude());
         html.append(arret.type() == TypeArret.ENTREPOT
-                ? "<tr class=\"entrepot\"><td>"
-                : "<tr><td>")
+                ? "<tr class=\"entrepot\"><td>" : "<tr><td>")
                 .append(libelleType(arret.type()))
                 .append("</td><td>")
                 .append(echapper(rues.get(noeud).isEmpty() ? coordonnees

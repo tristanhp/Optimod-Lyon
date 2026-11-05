@@ -49,24 +49,31 @@ final class MapCanvas extends Pane {
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
 
-    /** Palette de 6 couleurs distinctes pour les livreurs. */
-    private static final Color[] PALETTE_LIVREURS = {
-            Color.web("#1f77b4"), // Bleu
-            Color.web("#ff7f0e"), // Orange
-            Color.web("#2ca02c"), // Vert
-            Color.web("#d62728"), // Rouge
-            Color.web("#9467bd"), // Violet
-            Color.web("#8c564b") // Marron
-    };
+    /** Nombre de teintes réservées aux livreurs (le rouge d'alerte exclu). */
+    private static final double PLAGE_TEINTES = 310;
+
+    /** Première teinte des livreurs, en degrés : loin du rouge d'alerte. */
+    private static final double TEINTE_MINIMALE = 25;
+
+    /** Pas de teinte entre deux livreurs voisins (angle d'or, en degrés). */
+    private static final double PAS_TEINTE = 137.508;
+
+    /** Part de blanc mêlée à la couleur d'un livreur au départ (0 à 1). */
+    private static final double PART_BLANC_DEBUT = 0.6;
 
     /**
-     * Renvoie la couleur attribuée à un livreur.
+     * Renvoie la couleur attribuée à un livreur. Les teintes se suivent
+     * par l'angle d'or, donc deux livreurs voisins se distinguent, et
+     * aucune n'approche le rouge des arrêts après 13 h.
      *
-     * @param index numéro du livreur (0-indexé)
+     * @param index numéro du livreur, à partir de 0
      * @return couleur de la tournée
      */
-    public Color couleurLivreur(int index) {
-        return PALETTE_LIVREURS[Math.abs(index) % PALETTE_LIVREURS.length];
+    static Color couleurLivreur(int index) {
+        double teinte = TEINTE_MINIMALE
+                + Math.floorMod((long) Math.round(index * PAS_TEINTE * 1000),
+                        (long) (PLAGE_TEINTES * 1000)) / 1000.0;
+        return Color.hsb(teinte, 0.75, 0.75);
     }
 
     private static final Color COULEUR_CONTOUR_EVIDENCE = Color.BLACK;
@@ -100,17 +107,12 @@ final class MapCanvas extends Pane {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
     }
 
-    /** Couleur de la tournée au départ de l'entrepôt (clair). */
-    private static final Color COULEUR_DEBUT_TOURNEE = Color.web("#8ab4f8");
-
-    /** Couleur de la tournée au retour à l'entrepôt (foncé). */
-    private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
-
     /** Fond du numéro d'un arrêt dont l'arrivée dépasse 13 h (rouge). */
     private static final Color COULEUR_APRES_13H = Color.web("#d93025");
 
     /** Contour du numéro d'un arrêt dont l'arrivée dépasse 13 h. */
-    private static final Color COULEUR_APRES_13H_CONTOUR = Color.web("#8c1c13");
+    private static final Color COULEUR_APRES_13H_CONTOUR =
+            Color.web("#8c1c13");
 
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
@@ -554,22 +556,31 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Trace les tronçons de chaque chemin d'un trait épais, du plus clair (au
-     * départ) au plus foncé (au retour), avec une flèche au milieu de chaque
-     * tronçon pour montrer le sens de parcours.
+     * Trace les tronçons de chaque chemin d'un trait épais, dans la couleur
+     * du livreur, du plus clair (au départ) au plus foncé (au retour), avec
+     * une flèche au milieu de chaque tronçon pour montrer le sens de
+     * parcours.
      */
     private void dessinerTournees(GraphicsContext contexte) {
         contexte.setLineCap(StrokeLineCap.ROUND);
         for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
             int numeroLivreur = entree.getKey();
             Tournee tournee = entree.getValue();
-            Color couleurActuelle = couleurLivreur(numeroLivreur - 1);
-
+            Color couleur = couleurLivreur(numeroLivreur - 1);
+            Color debut = couleur.interpolate(Color.WHITE, PART_BLANC_DEBUT);
+            Color fin = couleur.darker();
+            int total = tournee.chemins().stream()
+                    .mapToInt(chemin -> chemin.troncons().size()).sum();
+            int fait = 0;
             for (Chemin chemin : tournee.chemins()) {
                 for (Troncon troncon : chemin.troncons()) {
                     verifierDansLePlan(troncon.origine());
                     verifierDansLePlan(troncon.destination());
-                    dessinerTroncon(contexte, troncon, couleurActuelle);
+                    double avancement = total <= 1 ? 0
+                            : (double) fait / (total - 1);
+                    dessinerTroncon(contexte, troncon,
+                            debut.interpolate(fin, avancement));
+                    fait++;
                 }
             }
         }
@@ -631,7 +642,8 @@ final class MapCanvas extends Pane {
                 boolean apres13h = arrets.get(rang).estApresHeureLimite();
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
                         : apres13h ? COULEUR_APRES_13H : Color.WHITE);
-                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR : couleurLivreur(entree.getKey() - 1));
+                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR
+                        : couleurLivreur(entree.getKey() - 1));
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);

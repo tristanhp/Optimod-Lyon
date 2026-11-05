@@ -69,7 +69,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonImporterPlan = new Button("Importer le plan");
 
     /** Bouton de calcul de la tournée. */
-    private final Button boutonImporterDemandes = new Button("Importer les demandes");
+    private final Button boutonImporterDemandes =
+            new Button("Importer les demandes");
 
     /** Ce qui vient d'être fait, en bas de la fenêtre. */
     private final Label message = new Label();
@@ -98,7 +99,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Label consigne = new Label();
 
     /** Nombre de livreurs de la journée, réglé par les flèches seulement. */
-    private final Spinner<Integer> champLivreurs = new Spinner<>(1, ProgrammeLivraisons.MAXIMUM_LIVREURS, 1);
+    private final Spinner<Integer> champLivreurs =
+            new Spinner<>(1, ProgrammeLivraisons.MAXIMUM_LIVREURS, 1);
 
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
@@ -171,7 +173,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 (observable, ancienne, nouvelle) -> {
                     if (actionNombreLivreurs != null && nouvelle != null
                             && programmeObserve != null
-                            && nouvelle != programmeObserve.obtenirNombreLivreurs()) {
+                            && nouvelle
+                            != programmeObserve.obtenirNombreLivreurs()) {
                         actionNombreLivreurs.accept(nouvelle);
                     }
                 });
@@ -196,7 +199,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
 
-                if (vide || getIndex() < 0 || getIndex() >= lignesTournee.size()) {
+                if (vide || getIndex() < 0
+                        || getIndex() >= lignesTournee.size()) {
                     setStyle("");
                     setGraphic(null);
                     return;
@@ -205,11 +209,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 LigneTournee ligne = lignesTournee.get(getIndex());
 
                 if (ligne.rang() == -1) {
-                    setGraphic(new Rectangle(10, 10, carte.couleurLivreur(ligne.livreur() - 1)));
+                    setGraphic(new Rectangle(10, 10,
+                            MapCanvas.couleurLivreur(ligne.livreur() - 1)));
                     setStyle("-fx-font-weight: bold;");
                 } else {
                     setGraphic(null);
-                    // On applique directement le style (rouge) stocké dans le record
                     setStyle(ligne.style());
                 }
             }
@@ -596,9 +600,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
-        texteHorsPlage = arrets.isEmpty() ? ""
-                : arrets.size()
-                        + " arrêt(s) hors plage annoncée. Annuler reste possible.";
+        texteHorsPlage = arrets.isEmpty() ? "" : arrets.size()
+                + " arrêt(s) hors plage annoncée. Annuler reste possible.";
         actualiserMessage();
     }
 
@@ -865,19 +868,18 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
-                // On passe une chaîne vide "" au lieu de false
-                lignesTournee.add(new LigneTournee(livreur, -1, dernierRang, ""));
+                lignesTournee.add(new LigneTournee(livreur, -1,
+                        dernierRang, ""));
             }
 
             if (tournee.arrets().size() <= 2) {
                 listeTournee.getItems().add("aucune demande");
-                // On passe une chaîne vide "" au lieu de false
-                lignesTournee.add(new LigneTournee(livreur, -2, dernierRang, ""));
+                lignesTournee.add(new LigneTournee(livreur, -2,
+                        dernierRang, ""));
             } else {
                 int rang = 0;
                 for (Tournee.Arret arret : tournee.arrets()) {
                     listeTournee.getItems().add(decrireArret(arret));
-                    // On utilise LibellesArrets.style(arret) comme c'est fait pour les tooltips
                     lignesTournee.add(new LigneTournee(livreur, rang++,
                             dernierRang, LibellesArrets.style(arret)));
                 }
