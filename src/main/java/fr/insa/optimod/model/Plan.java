@@ -526,20 +526,27 @@ public final class Plan {
         List<Integer> possibles = new ArrayList<>();
         for (Map.Entry<Integer, Tournee> entree
                 : new TreeMap<>(tournees).entrySet()) {
-            Demande chezLivreur = demande.avecLivreur(entree.getKey());
-            try {
-                int position = trouverPositionMoindreCout(entree.getValue(),
-                        chezLivreur);
-                if (insererDemande(entree.getValue(), chezLivreur, position)
-                        .estPossible()) {
-                    possibles.add(entree.getKey());
-                }
-            } catch (IllegalStateException refus) {
-                // Retour après 13 h ou adresse inaccessible : livreur écarté.
-                continue;
+            if (rentreAvantLimite(entree.getValue(),
+                    demande.avecLivreur(entree.getKey()))) {
+                possibles.add(entree.getKey());
             }
         }
         return Collections.unmodifiableList(possibles);
+    }
+
+    /**
+     * Vrai si le livreur rentre avant la limite en prenant la demande à sa
+     * position de moindre coût. Retour après 13 h ou adresse inaccessible :
+     * faux.
+     */
+    private boolean rentreAvantLimite(Tournee tournee, Demande demande) {
+        try {
+            return insererDemande(tournee, demande,
+                    trouverPositionMoindreCout(tournee, demande))
+                    .estPossible();
+        } catch (IllegalStateException refus) {
+            return false;
+        }
     }
 
     /**

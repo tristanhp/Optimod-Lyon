@@ -1589,4 +1589,92 @@ public class PlanTest {
                 plan.obtenirNoeud(2));
         assertFalse(deplacee.estPossible());
     }
+
+    // --- Position de moindre coût et livreurs possibles ---
+
+    /** Tournée 1, 3, 2, 1 partant à l'heure donnée. */
+    private static Tournee tourneeDeTroisArretsAu(Plan plan, LocalTime depart) {
+        Noeud entrepot = plan.obtenirNoeud(1);
+        return tourneeImposee(plan, depart,
+                List.of(entrepot, plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                        entrepot),
+                List.of(0, 60, 60, 0));
+    }
+
+    /**
+     * La position de moindre coût donne-t-elle toujours le retour
+     * le plus tôt ? On compare, pour chaque départ autour de la limite, la
+     * réponse de trouverLivreursPossibles à un essai de toutes les positions.
+     */
+    @Test
+    public void moindreCoutDonneLeRetourLePlusTot() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande demande = new Demande(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), 60, 60);
+        Tournee base = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0));
+        LocalTime meilleurRetour = null;
+        for (int position = 1; position < base.arrets().size(); position++) {
+            LocalTime retour = plan.insererDemande(base, demande, position)
+                    .obtenirHeureRetour();
+            if (meilleurRetour == null || retour.isBefore(meilleurRetour)) {
+                meilleurRetour = retour;
+            }
+        }
+        long ecart = LocalTime.of(8, 0).until(meilleurRetour,
+                ChronoUnit.SECONDS);
+        LocalTime departLimite = LocalTime.of(13, 0).minusSeconds(ecart);
+        for (int decalage = -10; decalage <= 10; decalage++) {
+            LocalTime depart = departLimite.plusSeconds(decalage);
+            Tournee tournee = tourneeDeTroisArretsAu(plan, depart);
+            boolean uneFaisable = false;
+            for (int position = 1; position < tournee.arrets().size();
+                    position++) {
+                try {
+                    uneFaisable |= plan.insererDemande(tournee, demande,
+                            position).estPossible();
+                } catch (IllegalStateException refus) {
+                    continue;
+                }
+            }
+            assertEquals("départ " + depart, uneFaisable,
+                    !plan.trouverLivreursPossibles(Map.of(1, tournee),
+                            demande).isEmpty());
+        }
+    }
+
+    /**
+     * Le livreur est proposé parce que la position de moindre coût
+     * rentre à 13 h, mais une autre position est refusée.
+     */
+    @Test
+    public void livreurPossibleMaisAutrePositionRefusee()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande demande = new Demande(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), 60, 60);
+        Tournee base = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0));
+        int meilleure = plan.trouverPositionMoindreCout(base, demande);
+        LocalTime retourMeilleur = plan.insererDemande(base, demande,
+                meilleure).obtenirHeureRetour();
+        int pire = meilleure;
+        LocalTime retourPire = retourMeilleur;
+        for (int position = 1; position < base.arrets().size(); position++) {
+            LocalTime retour = plan.insererDemande(base, demande, position)
+                    .obtenirHeureRetour();
+            if (retour.isAfter(retourPire)) {
+                pire = position;
+                retourPire = retour;
+            }
+        }
+        assertTrue("positions de coûts différents", pire != meilleure);
+        long marge = retourMeilleur.until(LocalTime.of(13, 0),
+                ChronoUnit.SECONDS);
+        Tournee tournee = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0)
+                .plusSeconds(marge));
+        assertEquals(List.of(1), plan.trouverLivreursPossibles(
+                Map.of(1, tournee), demande));
+        int positionRefusee = pire;
+        assertThrows(IllegalStateException.class,
+                () -> plan.insererDemande(tournee, demande, positionRefusee));
+    }
 }

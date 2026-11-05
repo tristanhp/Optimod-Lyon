@@ -344,8 +344,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         ChoiceDialog<Integer> dialogue = new ChoiceDialog<>(livreurs.get(0),
                 livreurs);
         dialogue.setTitle("Ajout impossible chez ce livreur");
-        dialogue.setHeaderText("Le livreur " + livreurRefuse + " ne peut pas "
-                + "prendre cette demande avant 13 h.\n" + detail);
+        dialogue.setHeaderText("Ajout refusé chez le livreur " + livreurRefuse
+                + ".\n" + detail + "\nLivreurs qui rentrent avant 13 h avec "
+                + "la position de moindre coût (la position choisie ensuite "
+                + "peut encore être refusée) :");
         dialogue.setContentText("Affecter la demande au livreur :");
         ((Button) dialogue.getDialogPane().lookupButton(ButtonType.OK))
                 .setText("Affecter");
