@@ -324,6 +324,15 @@ public final class MainController {
     }
 
     /**
+     * Fait confirmer un nouveau calcul complet par l'administrateur.
+     *
+     * @return vrai si le calcul peut être relancé
+     */
+    boolean confirmerRecalcul() {
+        return ecran.confirmerRecalcul();
+    }
+
+    /**
      * Affiche les points choisis sans modifier le programme.
      *
      * @param collecte  point de collecte, ou null pour effacer l'aperçu

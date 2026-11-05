@@ -37,8 +37,10 @@ final class EtatCalculEnCours implements Etat {
     /**
      * Range les tournées dans le programme ({@link EtatTourneeCalculee}), même
      * si un livreur revient après {@code Plan.HEURE_LIMITE_RETOUR} : ce n'est
-     * pas une erreur de calcul. Sinon affiche l'erreur (retour à
-     * {@link EtatProgrammeCharge}).
+     * pas une erreur de calcul. Sinon affiche l'erreur et revient à l'état du
+     * programme : {@link EtatProgrammeCharge} sans tournées, et
+     * {@link EtatTourneeCalculee} si un recalcul échoue, car les tournées
+     * d'avant restent affichées.
      */
     @Override
     public void finirCalcul(MainController controleur,
@@ -49,7 +51,7 @@ final class EtatCalculEnCours implements Etat {
             controleur.changerEtat(new EtatTourneeCalculee());
             controleur.confirmerCalcul(tournees);
         } else {
-            controleur.changerEtat(new EtatProgrammeCharge());
+            controleur.retrouverEtatProgramme();
             controleur.afficherErreurCalcul(erreur);
         }
     }
