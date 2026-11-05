@@ -5,6 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.Arret;
+import fr.insa.optimod.model.Troncon;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -943,10 +945,7 @@ public final class MainController {
         for (Entry<Integer, Tournee> livreur : programme.obtenirTournees().entrySet()) {
             ecran.choisirFichierGenerationFeuilleDeRoute(livreur.getKey()).ifPresent(fichier -> {
                 try (FileWriter sortie = new FileWriter(fichier)) {
-                    System.out.println("GENERATION!!!");
-
                     genererFeuilleDeRouteHTMLPourLivreur(sortie, livreur.getValue());
-
                 } catch (IOException erreur) {
                     ecran.afficherErreurXml(erreur.getMessage());
                 }
@@ -993,6 +992,7 @@ public final class MainController {
                 "    <tr>\r\n" + //
                 "      <th>Type d'arret</th>\r\n" + //
                 "      <th>Adresse</th>\r\n" + //
+                "      <th>Lien Google Maps</th>\r\n" + //
                 "      <th>Plage annoncée</th>\r\n" + //
                 "      <th>Heure d'arrivée</th>\r\n" + //
                 "      <th>Heure de départ</th>\r\n" + //
@@ -1003,9 +1003,20 @@ public final class MainController {
 
         for (Arret arret : tournee.arrets()) {
             long decalage = Duration.between(arret.arrivee(), arret.depart()).getSeconds();
+            ArrayList<String> rue = new ArrayList<>();
+            Noeud id = arret.noeud();
+            for (Troncon troncon : plan.obtenirTroncons()) {
+                if (troncon.origine().equals(id) || troncon.destination().equals(id)) {
+                    if (!rue.contains(troncon.nomRue())) {
+                        rue.add(troncon.nomRue());
+                    }
+                }
+            }
             fileOutpuWriter.write("<tr>\r\n" + //
                     "      <td>" + arret.type() + "</td>\r\n" + //
-                    "      <td>" + arret.noeud() + "</td>\r\n" + //
+                    "      <td>" + rue + "</td>\r\n" + //
+                    "      <td> <a href=\"https://maps.google.com/?q=" + id.latitude() + "," + id.longitude()
+                    + "\">(" + id.latitude() + ", " + id.longitude() + ")</a></td>" + //
                     "      <td style=\"text-align: center\";>" + arret.debutPlage() + " - " + arret.finPlage()
                     + "</td>\r\n" + //
                     "      <td style=\"text-align: center\";>" + arret.arrivee() + "</td>\r\n" + //
