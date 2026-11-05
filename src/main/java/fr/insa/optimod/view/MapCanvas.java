@@ -300,6 +300,7 @@ final class MapCanvas extends Pane {
                     surClicArret.accept(entree.getKey(), rang);
                     detailsArret.setText(
                             LibellesArrets.decrire(plan, arret));
+                    detailsArret.setStyle(LibellesArrets.style(arret));
                     detailsArret.show(this, ecranXSouris + 12,
                             ecranYSouris + 12);
                     return;
