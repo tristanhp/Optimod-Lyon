@@ -1,21 +1,27 @@
 package fr.insa.optimod.model;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.time.DateTimeException;
 import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamWriter;
 
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
@@ -25,6 +31,13 @@ import fr.insa.optimod.model.Tournee.TypeArret;
  * Sauvegarde XML version 1 pour le modèle actuel à un livreur.
  * Le plan est référencé, les demandes et l'ordre sont conservés.
  *
+ * <p>
+ * Le plan est désigné par son chemin relatif au dossier de la sauvegarde :
+ * une sauvegarde déplacée avec son plan se restaure encore. Les anciennes
+ * sauvegardes, qui désignent le plan par un chemin absolu, se restaurent
+ * aussi : si ce chemin n'existe pas (autre machine, autre système), le plan
+ * est cherché par son nom dans le dossier de la sauvegarde.
+ *
  * @param plan        plan rechargé
  * @param fichierPlan fichier du plan
  * @param programme   programme restauré
@@ -32,6 +45,13 @@ import fr.insa.optimod.model.Tournee.TypeArret;
  */
 public record SauvegardeTournee(Plan plan, Path fichierPlan,
         ProgrammeLivraisons programme, Tournee tournee) {
+
+    /**
+     * Nombre maximal d'affectations partielles des arrêts aux demandes
+     * examinées à la restauration : au-delà, la sauvegarde est refusée
+     * plutôt que de bloquer l'application.
+     */
+    private static final int ESSAIS_MAXIMUM = 200_000;
 
     /**
      * Écrit une sauvegarde sans recopier le plan.
@@ -56,8 +76,8 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                 xml.writeStartElement("sauvegardeTournee");
                 xml.writeAttribute("version", "1");
                 xml.writeAttribute("nombreLivreurs", "1");
-                xml.writeAttribute("plan", fichierPlan.toAbsolutePath()
-                        .normalize().toString());
+                xml.writeAttribute("plan", referencePlan(fichier,
+                        fichierPlan));
                 xml.writeAttribute("entrepot", Long.toString(
                         programme.obtenirEntrepot().identifiant()));
                 xml.writeAttribute("heureDepart",
@@ -95,46 +115,77 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
     }
 
     /**
+     * Chemin du plan relatif au dossier de la sauvegarde, avec des « / »
+     * (lus sur tous les systèmes). Chemin absolu si aucun chemin relatif
+     * n'existe (plan sur un autre disque).
+     */
+    private static String referencePlan(Path fichier, Path fichierPlan) {
+        Path plan = fichierPlan.toAbsolutePath().normalize();
+        Path dossier = fichier.toAbsolutePath().normalize().getParent();
+        try {
+            return dossier.relativize(plan).toString()
+                    .replace(File.separatorChar, '/');
+        } catch (IllegalArgumentException autreDisque) {
+            return plan.toString();
+        }
+    }
+
+    /**
      * Recharge le plan, les demandes et les arrêts avant tout affichage.
      *
      * @param fichier sauvegarde XML
      * @return état restauré, indépendant de l'état courant
      * @throws SAXException si le fichier ou le plan est invalide ou illisible
+     *                      (message en français)
      */
     public static SauvegardeTournee restaurer(Path fichier)
             throws SAXException {
         try {
-            Element racine = Plan.creerLecteurXml().parse(fichier.toFile())
+            Element racine = Plan.lireXml(fichier.toFile())
                     .getDocumentElement();
-            if (!"sauvegardeTournee".equals(racine.getTagName())
-                    || !"1".equals(attribut(racine, "version"))
-                    || !"1".equals(attribut(racine, "nombreLivreurs"))) {
-                throw new SAXException(
-                        "Format de sauvegarde non pris en charge.");
+            if (!"sauvegardeTournee".equals(racine.getTagName())) {
+                throw new SAXException("Ce fichier n'est pas une sauvegarde "
+                        + "de tournée.");
             }
-            Path fichierPlan = fichier.toAbsolutePath()
-                    .resolveSibling(attribut(racine, "plan")).normalize();
+            if (!"1".equals(racine.getAttribute("version"))
+                    || !"1".equals(racine.getAttribute("nombreLivreurs"))) {
+                throw new SAXException("Format de sauvegarde non pris en "
+                        + "charge : seule la version 1, à un livreur, se "
+                        + "restaure.");
+            }
+            Path fichierPlan = trouverPlan(fichier,
+                    Plan.lireAttribut(racine, "plan", "sauvegarde"));
             Plan plan = new Plan(fichierPlan.toString());
-            LocalTime depart = LocalTime.parse(attribut(racine, "heureDepart"));
-            Noeud entrepot = adresse(racine, "entrepot", plan);
+            LocalTime depart = ProgrammeLivraisons.lireHeure(
+                    Plan.lireAttribut(racine, "heureDepart", "sauvegarde"));
+            Noeud entrepot = adresse(racine, "entrepot", "entrepôt", plan);
             List<Demande> demandes = new ArrayList<>();
-            NodeList elements = racine.getElementsByTagName("demande");
-            for (int i = 0; i < elements.getLength(); i++) {
-                Element element = (Element) elements.item(i);
-                demandes.add(new Demande(adresse(element, "collecte", plan),
-                        adresse(element, "livraison", plan),
-                        entier(element, "dureeCollecte"),
-                        entier(element, "dureeLivraison")));
+            List<Element> elements = Plan.elementsFils(racine, "demande");
+            if (elements.size() > ProgrammeLivraisons.MAXIMUM_DEMANDES) {
+                throw new SAXException("La sauvegarde contient "
+                        + elements.size() + " demandes : l'application en "
+                        + "accepte au plus "
+                        + ProgrammeLivraisons.MAXIMUM_DEMANDES + ".");
+            }
+            for (int i = 0; i < elements.size(); i++) {
+                Element element = elements.get(i);
+                String quoi = "demande n° " + (i + 1);
+                demandes.add(new Demande(
+                        adresse(element, "collecte", quoi, plan),
+                        adresse(element, "livraison", quoi, plan),
+                        duree(element, "dureeCollecte", quoi),
+                        duree(element, "dureeLivraison", quoi)));
             }
             ProgrammeLivraisons programme = new ProgrammeLivraisons(entrepot,
                     depart, demandes);
             List<Noeud> adresses = new ArrayList<>();
             List<Integer> durees = new ArrayList<>();
-            NodeList arrets = racine.getElementsByTagName("arret");
-            for (int i = 0; i < arrets.getLength(); i++) {
-                Element arret = (Element) arrets.item(i);
-                adresses.add(adresse(arret, "noeud", plan));
-                durees.add(entier(arret, "duree"));
+            List<Element> arrets = Plan.elementsFils(racine, "arret");
+            for (int i = 0; i < arrets.size(); i++) {
+                Element arret = arrets.get(i);
+                String quoi = "arrêt n° " + (i + 1);
+                adresses.add(adresse(arret, "noeud", quoi, plan));
+                durees.add(duree(arret, "duree", quoi));
             }
             if (adresses.isEmpty() || !adresses.get(0).equals(entrepot)
                     || !adresses.get(adresses.size() - 1).equals(entrepot)) {
@@ -149,8 +200,8 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
             types.add(TypeArret.ENTREPOT);
             servies.add(null);
             if (adresses.size() != nombreAttendu
-                    || !respecteDemandes(adresses, durees, demandes,
-                            new int[demandes.size()], 1, types, servies)) {
+                    || !new AffectationArrets(adresses, durees, demandes,
+                            types, servies).chercher(1)) {
                 throw new SAXException("Les arrêts ne respectent pas les "
                         + "demandes et leur contrainte d'ordre.");
             }
@@ -161,21 +212,21 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
             Tournee tournee = plan.recalculerTournee(depart, adresses, durees,
                     types, servies);
             List<Tournee.Arret> passages = new ArrayList<>();
-            for (int i = 0; i < arrets.getLength(); i++) {
-                Element element = (Element) arrets.item(i);
+            for (int i = 0; i < arrets.size(); i++) {
+                Element element = arrets.get(i);
                 Tournee.Arret arret = tournee.arrets().get(i);
                 if (element.hasAttribute("debutPlage")
                         || element.hasAttribute("finPlage")) {
                     arret = new Tournee.Arret(arret.noeud(), arret.arrivee(),
                             arret.depart(), arret.type(), arret.demande(),
-                            LocalTime.parse(attribut(element, "debutPlage")),
-                            LocalTime.parse(attribut(element, "finPlage")));
+                            heurePlage(element, "debutPlage", i),
+                            heurePlage(element, "finPlage", i));
                 }
                 passages.add(arret);
             }
             return new SauvegardeTournee(plan, fichierPlan, programme,
                     new Tournee(passages, tournee.chemins(), false));
-        } catch (IOException | DateTimeException | IllegalArgumentException
+        } catch (IOException | IllegalArgumentException
                 | IllegalStateException erreur) {
             throw new SAXException("Impossible de restaurer la tournée : "
                     + erreur.getMessage(), erreur);
@@ -183,70 +234,164 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
     }
 
     /**
-     * Retrouve une affectation valide même si des demandes partagent une
-     * adresse et une durée. 0 : avant collecte, 1 : collectée, 2 : livrée.
-     * Range dans {@code types} et {@code servies} ce que fait chaque arrêt
-     * visité (à partir du rang 1) quand l'affectation est valide.
+     * Retrouve le fichier du plan désigné par la sauvegarde : d'abord le
+     * chemin écrit (relatif au dossier de la sauvegarde, ou absolu pour les
+     * anciennes sauvegardes), puis un fichier de même nom dans le dossier de
+     * la sauvegarde. Le nom est pris après le dernier « / » ou « \ », pour
+     * lire aussi une sauvegarde écrite sous un autre système.
+     *
+     * @throws SAXException si aucun des deux fichiers n'existe
      */
-    private static boolean respecteDemandes(List<Noeud> adresses,
-            List<Integer> durees, List<Demande> demandes, int[] progression,
-            int rang, List<TypeArret> types, List<Demande> servies) {
-        if (rang >= adresses.size() - 1) {
-            for (int etape : progression) {
-                if (etape != 2) {
-                    return false;
+    private static Path trouverPlan(Path fichier, String reference)
+            throws SAXException {
+        Path dossier = fichier.toAbsolutePath().normalize().getParent();
+        String nom = reference.substring(Math.max(reference.lastIndexOf('/'),
+                reference.lastIndexOf('\\')) + 1);
+        List<String> candidats = List.of(reference, nom);
+        for (String candidat : candidats) {
+            try {
+                Path chemin = dossier.resolve(candidat).normalize();
+                if (!candidat.isEmpty() && Files.isRegularFile(chemin)) {
+                    return chemin;
                 }
+            } catch (InvalidPathException cheminIllisible) {
+                // Chemin d'un autre système : on essaie le candidat suivant.
             }
-            return true;
         }
-        for (int i = 0; i < demandes.size(); i++) {
-            Demande demande = demandes.get(i);
-            int etape = progression[i];
-            Noeud adresse = etape == 0 ? demande.collecte()
-                    : demande.livraison();
-            int duree = etape == 0 ? demande.dureeCollecte()
-                    : demande.dureeLivraison();
-            if (etape < 2 && adresse.equals(adresses.get(rang))
-                    && duree == durees.get(rang)) {
-                progression[i]++;
-                types.add(etape == 0 ? TypeArret.COLLECTE
-                        : TypeArret.LIVRAISON);
-                servies.add(demande);
-                if (respecteDemandes(adresses, durees, demandes, progression,
-                        rang + 1, types, servies)) {
+        throw new SAXException("Plan introuvable : « " + nom + " ». Placez "
+                + "le fichier du plan dans le même dossier que la sauvegarde ("
+                + dossier + ").");
+    }
+
+    /**
+     * Affecte chaque arrêt de la tournée sauvegardée (hors entrepôt) à la
+     * collecte ou à la livraison d'une demande, en respectant la contrainte
+     * d'ordre. Les demandes identiques (mêmes adresses et durées) sont
+     * interchangeables : elles forment une seule classe, ce qui évite
+     * d'essayer toutes leurs permutations ; les échecs déjà rencontrés sont
+     * retenus, et le nombre d'essais est borné. Range dans {@code types} et
+     * {@code servies} ce que fait chaque arrêt quand l'affectation est
+     * trouvée.
+     */
+    private static final class AffectationArrets {
+        private final List<Noeud> adresses;
+        private final List<Integer> durees;
+        private final List<TypeArret> types;
+        private final List<Demande> servies;
+        /** Demandes de chaque classe de demandes identiques. */
+        private final List<List<Demande>> classes = new ArrayList<>();
+        /** Nombre de demandes collectées, par classe. */
+        private final int[] collectees;
+        /** Nombre de demandes livrées, par classe. */
+        private final int[] livrees;
+        /** États (rang, progression) déjà connus pour mener à un échec. */
+        private final Set<String> echecs = new HashSet<>();
+        private int essais;
+
+        AffectationArrets(List<Noeud> adresses, List<Integer> durees,
+                List<Demande> demandes, List<TypeArret> types,
+                List<Demande> servies) {
+            this.adresses = adresses;
+            this.durees = durees;
+            this.types = types;
+            this.servies = servies;
+            Map<Demande, List<Demande>> parDemande = new LinkedHashMap<>();
+            for (Demande demande : demandes) {
+                parDemande.computeIfAbsent(demande, cle -> new ArrayList<>())
+                        .add(demande);
+            }
+            classes.addAll(parDemande.values());
+            collectees = new int[classes.size()];
+            livrees = new int[classes.size()];
+        }
+
+        boolean chercher(int rang) throws SAXException {
+            if (rang >= adresses.size() - 1) {
+                for (int k = 0; k < classes.size(); k++) {
+                    if (livrees[k] != classes.get(k).size()) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            String etat = rang + Arrays.toString(collectees)
+                    + Arrays.toString(livrees);
+            if (echecs.contains(etat)) {
+                return false;
+            }
+            if (++essais > ESSAIS_MAXIMUM) {
+                throw new SAXException("Sauvegarde trop complexe à vérifier : "
+                        + "les arrêts ne correspondent pas aux demandes.");
+            }
+            Noeud adresse = adresses.get(rang);
+            int duree = durees.get(rang);
+            for (int k = 0; k < classes.size(); k++) {
+                List<Demande> classe = classes.get(k);
+                Demande modele = classe.get(0);
+                if (collectees[k] < classe.size()
+                        && modele.collecte().equals(adresse)
+                        && modele.dureeCollecte() == duree
+                        && essayer(rang, TypeArret.COLLECTE,
+                                classe.get(collectees[k]), collectees, k)) {
                     return true;
                 }
-                types.remove(types.size() - 1);
-                servies.remove(servies.size() - 1);
-                progression[i]--;
+                if (livrees[k] < collectees[k]
+                        && modele.livraison().equals(adresse)
+                        && modele.dureeLivraison() == duree
+                        && essayer(rang, TypeArret.LIVRAISON,
+                                classe.get(livrees[k]), livrees, k)) {
+                    return true;
+                }
             }
+            echecs.add(etat);
+            return false;
         }
-        return false;
+
+        private boolean essayer(int rang, TypeArret type, Demande demande,
+                int[] compteurs, int classe) throws SAXException {
+            compteurs[classe]++;
+            types.add(type);
+            servies.add(demande);
+            if (chercher(rang + 1)) {
+                return true;
+            }
+            types.remove(types.size() - 1);
+            servies.remove(servies.size() - 1);
+            compteurs[classe]--;
+            return false;
+        }
     }
 
-    private static String attribut(Element element, String nom)
+    private static LocalTime heurePlage(Element element, String nom,
+            int rang) throws SAXException {
+        String valeur = Plan.lireAttribut(element, nom,
+                "arrêt n° " + (rang + 1));
+        try {
+            return LocalTime.parse(valeur);
+        } catch (DateTimeParseException erreur) {
+            throw new SAXException("Valeur invalide pour l'attribut « " + nom
+                    + " » (arrêt n° " + (rang + 1) + ") : « " + valeur
+                    + " ».", erreur);
+        }
+    }
+
+    private static int duree(Element element, String nom, String quoi)
             throws SAXException {
-        String valeur = element.getAttribute(nom);
-        if (valeur.isBlank()) {
-            throw new SAXException("Attribut requis : " + nom);
-        }
-        return valeur;
-    }
-
-    private static int entier(Element element, String nom) throws SAXException {
-        int valeur = Integer.parseInt(attribut(element, nom));
+        int valeur = Plan.lireEntier(element, nom, quoi);
         if (valeur < 0) {
-            throw new SAXException("Durée sur place négative.");
+            throw new SAXException("Durée sur place négative (" + quoi
+                    + ").");
         }
         return valeur;
     }
 
-    private static Noeud adresse(Element element, String nom, Plan plan)
-            throws SAXException {
-        Noeud noeud = plan.obtenirNoeud(Long.parseLong(attribut(element, nom)));
+    private static Noeud adresse(Element element, String nom, String quoi,
+            Plan plan) throws SAXException {
+        long identifiant = Plan.lireLong(element, nom, quoi);
+        Noeud noeud = plan.obtenirNoeud(identifiant);
         if (noeud == null) {
-            throw new SAXException("Adresse absente du plan : "
-                    + attribut(element, nom));
+            throw new SAXException("Adresse absente du plan : " + identifiant
+                    + " (" + quoi + ").");
         }
         return noeud;
     }

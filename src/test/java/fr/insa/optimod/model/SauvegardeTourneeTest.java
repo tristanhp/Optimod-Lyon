@@ -63,8 +63,8 @@ public class SauvegardeTourneeTest {
                 .getDocumentElement();
         assertEquals("sauvegardeTournee", racine.getTagName());
         assertEquals("1", racine.getAttribute("version"));
-        assertEquals(fichierPlan.toAbsolutePath().toString(),
-                racine.getAttribute("plan"));
+        // Chemin relatif au dossier de la sauvegarde : ici, le même dossier.
+        assertEquals("plan.xml", racine.getAttribute("plan"));
         assertEquals("1", racine.getAttribute("entrepot"));
         assertEquals("08:00", racine.getAttribute("heureDepart"));
         NodeList demandes = racine.getElementsByTagName("demande");
@@ -206,5 +206,170 @@ public class SauvegardeTourneeTest {
                 + "</sauvegardeTournee>");
         assertThrows(SAXException.class,
                 () -> SauvegardeTournee.restaurer(fichier));
+    }
+
+    // --- Sauvegardes déplacées, anciennes ou piégées ---
+
+    /** Sauvegarde d'une tournée d'une demande sur le petit réseau. */
+    private Path sauvegarderUneDemande(Path fichierPlan, Path fichier)
+            throws Exception {
+        Plan plan = new Plan(fichierPlan.toString());
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0),
+                List.of(new Demande(plan.obtenirNoeud(3),
+                        plan.obtenirNoeud(2), 120, 240)));
+        programme.definirTournees(plan.calculerTournees(programme));
+        SauvegardeTournee.sauvegarder(fichier, fichierPlan, programme);
+        return fichier;
+    }
+
+    /** Le plan est désigné par un chemin relatif, écrit avec des « / ». */
+    @Test
+    public void cheminDuPlanRelatifALaSauvegarde() throws Exception {
+        Path plans = dossier.newFolder("plans").toPath();
+        Path sauvegardes = dossier.newFolder("sauvegardes").toPath();
+        Path fichierPlan = plans.resolve("plan.xml");
+        Files.writeString(fichierPlan, PlansPourTests.PETIT_RESEAU);
+        Path fichier = sauvegarderUneDemande(fichierPlan,
+                sauvegardes.resolve("tournee.xml"));
+        assertTrue(Files.readString(fichier).contains(
+                "plan=\"../plans/plan.xml\""));
+        assertEquals(fichierPlan.toAbsolutePath().normalize(),
+                SauvegardeTournee.restaurer(fichier).fichierPlan());
+    }
+
+    /** Une sauvegarde déplacée avec son plan se restaure encore. */
+    @Test
+    public void sauvegardeDeplaceeAvecSonPlanRestauree() throws Exception {
+        Path depart = dossier.newFolder("depart").toPath();
+        Path arrivee = dossier.newFolder("arrivee").toPath();
+        Path fichierPlan = depart.resolve("plan.xml");
+        Files.writeString(fichierPlan, PlansPourTests.PETIT_RESEAU);
+        sauvegarderUneDemande(fichierPlan, depart.resolve("tournee.xml"));
+        Files.move(fichierPlan, arrivee.resolve("plan.xml"));
+        Files.move(depart.resolve("tournee.xml"),
+                arrivee.resolve("tournee.xml"));
+        assertEquals(1, SauvegardeTournee.restaurer(arrivee.resolve(
+                "tournee.xml")).programme().obtenirDemandes().size());
+    }
+
+    /**
+     * Une ancienne sauvegarde au chemin absolu d'une autre machine (Windows)
+     * se restaure si le plan est à côté d'elle.
+     */
+    @Test
+    public void ancienneSauvegardeCheminWindowsRestauree() throws Exception {
+        Path fichierPlan = dossier.newFile("plan.xml").toPath();
+        Files.writeString(fichierPlan, PlansPourTests.PETIT_RESEAU);
+        Path fichier = sauvegarderUneDemande(fichierPlan,
+                dossier.newFile("tournee.xml").toPath());
+        Files.writeString(fichier, Files.readString(fichier).replace(
+                "plan=\"plan.xml\"",
+                "plan=\"C:\\Users\\julie\\Bureau\\data\\plan.xml\""));
+        assertEquals(1, SauvegardeTournee.restaurer(fichier).programme()
+                .obtenirDemandes().size());
+    }
+
+    /** La sauvegarde fournie avec l'application se restaure. */
+    @Test
+    public void sauvegardeFournieRestauree() throws Exception {
+        Path fichier = Path.of(getClass().getResource(
+                "/data/demande_sauvegardee_grand.xml").toURI());
+        SauvegardeTournee restauree = SauvegardeTournee.restaurer(fichier);
+        assertEquals("grandPlan.xml",
+                restauree.fichierPlan().getFileName().toString());
+        assertFalse(restauree.programme().obtenirDemandes().isEmpty());
+    }
+
+    /** Un plan introuvable est nommé dans un message français. */
+    @Test
+    public void planIntrouvableNommeEnFrancais() throws Exception {
+        Path fichier = dossier.newFile("tournee.xml").toPath();
+        Files.writeString(fichier, "<sauvegardeTournee version=\"1\" "
+                + "nombreLivreurs=\"1\" plan=\"D:\\ailleurs\\absent.xml\" "
+                + "entrepot=\"1\" heureDepart=\"08:00\"/>");
+        SAXException erreur = assertThrows(SAXException.class,
+                () -> SauvegardeTournee.restaurer(fichier));
+        assertTrue(erreur.getMessage(), erreur.getMessage().contains(
+                "Plan introuvable : « absent.xml »"));
+    }
+
+    /** Une sauvegarde d'une autre version est refusée en le disant. */
+    @Test
+    public void autreVersionRefusee() throws Exception {
+        Path fichier = dossier.newFile("v2.xml").toPath();
+        Files.writeString(fichier, "<sauvegardeTournee version=\"2\" "
+                + "nombreLivreurs=\"3\" plan=\"plan.xml\"/>");
+        SAXException erreur = assertThrows(SAXException.class,
+                () -> SauvegardeTournee.restaurer(fichier));
+        assertTrue(erreur.getMessage().contains("version 1"));
+    }
+
+    /** Une durée illisible est citée dans un message français. */
+    @Test
+    public void dureeIllisibleMessageFrancais() throws Exception {
+        Files.writeString(dossier.newFile("plan.xml").toPath(),
+                PlansPourTests.PETIT_RESEAU);
+        Path fichier = dossier.newFile("duree.xml").toPath();
+        Files.writeString(fichier, "<sauvegardeTournee version=\"1\" "
+                + "nombreLivreurs=\"1\" plan=\"plan.xml\" entrepot=\"1\" "
+                + "heureDepart=\"08:00\"><arret noeud=\"1\" duree=\"abc\"/>"
+                + "</sauvegardeTournee>");
+        SAXException erreur = assertThrows(SAXException.class,
+                () -> SauvegardeTournee.restaurer(fichier));
+        assertTrue(erreur.getMessage(), erreur.getMessage().contains(
+                "« abc »"));
+        assertFalse(erreur.getMessage().contains("For input"));
+    }
+
+    /**
+     * Sauvegarde de {@code nombre} demandes identiques : toutes les
+     * collectes, puis les livraisons ; avec {@code piegee}, la dernière
+     * livraison est remplacée par une collecte de trop.
+     */
+    private Path sauvegardeDemandesIdentiques(int nombre, boolean piegee)
+            throws Exception {
+        Files.writeString(dossier.newFile("plan.xml").toPath(),
+                PlansPourTests.PETIT_RESEAU);
+        StringBuilder xml = new StringBuilder("<sauvegardeTournee "
+                + "version=\"1\" nombreLivreurs=\"1\" plan=\"plan.xml\" "
+                + "entrepot=\"1\" heureDepart=\"08:00\">");
+        for (int i = 0; i < nombre; i++) {
+            xml.append("<demande collecte=\"3\" livraison=\"2\" "
+                    + "dureeCollecte=\"60\" dureeLivraison=\"60\"/>");
+        }
+        xml.append("<arret noeud=\"1\" duree=\"0\"/>");
+        for (int i = 0; i < nombre; i++) {
+            xml.append("<arret noeud=\"3\" duree=\"60\"/>");
+        }
+        for (int i = 0; i < nombre; i++) {
+            xml.append(piegee && i == nombre - 1
+                    ? "<arret noeud=\"3\" duree=\"60\"/>"
+                    : "<arret noeud=\"2\" duree=\"60\"/>");
+        }
+        xml.append("<arret noeud=\"1\" duree=\"0\"/></sauvegardeTournee>");
+        Path fichier = dossier.newFile("identiques.xml").toPath();
+        Files.writeString(fichier, xml.toString());
+        return fichier;
+    }
+
+    /**
+     * Une sauvegarde piégée (demandes identiques et un arrêt de trop) est
+     * refusée vite : auparavant, toutes les permutations étaient essayées.
+     */
+    @Test(timeout = 5000)
+    public void sauvegardeAuxDemandesIdentiquesPiegeeRefuseeVite()
+            throws Exception {
+        Path fichier = sauvegardeDemandesIdentiques(40, true);
+        assertThrows(SAXException.class,
+                () -> SauvegardeTournee.restaurer(fichier));
+    }
+
+    /** Des demandes identiques se restaurent vite. */
+    @Test(timeout = 5000)
+    public void demandesIdentiquesRestaureesVite() throws Exception {
+        Path fichier = sauvegardeDemandesIdentiques(40, false);
+        assertEquals(82, SauvegardeTournee.restaurer(fichier).tournee()
+                .arrets().size());
     }
 }
