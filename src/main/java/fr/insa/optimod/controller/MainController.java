@@ -27,6 +27,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.Arret;
+import fr.insa.optimod.model.Tournee.TypeArret;
 import fr.insa.optimod.model.Troncon;
 
 /**
@@ -1054,8 +1055,8 @@ public final class MainController {
                 "    <h1 class=\"aligncenter\">Livreur n°" + nb + "</h1>\r\n" + //
                 "    <p> </p>\r\n" + //
                 "\r\n" + //
-                "    <h2>Heure de départ prévue de l'entrepot : 08:00</h2>\r\n" + //
-                "    <h2>Heure de retour prévue de l'entrepot : 11:13:58</h2>");
+                "    <h2>Heure de départ prévue de l'entrepot : " + tournee.arrets().getFirst().depart() + "</h2>\r\n" + //
+                "    <h2>Heure de retour prévue de l'entrepot : " + tournee.arrets().getLast().arrivee() + "</h2>");
 
         fileOutpuWriter.write("<table border=\"1\", border-collapse= collapse;>\r\n" + //
                 "  <caption>Liste des Demande de Livraisons</caption>\r\n" + //
@@ -1083,16 +1084,31 @@ public final class MainController {
                     }
                 }
             }
+            String plage, heureDepart, heureArrive;
+            if (arret.type() == TypeArret.ENTREPOT) {
+                if (arret.equals(tournee.arrets().getFirst())) {
+                    plage = arret.depart().toString();
+                    heureDepart = arret.depart().toString();
+                    heureArrive = "--";
+                } else {
+                    plage = arret.arrivee().toString();
+                    heureArrive = arret.arrivee().toString();
+                    heureDepart = "--";
+                }
+
+            } else {
+                plage = arret.debutPlage() + " - " + arret.finPlage();
+                heureArrive = arret.arrivee().toString();
+                heureDepart = (arret.depart().equals(arret.arrivee()) ? " -- " : arret.depart().toString());
+            }
             fileOutpuWriter.write("<tr>\r\n" + //
                     "      <td>" + arret.type() + "</td>\r\n" + //
                     "      <td>" + rue + "</td>\r\n" + //
                     "      <td> <a href=\"https://maps.google.com/?q=" + id.latitude() + "," + id.longitude()
                     + "\">(" + id.latitude() + ", " + id.longitude() + ")</a></td>" + //
-                    "      <td style=\"text-align: center\";>" + arret.debutPlage() + " - " + arret.finPlage()
-                    + "</td>\r\n" + //
-                    "      <td style=\"text-align: center\";>" + arret.arrivee() + "</td>\r\n" + //
-                    "      <td style=\"text-align: center\";>"
-                    + (arret.depart().equals(arret.arrivee()) ? " -- " : arret.depart()) + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>" + plage + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>" + heureArrive + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>" + heureDepart + "</td>\r\n" + //
                     "      <td style=\"text-align: center\";>"
                     + (decalage == 0 ? "--" : (decalage / 60 == 0 ? "" : decalage / 60 + " min"))
                     + (decalage % 60 == 0 ? "" : decalage % 60 + " s") + "</td>\r\n"
