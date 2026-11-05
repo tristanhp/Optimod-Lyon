@@ -366,12 +366,12 @@ public final class Plan {
      * @param tournee  tournée de départ, jamais modifiée
      * @param demande  demande à insérer
      * @param position rang de collecte, entre 1 et le rang du retour inclus
-     * @return nouvelle tournée sans recherche de position ni appel au TSP
+     * @return nouvelle tournée sans recherche de position ni appel au TSP ;
+     *         si elle rentre après {@link #HEURE_LIMITE_RETOUR}, elle est
+     *         renvoyée quand même, signalée par {@link Tournee#estPossible()}
      * @throws IllegalArgumentException si la position est invalide
      * @throws IllegalStateException    si un nouveau chemin est inaccessible ou
-     *                                  si l'insertion rend le retour impossible
-     *                                  (après 13 h, alors que
-     *                                  la tournée d'avant rentrait à l'heure)
+     *                                  si la tournée dépasse minuit
      */
     public Tournee insererDemande(Tournee tournee, Demande demande,
             int position) {
@@ -428,13 +428,7 @@ public final class Plan {
                     nouveau.demande(), ancien.debutPlage(),
                     ancien.finPlage()));
         }
-        Tournee apres = new Tournee(arrets, candidate.chemins(), false);
-        if (!apres.estPossible() && tournee.estPossible()) {
-            throw new IllegalStateException("Insertion refusée : le retour à "
-                    + "l'entrepôt serait à " + apres.obtenirHeureRetour()
-                    + ", après " + HEURE_LIMITE_RETOUR + ".");
-        }
-        return apres;
+        return new Tournee(arrets, candidate.chemins(), false);
     }
 
     /**
@@ -449,8 +443,9 @@ public final class Plan {
      * temps de trajet ajouté, c'est-à-dire les deux trajets qui entourent la
      * demande moins le trajet direct qu'ils remplacent (repris de la tournée).
      * Le voyageur de commerce n'est pas lancé. En cas d'égalité, la première
-     * position est gardée. La règle des 13 h n'est pas vérifiée ici, mais par
-     * {@link #insererDemande}.
+     * position est gardée. L'heure de retour n'est pas vérifiée ici :
+     * {@link #insererDemande} renvoie la tournée, signalée par
+     * {@link Tournee#estPossible()} si elle rentre après 13 h.
      *
      * @param tournee tournée actuelle d'un livreur, jamais modifiée
      * @param demande demande à insérer
@@ -503,9 +498,10 @@ public final class Plan {
     /**
      * Cherche les livreurs qui peuvent prendre une demande de plus et rentrer
      * à l'entrepôt avant {@link #HEURE_LIMITE_RETOUR}. C'est une aide à la
-     * décision, utilisée quand l'insertion chez le livreur choisi est refusée :
-     * rien n'est inséré, aucune tournée ne change, et l'administrateur choisit
-     * ensuite le livreur puis la position.
+     * décision, utilisée quand l'insertion chez le livreur choisi le ferait
+     * rentrer après 13 h : rien n'est inséré, aucune tournée ne change, et
+     * l'administrateur choisit ensuite le livreur puis la position, ou garde
+     * le livreur choisi malgré le retard.
      *
      * <p>Pour chaque livreur, y compris celui de la demande, on essaie la
      * position de {@link #trouverPositionMoindreCout}. Elle donne le retour le
@@ -514,8 +510,8 @@ public final class Plan {
      * peut. Ce n'est donc qu'un test de faisabilité : la position réellement
      * choisie par l'administrateur peut être une autre. Un livreur dont la
      * tournée rentre déjà après 13 h n'est pas proposé, de même qu'un livreur
-     * pour lequel une adresse est inaccessible. Le voyageur de commerce n'est
-     * pas lancé.
+     * pour lequel une adresse est inaccessible ou dont la tournée dépasserait
+     * minuit. Le voyageur de commerce n'est pas lancé.
      *
      * @param tournees tournées actuelles, par numéro de livreur, jamais
      *        modifiées
@@ -538,8 +534,8 @@ public final class Plan {
 
     /**
      * Vrai si le livreur rentre avant la limite en prenant la demande à sa
-     * position de moindre coût. Retour après 13 h ou adresse inaccessible :
-     * faux.
+     * position de moindre coût. Retour après 13 h, adresse inaccessible ou
+     * tournée qui dépasse minuit : faux.
      */
     private boolean rentreAvantLimite(Tournee tournee, Demande demande) {
         try {

@@ -1,6 +1,7 @@
 # 0006. Plusieurs livreurs, une tournée par livreur
 
-- **Statut** : Proposée
+- **Statut** : Proposée ; mise à jour le 2026-11-05 (TIG-45) : un retour
+  après 13 h n'est plus refusé par une modification, voir les points 6 et 11
 - **Date** : 2026-11-01
 
 ## Contexte
@@ -49,7 +50,13 @@ avant le code et relu dans la PR.
    Le contrôleur range la tournée sans fenêtre d'erreur : « Calculer »
    n'échoue pas à cause de 13 h, et le signal est le rouge des arrêts. Une
    adresse inaccessible ou un calcul sans solution restent une
-   `IllegalStateException`.
+   `IllegalStateException`. Depuis la mise à jour du 2026-11-05, aucune
+   modification (ajout, changement de livreur, ordre, déplacement) n'est
+   refusée parce que la tournée rentre après 13 h : le contrôleur la range et
+   la consigne prévient du retour (`MainController.obtenirAvertissementRetour`,
+   déduit des tournées affichées). Le seul refus lié à l'heure est le
+   dépassement de minuit (« La tournée dépasse minuit. »), limite technique de
+   `LocalTime`.
 7. **Annuler et rétablir** : une commande qui modifie les demandes garde les
    tournées d'avant et d'après. `annuler()` remet celles d'avant ; rétablir
    remet celles d'après, sans recalcul. Quand l'utilisateur calcule après une
@@ -78,8 +85,19 @@ avant le code et relu dans la PR.
     arrêts eux-mêmes (une collecte suivie de la livraison de la même demande),
     sans chercher les arrêts par leur nœud. `CommandeChangerOrdre` garde les
     tournées d'avant et d'après, comme les autres commandes. Le contrôleur
-    refuse un changement qui rend impossible une tournée possible (retour
-    après 13 h) ; il accepte de changer l'ordre d'une tournée déjà en retard.
+    accepte un changement qui fait rentrer le livreur après 13 h et le
+    signale par la consigne (point 6) ; il ne refuse que la contrainte d'ordre
+    et le dépassement de minuit.
+11. **Ajout après 13 h (TIG-70, TIG-45)** : quand l'insertion fait rentrer le
+    livreur après 13 h, `MapScreen.choisirLivreurPossible` prévient
+    l'administrateur de l'heure de retour et lui propose les livreurs qui
+    rentrent avant 13 h (`Plan.trouverLivreursPossibles`, liste éventuellement
+    vide, livreur d'origine compris). Il peut affecter la demande à l'un d'eux
+    (puis choisir la position), la garder chez le livreur
+    (`MapScreen.GARDER_LIVREUR`, avec la position déjà choisie) ou annuler :
+    rien n'est modifié. Ce n'est plus un refus : la règle ne dépend plus de
+    l'historique de la tournée, une tournée déjà en retard est avertie comme
+    les autres.
 
 ## Alternatives envisagées
 
@@ -106,6 +124,10 @@ avant le code et relu dans la PR.
 - Avec un livreur, le comportement est le même qu'avant, sauf le retour après
   13 h, désormais affiché sans message d'erreur (test
   `retourApres13hSignale`).
+- Une tournée qui rentre après 13 h n'est jamais refusée par une modification ;
+  l'avertissement est déduit des tournées affichées, donc Annuler et Rétablir
+  le retrouvent sans l'avoir retenu (tests `ordreApres13hAccepteEtSignale`,
+  `changerLivreurApres13hAccepteEtSignale`).
 - Les commandes futures (changer de livreur, déplacer, réordonner, rejeter)
   implémentent `memoriserTourneesAvant` et `memoriserTourneesApres`.
 - Le recalcul local (TIG-101) ne touche que la tournée du livreur de la

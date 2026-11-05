@@ -149,9 +149,12 @@ Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 demandes (`demandePetit1.xml` … `demandeGrand9.xml`), chacun prévu pour le plan
 de même taille.
 
-Pour tester les arrêts rouges après 13 h, importer `petitPlan.xml`, puis
-`demande_trop_importante.xml` et calculer avec un seul livreur : les douze
-heures sur place imposent un retour après 20 h.
+Pour tester l'avertissement après 13 h, importer `petitPlan.xml`, puis
+`demande_trop_importante.xml` et calculer avec un seul livreur : les six
+heures sur place imposent un retour à 14:17, seul le retour est après 13 h
+(rouge dans la liste, contour rouge du losange sur la carte). Pour voir des
+arrêts numérotés en rouge, ajouter ensuite une demande à ce livreur : ses
+arrêts arrivent après 13 h.
 
 1. **Importer le plan** : choisir un fichier de plan. La carte s'affiche
    (tronçons en gris, nœuds en points sombres). Molette pour zoomer,
@@ -166,7 +169,9 @@ heures sur place imposent un retour après 20 h.
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
    inaccessible, un message l'explique ; si un livreur revient après 13 h,
-   sa tournée est affichée quand même, sans message d'erreur. Les arrêts dont
+   sa tournée est affichée quand même, sans fenêtre d'erreur, et la consigne
+   l'en avertit (« Retour à l'entrepôt à 14:17, après 13 h », avec le numéro
+   du livreur s'il y en a plusieurs). Les arrêts dont
    l'arrivée dépasse 13 h sont rouges dans la liste et le popup, avec la
    mention « Après 13 h » sur sa propre ligne, même s'ils respectent leur
    plage annoncée ; sur la carte, leur numéro est sur fond rouge. Si la
@@ -196,24 +201,28 @@ heures sur place imposent un retour après 20 h.
      sélectionné, on peut donc le déplacer de plusieurs rangs en recliquant.
      L'entrepôt (départ et retour) ne se déplace pas. Si le point de livraison
      d'une demande passerait avant son point de collecte (contrainte d'ordre),
-     ou si le changement ferait dépasser 13 h à une tournée qui rentrait à
-     l'heure, une fenêtre explique le refus et rien ne change ;
+     ou si la tournée dépasserait minuit, une fenêtre explique le refus et
+     rien ne change. Un retour après 13 h n'est pas un refus : le changement
+     est fait et la consigne l'annonce ;
    - *Déplacer* : sélectionner un point de collecte ou de livraison dans la
      liste des tournées, cliquer sur *Déplacer*, puis sur sa nouvelle adresse
      sur la carte (un second clic sur *Déplacer* annule). L'ordre des arrêts ne
      change pas : seuls les deux trajets autour du point sont recalculés, et
      seule la tournée de son livreur change. Si la tournée devient impossible
-     (adresse inaccessible, ou retour après 13 h pour une tournée qui rentrait
-     à l'heure), une fenêtre explique le refus et rien ne change ;
+     (adresse inaccessible, ou dépassement de minuit), une fenêtre explique le
+     refus et rien ne change. Un retour après 13 h n'est pas un refus : le
+     point est déplacé et la consigne l'annonce ;
    - *Changer de livreur* : sélectionner une demande dans la liste de gauche,
      cliquer sur le bouton sous la liste, choisir le nouveau livreur, puis
      l'endroit de sa tournée où insérer la demande (voir plus bas). La demande
      quitte la tournée de son ancien livreur, qui garde l'ordre de ses autres
      arrêts, et entre dans celle du nouveau, sans relancer le TSP ; les autres
-     tournées ne changent pas. Si le nouveau livreur, qui rentrait à l'heure,
-     rentrerait après 13 h, ou si une adresse est inaccessible, une fenêtre
-     explique le refus et rien ne change. Le bouton n'est actif que s'il y a
-     plusieurs livreurs (voir le champ *Livreurs*) ;
+     tournées ne changent pas. Si une adresse est inaccessible, ou si la
+     tournée du nouveau livreur dépasserait minuit, une fenêtre explique le
+     refus et rien ne change. Si le nouveau livreur rentre après 13 h, le
+     changement est fait et la consigne nomme ce livreur et son heure de
+     retour. Le bouton n'est actif que s'il y a plusieurs livreurs (voir le
+     champ *Livreurs*) ;
    - *Livreurs* (champ de la barre d'outils, flèches haut et bas, de 1 à 20) :
      règle le nombre de livreurs de la journée, avant ou après le calcul. Un
      livreur ajouté a une tournée vide, prête à recevoir des demandes (*Ajouter
@@ -238,14 +247,26 @@ la position qui fait rentrer le livreur le plus tôt (collecte et livraison
 côte à côte) : l'administrateur garde la main, le calcul n'a lieu que s'il
 choisit cette entrée, et Annuler le défait. Le même dialogue sert à l'ajout
 d'une demande et au changement de livreur.
-Si l'insertion fait rentrer le livreur après 13 h, l'application cherche les
-livreurs qui peuvent prendre la demande avant 13 h (en essayant la position
-*Moindre coût* chez chacun, sans rien insérer) et les propose, le livreur
-d'origine compris : une autre position chez lui peut suffire. L'administrateur
-choisit un livreur, puis la position dans sa tournée ; un nouveau refus rouvre
-la proposition. S'il annule, ou si aucun livreur ne peut la prendre, l'ajout est
-refusé avec un message et le programme n'est pas modifié. Une tournée qui rentre
-déjà après 13 h accepte une demande de plus, sans proposition.
+Si l'insertion fait rentrer le livreur après 13 h, ce n'est pas un refus :
+l'application prévient l'administrateur (« Le livreur 1 rentrerait à 14:10,
+après 13:00 ») et cherche les livreurs qui peuvent prendre la demande avant
+13 h (en essayant la position *Moindre coût* chez chacun, sans rien insérer),
+le livreur d'origine compris : une autre position chez lui peut suffire. La
+fenêtre, qui s'ouvre aussi quand la liste est vide et pour une tournée déjà en
+retard, offre trois choix :
+
+- *Affecter* à un livreur de la liste, puis choisir la position dans sa
+  tournée ; si cette position le fait encore rentrer après 13 h, la fenêtre se
+  rouvre ;
+- *Garder ce livreur* : la demande est ajoutée chez lui à la position déjà
+  choisie, sans autre calcul, et la consigne annonce son retour après 13 h ;
+- *Annuler* (ou Échap, ou la croix) : l'ajout est abandonné, rien n'est
+  modifié, pas même l'historique.
+
+Une adresse inaccessible, une position invalide ou une tournée qui dépasse
+minuit refusent l'ajout avec un message, sans proposer d'autre livreur.
+Annuler et Rétablir retrouvent l'avertissement : il se déduit des tournées
+affichées, pas d'un état retenu.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
@@ -302,7 +323,7 @@ Termes principaux et leur traduction dans le code :
 | Feuille de route | Page HTML imprimable d'un livreur : arrêts dans l'ordre, heures de passage et itinéraire rue par rue | `FeuilleDeRoute` |
 | Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
 | Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
-| Tournée possible | Tournée qui respecte toutes les règles, dont le retour avant 13 h | `Tournee.estPossible()` |
+| Tournée possible | Tournée dont le retour est au plus tard à 13 h ; sinon elle est affichée quand même, avec un avertissement | `Tournee.estPossible()` |
 | Contrainte d'ordre | Le colis est récupéré avant d'être livré | `GrapheDepandance` |
 | Vitesse | 15 km/h pour tous | `Plan.VITESSE_KMH` |
 | Modification interactive | Ajout, suppression, déplacement, changement d'ordre | `Commande*` |

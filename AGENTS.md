@@ -103,8 +103,11 @@ Pour brancher une nouvelle modification :
    bouger) : lever `IllegalArgumentException` (demande refusée) ou
    `IllegalStateException` (adresse inaccessible) avec un message lisible par
    l'utilisateur. Un retour après 13 h n'est **pas** une exception : la méthode
-   renvoie la tournée, `Tournee.estPossible()` est faux ; c'est au contrôleur de
-   refuser, si la règle du ticket le demande.
+   renvoie la tournée, `Tournee.estPossible()` est faux, et le contrôleur ne
+   refuse pas : l'avertissement vient de la consigne
+   (`MainController.obtenirAvertissementRetour`) et, à l'ajout, de
+   `MapScreen.choisirLivreurPossible` (ADR 0006). Seul un dépassement de minuit
+   est une `IllegalStateException`.
 3. **Une commande** (`Commande`) : elle garde les tournées d'avant et d'après
    (`Map<Integer, Tournee>`, une par livreur) et les range dans
    `ProgrammeLivraisons` avec `definirTournees`, que la vue observe. Si elle
@@ -123,7 +126,8 @@ Pour brancher une nouvelle modification :
 6. **Un calcul long** tourne hors du thread JavaFX (voir *Architecture*).
 7. **La consigne** « ordre non optimisé » s'affiche après une modification qui
    garde un ordre (suppression, changement d'ordre) ; elle nomme le livreur
-   s'il y en a plusieurs.
+   s'il y en a plusieurs. L'avertissement « retour après 13 h » s'y ajoute
+   tout seul, déduit des tournées affichées : ne pas le poser à la main.
 8. Tests d'abord ; README et diagrammes dans la même PR.
 
 Les tournées sont une donnée du modèle (une par livreur) ; il n'y a plus de
@@ -175,8 +179,8 @@ correspondance dans le code. Règles :
 - Lecture XML : passer par `Plan.creerLecteurXml()` (DOCTYPE interdit). Une
   erreur de fichier devient une `SAXException` au message lisible par
   l'utilisateur ; une adresse inaccessible ou un calcul sans solution, une
-  `IllegalStateException` ; un retour après 13 h, une tournée renvoyée avec
-  `Tournee.estPossible()` faux.
+  `IllegalStateException`, de même qu'une tournée qui dépasse minuit ; un
+  retour après 13 h, une tournée renvoyée avec `Tournee.estPossible()` faux.
 - `docs/code-fourni/` est en lecture seule. `algo/tsp` ne sera nettoyé (garder
   seulement `TSP3`) qu'à la fin du projet : ne pas le faire sans demande.
 

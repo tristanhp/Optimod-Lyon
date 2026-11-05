@@ -87,7 +87,8 @@ public class MainControllerTest {
                 new ArrayDeque<>();
         /** Listes de livreurs proposées après un refus, dans l'ordre. */
         private final List<List<Integer>> livreursProposes = new ArrayList<>();
-        private final List<Integer> livreursRefuses = new ArrayList<>();
+        /** Livreurs chez qui l'ajout finirait après 13 h, dans l'ordre. */
+        private final List<Integer> livreursAvertis = new ArrayList<>();
         private String detailProposition;
         private String refusAjout;
         private IntConsumer actionNombreLivreurs;
@@ -322,9 +323,9 @@ public class MainControllerTest {
         }
 
         @Override
-        public Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+        public Optional<Integer> choisirLivreurPossible(int livreur,
                 List<Integer> livreurs, String detail) {
-            livreursRefuses.add(livreurRefuse);
+            livreursAvertis.add(livreur);
             livreursProposes.add(List.copyOf(livreurs));
             detailProposition = detail;
             evenements.add("livreurs possibles");
@@ -1241,6 +1242,117 @@ public class MainControllerTest {
         assertNull(ecran.erreurCalcul);
         assertEquals(List.of("attente:true", "attente:false"),
                 ecran.evenements);
+        assertEquals(EtatTourneeCalculee.CONSIGNE
+                + " Retour à l'entrepôt à 13:42, après 13 h.",
+                ecran.consigne);
+    }
+
+    // --- Avertissement « retour après 13 h » (TIG-45) ---
+
+    /** Une tournée qui rentre avant 13 h ne déclenche aucun avertissement. */
+    @Test
+    public void calculAvant13hSansAvertissement() throws Exception {
+        tourneesCalculees = Map.of(1, tourneeRevenantA(LocalTime.of(13, 0)));
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+    }
+
+    /** Avec plusieurs livreurs, seul celui qui rentre en retard est nommé. */
+    @Test
+    public void calculDeuxLivreursNommeSeulementCeluiEnRetard()
+            throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        tourneesCalculees = Map.of(1, tourneeRevenantA(LocalTime.of(11, 0)),
+                2, tourneeRevenantA(LocalTime.of(13, 20)));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(EtatTourneeCalculee.CONSIGNE
+                + " Retour après 13 h : livreur 2 à 13:20.", ecran.consigne);
+    }
+
+    /** Plusieurs livreurs en retard sont nommés dans l'ordre de leur numéro. */
+    @Test
+    public void calculDeuxLivreursEnRetardLesNommeTous() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        tourneesCalculees = Map.of(2, tourneeRevenantA(LocalTime.of(13, 20)),
+                1, tourneeRevenantA(LocalTime.of(13, 5)));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(EtatTourneeCalculee.CONSIGNE
+                + " Retour après 13 h : livreur 1 à 13:05, livreur 2 à 13:20.",
+                ecran.consigne);
+    }
+
+    /**
+     * L'avertissement s'ajoute à la consigne « solution non prouvée optimale »
+     * au lieu de la remplacer.
+     */
+    @Test
+    public void calculNonProuveEtApres13hAfficheLesDeux() throws Exception {
+        tourneesCalculees = Map.of(1,
+                nonProuvee(tourneeRevenantA(LocalTime.of(13, 42))));
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE
+                + " Retour à l'entrepôt à 13:42, après 13 h.",
+                ecran.consigne);
+    }
+
+    /**
+     * Une suppression qui ramène la tournée avant 13 h retire l'avertissement :
+     * il est déduit des tournées affichées, pas retenu.
+     */
+    @Test
+    public void suppressionQuiRamenerAvant13hRetireLAvertissement()
+            throws Exception {
+        calculerRentrantA(LocalTime.of(13, 10));
+        assertTrue(ecran.consigne.contains("après 13 h"));
+
+        ecran.actionSupprimer.accept(0);
+
+        assertTrue(tournees().get(1).estPossible());
+        assertFalse(ecran.consigne.contains("après 13 h"));
+        assertTrue(ecran.consigne.startsWith("Ordre non optimisé"));
+    }
+
+    /**
+     * Une suppression après laquelle la tournée rentre encore après 13 h
+     * garde l'avertissement, à côté de « ordre non optimisé ».
+     */
+    @Test
+    public void suppressionEncoreApres13hGardeLAvertissement()
+            throws Exception {
+        calculerRentrantA(LocalTime.of(14, 30));
+
+        ecran.actionSupprimer.accept(0);
+
+        assertFalse(tournees().get(1).estPossible());
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE
+                + " Retour à l'entrepôt à "
+                + tournees().get(1).obtenirHeureRetour() + ", après 13 h.",
+                ecran.consigne);
+    }
+
+    /**
+     * Régler le nombre de livreurs ne change pas les tournées : le retard du
+     * livreur 1 reste signalé, et il est nommé puisqu'il y a deux livreurs.
+     */
+    @Test
+    public void reglerLeNombreDeLivreursGardeLAvertissement()
+            throws Exception {
+        calculerRentrantA(LocalTime.of(13, 10));
+
+        ecran.actionNombreLivreurs.accept(2);
+
+        assertEquals(2, tournees().size());
+        assertTrue(ecran.consigne.contains("livreur 1 à "
+                + tournees().get(1).obtenirHeureRetour()));
+        assertFalse(ecran.consigne.contains("livreur 2 à"));
     }
 
     /** Deux livreurs : les deux tournées calculées sont rangées. */
@@ -1559,16 +1671,21 @@ public class MainControllerTest {
         assertFalse(ecran.horsPlage.isEmpty());
     }
 
-    /** Un ajout impossible ne touche ni au programme ni à l'historique. */
+    /**
+     * Un ajout qui fait dépasser minuit est refusé (seule limite horaire qui
+     * reste un refus) et ne touche ni au programme ni à l'historique : aucun
+     * autre livreur n'est proposé.
+     */
     @Test
-    public void insertionImpossibleConserveEtat() throws Exception {
+    public void ajoutQuiDepasseMinuitRefuse() throws Exception {
         controleur = new MainController(ecran, Plan::calculerTournees,
                 arrierePlan::add, Runnable::run);
         chargerDeuxDemandes();
         ecran.actionCalculer.run();
         arrierePlan.remove().run();
         Tournee avant = tournees().get(1);
-        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("300", "5", 1));
+        ecran.saisie = Optional.of(
+                new MapScreen.SaisieDemande("1000", "5", 1));
         ecran.actionAjouter.run();
         ecran.actionClicNoeud.accept(NOEUD_A);
         ecran.actionClicNoeud.accept(NOEUD_B);
@@ -1577,6 +1694,7 @@ public class MainControllerTest {
         assertEquals(2, demandes().size());
         assertFalse(controleur.peutAnnuler());
         assertNotNull(ecran.refusAjout);
+        assertTrue(ecran.refusAjout.contains("minuit"));
         assertNull(ecran.erreurCalcul);
         assertTrue(ecran.livreursProposes.isEmpty());
         assertFalse(ecran.attente);
@@ -1584,7 +1702,30 @@ public class MainControllerTest {
         assertNull(ecran.livraisonProvisoire);
     }
 
-    // --- Ajout impossible avant 13 h : proposer un livreur (TIG-70) ---
+    /**
+     * Avec deux livreurs, un ajout qui dépasse minuit est refusé sans rien
+     * proposer : la liste des livreurs « avant 13 h » ne dit pas qui peut
+     * finir avant minuit.
+     */
+    @Test
+    public void ajoutQuiDepasseMinuitNeProposeAucunLivreur() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+
+        ajouterUneDemandeAuLivreur(1, "1000", "5");
+
+        assertNotNull(ecran.refusAjout);
+        assertTrue(ecran.refusAjout.contains("minuit"));
+        assertTrue(ecran.livreursProposes.isEmpty());
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    // --- Ajout après 13 h : prévenir et proposer un livreur (TIG-70) ---
 
     /**
      * Deux livreurs. Le livreur 1 a les deux demandes et sa tournée rentre
@@ -1656,13 +1797,13 @@ public class MainControllerTest {
     }
 
     /**
-     * L'ajout est refusé chez le livreur 1 (retour après 13 h) : l'écran
+     * L'ajout ferait rentrer le livreur 1 après 13 h : l'écran le prévient et
      * propose le livreur 2, que l'administrateur choisit. La demande est
      * ajoutée chez lui, sans recalcul complet, et l'ajout s'annule et se
      * rétablit comme un autre.
      */
     @Test
-    public void ajoutRefuseAutreLivreurTrouveEtChoisi() throws Exception {
+    public void ajoutApres13hAutreLivreurChoisi() throws Exception {
         calculerAvecLivreurUnAuLimite();
         Map<Integer, Tournee> avant = tournees();
         int calculsAvant = nombreDeCalculs;
@@ -1671,7 +1812,7 @@ public class MainControllerTest {
         ajouterUneDemandeAuLivreur(1, "2", "3");
 
         assertEquals(List.of(List.of(2)), ecran.livreursProposes);
-        assertEquals(List.of(1), ecran.livreursRefuses);
+        assertEquals(List.of(1), ecran.livreursAvertis);
         assertTrue(ecran.detailProposition.contains("13:00"));
         assertNull(ecran.refusAjout);
         assertEquals(2, ecran.nombreDePositionsProposees);
@@ -1696,20 +1837,86 @@ public class MainControllerTest {
     }
 
     /**
-     * Personne ne peut prendre la demande avant 13 h : la liste est vide, le
-     * refus est expliqué, et demandes, tournées et historique ne changent pas.
+     * L'administrateur garde le livreur 1 malgré l'avertissement : la demande
+     * y est ajoutée à la position déjà choisie, sans autre calcul ni autre
+     * choix de position. Le retour après 13 h est signalé par la consigne ;
+     * Annuler la retire, Rétablir la remet.
      */
     @Test
-    public void ajoutRefuseSansLivreurPossible() throws Exception {
+    public void ajoutApres13hGardeChezLeLivreur() throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+        int calculsAvant = nombreDeCalculs;
+        ecran.livreursPossiblesChoisis.add(
+                Optional.of(MapScreen.GARDER_LIVREUR));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(2)), ecran.livreursProposes);
+        assertNull(ecran.refusAjout);
+        assertEquals(1, ecran.nombreDePositionsProposees);
+        assertEquals(3, demandes().size());
+        assertEquals(1, demandes().get(2).livreur());
+        assertFalse(tournees().get(1).estPossible());
+        assertSame(avant.get(2), tournees().get(2));
+        assertEquals(calculsAvant, nombreDeCalculs);
+        assertTrue(ecran.consigne.contains("livreur 1 à "
+                + tournees().get(1).obtenirHeureRetour()));
+        assertTrue(ecran.consigne.contains("après 13 h"));
+        assertFalse(ecran.consigne.contains("livreur 2"));
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        assertTrue(tournees().get(1).estPossible());
+        assertFalse(ecran.consigne.contains("après 13 h"));
+        ecran.actionRefaire.run();
+        assertEquals(3, demandes().size());
+        assertTrue(ecran.consigne.contains("après 13 h"));
+        assertEquals(calculsAvant, nombreDeCalculs);
+    }
+
+    /**
+     * Personne d'autre ne peut prendre la demande avant 13 h : la liste est
+     * vide, mais l'administrateur est prévenu et peut garder le livreur.
+     */
+    @Test
+    public void ajoutApres13hSansAutreLivreurGarde() throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.livreursPossiblesChoisis.add(
+                Optional.of(MapScreen.GARDER_LIVREUR));
+
+        ajouterUneDemandeAuLivreur(1, "300", "5");
+
+        assertEquals(List.of(List.<Integer>of()), ecran.livreursProposes);
+        assertTrue(ecran.detailProposition.contains("13:00"));
+        assertNull(ecran.refusAjout);
+        assertNull(ecran.erreurCalcul);
+        assertEquals(3, demandes().size());
+        assertEquals(1, demandes().get(2).livreur());
+        assertFalse(tournees().get(1).estPossible());
+        assertSame(avant.get(2), tournees().get(2));
+        assertTrue(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Liste vide et l'administrateur annule : l'ajout est abandonné sans
+     * message d'erreur, et demandes, tournées et historique ne changent pas.
+     */
+    @Test
+    public void ajoutApres13hSansAutreLivreurAnnule() throws Exception {
         calculerAvecLivreurUnAuLimite();
         Map<Integer, Tournee> avant = tournees();
 
         ajouterUneDemandeAuLivreur(1, "300", "5");
 
-        assertNotNull(ecran.refusAjout);
-        assertTrue(ecran.refusAjout.contains("13:00"));
+        assertEquals(List.of(List.<Integer>of()), ecran.livreursProposes);
+        assertNull(ecran.refusAjout);
         assertNull(ecran.erreurCalcul);
-        assertTrue(ecran.livreursProposes.isEmpty());
         assertEquals(2, demandes().size());
         assertSame(avant.get(1), tournees().get(1));
         assertSame(avant.get(2), tournees().get(2));
@@ -1720,11 +1927,11 @@ public class MainControllerTest {
     }
 
     /**
-     * L'administrateur annule la proposition de livreur : l'ajout est
-     * abandonné sans message d'erreur, et rien n'est modifié.
+     * L'administrateur annule l'avertissement : l'ajout est abandonné sans
+     * message d'erreur, et rien n'est modifié.
      */
     @Test
-    public void ajoutRefuseEtAnnule() throws Exception {
+    public void ajoutApres13hAnnule() throws Exception {
         calculerAvecLivreurUnAuLimite();
         Map<Integer, Tournee> avant = tournees();
         ecran.livreursPossiblesChoisis.add(Optional.empty());
@@ -1740,6 +1947,7 @@ public class MainControllerTest {
         assertFalse(controleur.peutAnnuler());
         assertFalse(ecran.attente);
         assertNull(ecran.collecteProvisoire);
+        assertEquals("Ajout annulé.", ecran.confirmation);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
@@ -1748,7 +1956,7 @@ public class MainControllerTest {
      * position : l'ajout est abandonné, rien n'est modifié.
      */
     @Test
-    public void annulerLaPositionApresUnRefusAbandonneLAjout()
+    public void annulerLaPositionApresLeDialogueAbandonneLAjout()
             throws Exception {
         calculerAvecLivreurUnAuLimite();
         Map<Integer, Tournee> avant = tournees();
@@ -1774,7 +1982,7 @@ public class MainControllerTest {
      * chez lui.
      */
     @Test
-    public void ajoutRefuseAutrePositionChezLeMemeLivreur() throws Exception {
+    public void ajoutApres13hAutrePositionChezLeMemeLivreur() throws Exception {
         int pire = calculerAvecLivreurUnAuLimiteDuMoindreCout();
         int calculsAvant = nombreDeCalculs;
         ecran.positionsEnFile.add(Optional.of(pire));
@@ -1794,11 +2002,32 @@ public class MainControllerTest {
     }
 
     /**
-     * Un nouveau refus, chez le livreur choisi, rouvre la proposition au lieu
-     * d'abandonner l'ajout.
+     * Une position qui rentre à 13:00 pile n'est pas en retard : ni
+     * avertissement, ni proposition, et la consigne ne parle pas de 13 h.
      */
     @Test
-    public void nouveauRefusRouvreLaProposition() throws Exception {
+    public void ajoutA13hPileSansProposition() throws Exception {
+        calculerAvecLivreurUnAuLimiteDuMoindreCout();
+        ecran.positionsEnFile.add(
+                Optional.of(MapScreen.POSITION_MOINDRE_COUT));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertTrue(ecran.livreursProposes.isEmpty());
+        assertNull(ecran.refusAjout);
+        assertEquals(3, demandes().size());
+        assertEquals(LocalTime.of(13, 0),
+                tournees().get(1).obtenirHeureRetour());
+        assertTrue(tournees().get(1).estPossible());
+        assertFalse(ecran.consigne.contains("après 13 h"));
+    }
+
+    /**
+     * Un nouveau retour après 13 h, chez le livreur choisi, rouvre la
+     * proposition au lieu d'abandonner l'ajout.
+     */
+    @Test
+    public void nouveauRetourApres13hRouvreLaProposition() throws Exception {
         int pire = calculerAvecLivreurUnAuLimiteDuMoindreCout();
         ecran.positionsEnFile.add(Optional.of(pire));
         ecran.positionsEnFile.add(Optional.of(pire));
@@ -1817,11 +2046,39 @@ public class MainControllerTest {
     }
 
     /**
-     * Un livreur qui rentrait déjà après 13 h accepte une demande de plus
-     * ({@link Plan#insererDemande}) : l'ajout n'ouvre aucune proposition.
+     * Au second passage, l'administrateur garde le livreur : l'ajout se fait
+     * avec la position déjà choisie, sans troisième choix de position.
      */
     @Test
-    public void ajoutDansUneTourneeDejaEnRetardAccepte() throws Exception {
+    public void nouveauRetourApres13hPuisGarderAjoute() throws Exception {
+        int pire = calculerAvecLivreurUnAuLimiteDuMoindreCout();
+        ecran.positionsEnFile.add(Optional.of(pire));
+        ecran.positionsEnFile.add(Optional.of(pire));
+        ecran.livreursPossiblesChoisis.add(Optional.of(1));
+        ecran.livreursPossiblesChoisis.add(
+                Optional.of(MapScreen.GARDER_LIVREUR));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(1, 2), List.of(1, 2)),
+                ecran.livreursProposes);
+        assertEquals(2, ecran.nombreDePositionsProposees);
+        assertNull(ecran.refusAjout);
+        assertEquals(3, demandes().size());
+        assertFalse(tournees().get(1).estPossible());
+        assertTrue(ecran.consigne.contains("après 13 h"));
+    }
+
+    /**
+     * Un livreur qui rentrait déjà après 13 h est averti lui aussi, comme un
+     * autre : la règle ne dépend pas de l'historique de sa tournée. Les
+     * livreurs partent tous à la même heure : le livreur 2, vide, ne rentre
+     * pas non plus avant 13 h avec cette demande, la liste est donc vide, et
+     * l'administrateur garde le livreur 1.
+     */
+    @Test
+    public void ajoutDansUneTourneeDejaEnRetardPrevientAussi()
+            throws Exception {
         calculerAvecDeuxLivreurs(1);
         Tournee deHuitHeures = tournees().get(1);
         long secondes = deHuitHeures.arrets().get(0).arrivee().until(
@@ -1831,10 +2088,12 @@ public class MainControllerTest {
                 LocalTime.of(13, 30).minusSeconds(secondes)));
         repartirEtCalculer(1);
         assertFalse(tournees().get(1).estPossible());
+        ecran.livreursPossiblesChoisis.add(
+                Optional.of(MapScreen.GARDER_LIVREUR));
 
         ajouterUneDemandeAuLivreur(1, "2", "3");
 
-        assertTrue(ecran.livreursProposes.isEmpty());
+        assertEquals(List.of(List.<Integer>of()), ecran.livreursProposes);
         assertNull(ecran.refusAjout);
         assertEquals(3, demandes().size());
         assertFalse(tournees().get(1).estPossible());
@@ -2562,42 +2821,76 @@ public class MainControllerTest {
     }
 
     /**
-     * Refus après 13 h avec le vrai calcul : le départ est fixé pour que la
-     * tournée du voyageur de commerce rentre exactement à 13:00:00. Tout autre
-     * ordre permis est plus long et rentre après 13 h : il est refusé avec le
-     * message, et la tournée affichée ne change pas.
+     * Recalcule avec le vrai calcul, le départ étant réglé pour que la
+     * tournée du voyageur de commerce rentre exactement à l'heure dite : tout
+     * autre ordre permis est plus long et rentre après cette heure.
+     *
+     * @param retour heure de retour voulue de la tournée du livreur 1
+     * @return cette tournée
      */
-    @Test
-    public void retourApres13hRefuseAvecLeVraiCalcul() throws Exception {
+    private Tournee calculerRentrantA(LocalTime retour) throws Exception {
         Tournee deHuitHeures = afficherUneTourneeDeDeuxDemandes();
         long secondes = deHuitHeures.arrets().get(0).arrivee().until(
                 deHuitHeures.obtenirHeureRetour(),
                 java.time.temporal.ChronoUnit.SECONDS);
-        importerProgramme(deuxDemandesPartantA(
-                LocalTime.of(13, 0).minusSeconds(secondes)));
+        importerProgramme(deuxDemandesPartantA(retour.minusSeconds(secondes)));
         ecran.actionCalculer.run();
         Tournee limite = tournees().get(1);
-        assertEquals(LocalTime.of(13, 0), limite.obtenirHeureRetour());
+        assertEquals(retour, limite.obtenirHeureRetour());
+        return limite;
+    }
 
-        int refus13h = 0;
+    /**
+     * Changer l'ordre d'une tournée qui rentre à 13:00 pile la fait rentrer
+     * après 13 h : ce n'est plus un refus. L'ordre est changé, la consigne
+     * prévient du retour après 13 h, et Annuler remet la même tournée.
+     */
+    @Test
+    public void ordreApres13hAccepteEtSignale() throws Exception {
+        Tournee limite = calculerRentrantA(LocalTime.of(13, 0));
+        assertTrue(limite.estPossible());
+
+        descendreUnArretPermis(limite);
+
+        assertNull(ecran.refusOrdre);
+        Tournee apres = tournees().get(1);
+        assertFalse(apres.estPossible());
+        assertTrue(ecran.consigne.contains("après 13 h"));
+        assertTrue(ecran.consigne.contains(
+                "" + apres.obtenirHeureRetour()));
+        ecran.actionAnnuler.run();
+        assertSame(limite, tournees().get(1));
+        assertFalse(ecran.consigne.contains("après 13 h"));
+    }
+
+    /**
+     * Minuit reste un refus : le départ est fixé pour que la tournée rentre
+     * à 23:59:59. Tout autre ordre permis est plus long, dépasse minuit et est
+     * refusé avec le message, la tournée affichée ne changeant pas.
+     */
+    @Test
+    public void ordreQuiDepasseMinuitRefuse() throws Exception {
+        Tournee limite = calculerRentrantA(LocalTime.of(23, 59, 59));
+
+        int refusMinuit = 0;
         for (int rang = 1; rang < limite.arrets().size() - 2; rang++) {
             ecran.refusOrdre = null;
             ecran.actionDescendre.accept(1, rang);
             if (ecran.refusOrdre == null) {
                 ecran.actionAnnuler.run(); // échange accepté : on le défait
-            } else if (ecran.refusOrdre.contains("13:00")) {
-                refus13h++;
+            } else if (ecran.refusOrdre.contains("minuit")) {
+                refusMinuit++;
             }
         }
 
-        assertTrue("au moins un ordre refusé après 13 h", refus13h > 0);
+        assertTrue("au moins un ordre refusé après minuit", refusMinuit > 0);
         assertSame(limite, tournees().get(1));
+        assertFalse(ecran.actions.contains(Action.ANNULER));
     }
 
     /**
      * Une tournée déjà en retard n'est pas bloquée : on peut encore changer
-     * l'ordre de ses arrêts. Seul un changement qui rend impossible une tournée
-     * possible est refusé.
+     * l'ordre de ses arrêts, et la consigne rappelle le retour après 13 h.
      */
     @Test
     public void changerLOrdreDUneTourneeDejaEnRetardEstAccepte()
@@ -2614,6 +2907,7 @@ public class MainControllerTest {
         assertNull(ecran.refusOrdre);
         assertTrue(ecran.actions.contains(Action.ANNULER));
         assertNotEquals(noeudsDe(enRetard), noeudsDe(tournees().get(1)));
+        assertTrue(ecran.consigne.contains("après 13 h"));
     }
 
     /**
@@ -2750,32 +3044,50 @@ public class MainControllerTest {
     }
 
     /**
-     * Les déplacements qui rendent la tournée impossible (adresse inaccessible,
-     * ou retour après 13 h, le départ étant réglé pour rentrer à 13 h pile)
-     * sont refusés avec un message : demandes, tournée affichée et historique
-     * ne changent pas.
+     * Les déplacements qui font rentrer après 13 h (le départ étant réglé pour
+     * rentrer à 13 h pile) ne sont plus refusés : le point est déplacé, la
+     * consigne prévient du retour après 13 h et Annuler remet la tournée. Les
+     * autres refus (adresse inaccessible) ne parlent pas de 13 h et ne
+     * changent rien : demandes, tournée affichée et historique restent
+     * intacts.
      */
     @Test
-    public void deplacerUnPointImpossibleNeChangeRien() throws Exception {
-        Tournee deHuitHeures = afficherUneTourneeDeDeuxDemandes();
-        LocalTime depart = LocalTime.of(13, 0).minusSeconds(
-                deHuitHeures.arrets().get(0).arrivee().until(
-                        deHuitHeures.obtenirHeureRetour(),
-                        java.time.temporal.ChronoUnit.SECONDS));
-        importerProgramme(ecrire("<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-                + "<demandeDeLivraisons><entrepot adresse=\"2835339774\" "
-                + "heureDepart=\"" + depart.getHour() + ":"
-                + depart.getMinute() + ":" + depart.getSecond() + "\"/>"
-                + "<livraison adresseEnlevement=\"1679901320\" "
-                + "adresseLivraison=\"208769457\" dureeEnlevement=\"420\" "
-                + "dureeLivraison=\"600\"/>"
-                + "<livraison adresseEnlevement=\"208769120\" "
-                + "adresseLivraison=\"25336179\" dureeEnlevement=\"420\" "
-                + "dureeLivraison=\"480\"/></demandeDeLivraisons>"));
-        ecran.actionCalculer.run();
-        Tournee limite = tournees().get(1);
+    public void deplacerUnPointApres13hAccepteEtSignale() throws Exception {
+        Tournee limite = calculerRentrantA(LocalTime.of(13, 0));
 
-        int refus = 0;
+        int acceptes = 0;
+        for (Noeud noeud : ecran.planAffiche.obtenirNoeuds()) {
+            ecran.refusDeplacement = null;
+            ecran.actionDeplacer.accept(1, 1);
+            ecran.actionClicNoeud.accept(noeud.identifiant());
+            if (ecran.refusDeplacement == null) {
+                if (ecran.actions.contains(Action.ANNULER)) {
+                    if (!tournees().get(1).estPossible()) {
+                        acceptes++;
+                        assertTrue(ecran.consigne.contains("après 13 h"));
+                    }
+                    ecran.actionAnnuler.run();
+                }
+                continue;
+            }
+            assertFalse(ecran.refusDeplacement.contains("13:00"));
+            assertSame(limite, tournees().get(1));
+            assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+            assertFalse(ecran.actions.contains(Action.ANNULER));
+        }
+        assertTrue("au moins un déplacement accepté après 13 h", acceptes > 0);
+    }
+
+    /**
+     * Minuit reste un refus : le départ est fixé pour rentrer à 23:59:59, et
+     * un déplacement qui rallonge la tournée la fait dépasser minuit. Il est
+     * refusé avec le message, sans rien changer.
+     */
+    @Test
+    public void deplacerUnPointQuiDepasseMinuitRefuse() throws Exception {
+        Tournee limite = calculerRentrantA(LocalTime.of(23, 59, 59));
+
+        int refusMinuit = 0;
         for (Noeud noeud : ecran.planAffiche.obtenirNoeuds()) {
             ecran.refusDeplacement = null;
             ecran.actionDeplacer.accept(1, 1);
@@ -2786,15 +3098,15 @@ public class MainControllerTest {
                 }
                 continue;
             }
-            // Une adresse inaccessible est aussi refusée, avec un autre texte.
-            if (ecran.refusDeplacement.contains("13:00")) {
-                refus++;
+            if (ecran.refusDeplacement.contains("minuit")) {
+                refusMinuit++;
             }
             assertSame(limite, tournees().get(1));
             assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
             assertFalse(ecran.actions.contains(Action.ANNULER));
         }
-        assertTrue("au moins un retour refusé après 13 h", refus > 0);
+        assertTrue("au moins un déplacement refusé après minuit",
+                refusMinuit > 0);
     }
 
     // --- Changer le livreur d'une demande (TIG-80) ---
@@ -2967,28 +3279,71 @@ public class MainControllerTest {
     }
 
     /**
-     * Un changement qui ferait rentrer après 13 h un livreur qui rentrait à
-     * l'heure est refusé avec un message : demandes, tournées et historique ne
-     * changent pas.
+     * Le livreur 1 rentre exactement à l'heure dite avec la première demande,
+     * la plus longue ; le livreur 2 a l'autre et rentre plus tôt.
+     *
+     * @param retour heure de retour voulue du livreur 1
      */
-    @Test
-    public void changerLivreurImpossibleNeChangeRien() throws Exception {
+    private void calculerAvecLivreurUnRentrantA(LocalTime retour)
+            throws Exception {
         calculerAvecDeuxLivreurs(2);
-        Tournee deHuitHeures = tournees().get(2);
+        Tournee deHuitHeures = tournees().get(1);
         long secondes = deHuitHeures.arrets().get(0).arrivee().until(
                 deHuitHeures.obtenirHeureRetour(),
                 java.time.temporal.ChronoUnit.SECONDS);
-        importerProgramme(deuxDemandesPartantA(
-                LocalTime.of(13, 0).minusSeconds(secondes)));
+        importerProgramme(deuxDemandesPartantA(retour.minusSeconds(secondes)));
         repartirEtCalculer(2);
-        Map<Integer, Tournee> limite = tournees();
-        assertEquals(LocalTime.of(13, 0), limite.get(2).obtenirHeureRetour());
-        List<Demande> avant = List.copyOf(demandes());
+        assertEquals(retour, tournees().get(1).obtenirHeureRetour());
+        assertTrue(tournees().get(2).obtenirHeureRetour().isBefore(retour));
+    }
 
-        ecran.actionChangerLivreur.accept(0);
+    /**
+     * Un changement qui ferait rentrer après 13 h un livreur qui rentrait à
+     * l'heure n'est plus refusé : la seconde demande passe chez le livreur 1,
+     * la consigne nomme ce livreur en retard et son heure de retour, et Annuler
+     * remet les deux tournées.
+     */
+    @Test
+    public void changerLivreurApres13hAccepteEtSignale() throws Exception {
+        calculerAvecLivreurUnRentrantA(LocalTime.of(13, 0));
+        Map<Integer, Tournee> limite = tournees();
+        assertTrue(limite.get(1).estPossible());
+        ecran.livreurChoisi = Optional.of(1);
+
+        ecran.actionChangerLivreur.accept(1);
+
+        assertNull(ecran.refusChangementLivreur);
+        assertEquals(1, demandes().get(1).livreur());
+        assertFalse(tournees().get(1).estPossible());
+        assertTrue(ecran.consigne.contains("livreur 1 à "
+                + tournees().get(1).obtenirHeureRetour()));
+        assertFalse(ecran.consigne.contains("livreur 2 à"));
+        assertTrue(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().get(1).livreur());
+        assertSame(limite.get(1), tournees().get(1));
+        assertSame(limite.get(2), tournees().get(2));
+        assertFalse(ecran.consigne.contains("après 13 h"));
+    }
+
+    /**
+     * Minuit reste un refus : un changement qui ferait dépasser minuit au
+     * nouveau livreur (qui rentre à 23:59:59) est refusé avec un message, et
+     * demandes, tournées et historique ne changent pas.
+     */
+    @Test
+    public void changerLivreurQuiDepasseMinuitRefuse() throws Exception {
+        calculerAvecLivreurUnRentrantA(LocalTime.of(23, 59, 59));
+        Map<Integer, Tournee> limite = tournees();
+        List<Demande> avant = List.copyOf(demandes());
+        ecran.livreurChoisi = Optional.of(1);
+
+        ecran.actionChangerLivreur.accept(1);
 
         assertNotNull(ecran.refusChangementLivreur);
-        assertTrue(ecran.refusChangementLivreur.contains("13:00"));
+        assertTrue(ecran.refusChangementLivreur.contains("minuit"));
         assertEquals(avant, demandes());
         assertSame(limite.get(1), tournees().get(1));
         assertSame(limite.get(2), tournees().get(2));
@@ -3027,8 +3382,7 @@ public class MainControllerTest {
 
     /**
      * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
-     * plus : seul le changement qui rend impossible une tournée possible est
-     * refusé.
+     * plus, et la consigne rappelle son retour après 13 h.
      */
     @Test
     public void changerLivreurVersTourneeDejaEnRetardAccepte()
@@ -3048,6 +3402,7 @@ public class MainControllerTest {
         assertNull(ecran.refusChangementLivreur);
         assertEquals(2, demandes().get(0).livreur());
         assertTrue(controleur.peutAnnuler());
+        assertTrue(ecran.consigne.contains("après 13 h"));
     }
 
     /** Annuler le choix du livreur ne change rien, pas même l'historique. */
@@ -3257,7 +3612,8 @@ public class MainControllerTest {
 
     /** Chaque état a une consigne en français, sans mot hors glossaire. */
     @Test
-    public void chaqueEtatALaSienne() {
+    public void chaqueEtatALaSienne() throws Exception {
+        chargerDeuxDemandes();
         List<Etat> etats = List.of(new EtatInitial(), new EtatPlanCharge(),
                 new EtatProgrammeCharge(), new EtatCalculEnCours(),
                 new EtatTourneeCalculee(), new EtatRestauration(),

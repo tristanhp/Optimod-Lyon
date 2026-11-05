@@ -56,8 +56,10 @@ La limite de recherche est de 10 secondes : la meilleure solution trouvée
 est utilisée ; elle n'est pas déclarée optimale si la recherche est coupée.
 Les distances transmises au TSP sont arrondies au mètre. La vitesse est
 15 km/h et chaque trajet est arrondi à la seconde. Les durées sur place
-s'ajoutent aux trajets. Le retour doit être au plus tard à 13 h, y compris
-en vérifiant le temps total pour éviter un débordement à minuit.
+s'ajoutent aux trajets. Le retour doit être au plus tard à 13 h : sinon la
+tournée est affichée quand même et l'utilisateur est prévenu (arrêts en
+rouge, consigne), sans qu'elle soit refusée. Le temps total est vérifié pour
+refuser un débordement à minuit.
 Le benchmark détaillé de TIG-49 reste à fournir par son responsable.
 
 ### Recalcul local et insertion
