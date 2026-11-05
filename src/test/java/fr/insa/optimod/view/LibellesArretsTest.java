@@ -79,7 +79,7 @@ public class LibellesArretsTest {
         Arret pile = new Arret(plan.obtenirNoeud(1), LocalTime.of(13, 0),
                 LocalTime.of(13, 5), TypeArret.LIVRAISON, demande);
         assertTrue(LibellesArrets.decrire(plan, apres)
-                .contains("Après 13 h"));
+                .endsWith("\nAprès 13 h"));
         assertFalse(LibellesArrets.decrire(plan, pile)
                 .contains("Après 13 h"));
     }
