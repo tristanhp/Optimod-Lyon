@@ -97,6 +97,28 @@ public final class MainController {
     static final String CONSIGNE_NON_PROUVEE_LIVREURS = "Livreur(s) %s : "
             + "solution non prouvée optimale (limite de temps atteinte).";
 
+    /**
+     * Avertissement ajouté à la consigne quand le seul livreur rentre après
+     * 13 h : {@code %s} est son heure de retour. Un retour après 13 h n'est
+     * jamais refusé, il est signalé ici et par le rouge des arrêts.
+     */
+    static final String CONSIGNE_RETOUR_APRES_LIMITE = " Retour à l'entrepôt à "
+            + "%s, après 13 h.";
+
+    /**
+     * Même avertissement avec plusieurs livreurs : {@code %s} nomme chaque
+     * livreur qui rentre après 13 h avec son heure de retour.
+     */
+    static final String CONSIGNE_RETOURS_APRES_LIMITE = " Retour après 13 h : "
+            + "%s.";
+
+    /**
+     * Détail montré à l'administrateur quand un ajout ferait rentrer un
+     * livreur après 13 h : le livreur, son heure de retour, l'heure limite.
+     */
+    static final String DETAIL_RETOUR_APRES_LIMITE = "Le livreur %d rentrerait "
+            + "à %s, après %s.";
+
     /** Consigne quand aucun point de collecte ou de livraison est choisi. */
     static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
             + "liste de la tournée, le point de collecte ou de livraison à "
@@ -368,13 +390,15 @@ public final class MainController {
      * Comme pour la suppression, le calcul se fait avant la commande : annuler
      * et rétablir ne recalculent rien.
      *
-     * <p>Si l'insertion est refusée parce que le livreur rentrerait après
-     * 13 h, l'administrateur se voit proposer les livreurs qui peuvent prendre
-     * la demande ({@link Plan#trouverLivreursPossibles}), y compris celui de
-     * la demande, puisqu'une autre position peut suffire. Le livreur choisi,
-     * il choisit la position dans sa tournée, comme à l'ajout. S'il n'y a
-     * aucun livreur possible, ou s'il annule, l'ajout est abandonné : rien
-     * n'est modifié.
+     * <p>Si l'insertion fait rentrer le livreur après 13 h, ce n'est pas un
+     * refus : l'administrateur est prévenu et se voit proposer les livreurs qui
+     * peuvent prendre la demande avant 13 h
+     * ({@link Plan#trouverLivreursPossibles}), y compris celui de la demande,
+     * puisqu'une autre position peut suffire. Il peut choisir un de ces
+     * livreurs, puis la position dans sa tournée comme à l'ajout, garder le
+     * livreur malgré le retard, ou annuler : l'ajout est alors abandonné et
+     * rien n'est modifié. Seuls une adresse inaccessible, une position invalide
+     * ou une tournée qui dépasse minuit refusent l'ajout.
      *
      * @param demande demande validée
      */
@@ -389,8 +413,9 @@ public final class MainController {
 
     /**
      * Fait choisir la position de la demande dans la tournée de son livreur,
-     * puis l'insère hors du thread de l'interface. Un refus pour cause de
-     * retour après 13 h mène à la proposition d'autres livreurs
+     * puis l'insère hors du thread de l'interface. Une insertion qui fait
+     * rentrer le livreur après 13 h n'est pas refusée : elle mène à
+     * l'avertissement et à la proposition d'autres livreurs
      * ({@link #proposerLivreurs}), qui peut rappeler cette méthode.
      *
      * @param demande demande à insérer chez son livreur
@@ -412,10 +437,16 @@ public final class MainController {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
                         demande, positionEffective(planCalcule,
                                 tourneeLivreur, demande, position));
-                interfaceUtilisateur.execute(
-                        () -> finirAjout(demande, avant, apres));
-            } catch (IllegalStateException refus) {
-                chercherLivreurs(planCalcule, demande, avant, refus);
+                if (apres.estPossible()) {
+                    interfaceUtilisateur.execute(
+                            () -> finirAjout(demande, avant, apres));
+                } else {
+                    List<Integer> possibles =
+                            planCalcule.trouverLivreursPossibles(avant,
+                                    demande);
+                    interfaceUtilisateur.execute(() -> proposerLivreurs(
+                            demande, avant, apres, possibles));
+                }
             } catch (RuntimeException erreur) {
                 interfaceUtilisateur.execute(() -> refuserAjout(erreur));
             }
@@ -423,57 +454,34 @@ public final class MainController {
     }
 
     /**
-     * Cherche les livreurs possibles après un refus, hors du thread de
-     * l'interface, puis les propose sur ce thread.
+     * Sur le thread de l'interface, quand l'ajout ferait rentrer le livreur
+     * après 13 h : l'administrateur est prévenu de l'heure de retour et
+     * choisit parmi les livreurs qui rentrent avant 13 h (la liste peut être
+     * vide). Un livreur choisi, il choisit la position chez lui
+     * ({@link #placerDemande}). S'il garde le livreur de la demande, elle est
+     * ajoutée à la position déjà choisie, sans autre calcul. S'il annule,
+     * l'ajout est abandonné : rien n'est modifié, pas même l'historique.
      *
-     * @param planCalcule plan sur lequel chercher
-     * @param demande demande refusée
+     * @param demande demande à ajouter, chez son livreur actuel
      * @param avant tournées d'avant l'ajout, par livreur
-     * @param refus cause du refus chez le livreur de la demande
-     */
-    private void chercherLivreurs(Plan planCalcule, Demande demande,
-            Map<Integer, Tournee> avant, IllegalStateException refus) {
-        List<Integer> possibles;
-        try {
-            possibles = planCalcule.trouverLivreursPossibles(avant, demande);
-        } catch (RuntimeException erreur) {
-            interfaceUtilisateur.execute(() -> refuserAjout(erreur));
-            return;
-        }
-        String raison = refus.getMessage() != null ? refus.getMessage()
-                : "L'ajout de la demande est impossible.";
-        interfaceUtilisateur.execute(
-                () -> proposerLivreurs(demande, avant, raison, possibles));
-    }
-
-    /**
-     * Sur le thread de l'interface, après un refus : sans livreur possible le
-     * refus est expliqué ; sinon l'administrateur choisit un livreur, puis la
-     * position chez lui ({@link #placerDemande}). Sans choix, l'ajout est
-     * abandonné. Dans tous les cas où l'ajout s'arrête, rien n'est modifié,
-     * pas même l'historique.
-     *
-     * @param demande demande refusée
-     * @param avant tournées d'avant l'ajout, par livreur
-     * @param raison cause du refus chez le livreur de la demande
+     * @param apres tournée du livreur de la demande avec l'ajout, après 13 h
      * @param possibles livreurs qui peuvent prendre la demande avant 13 h
      */
     private void proposerLivreurs(Demande demande, Map<Integer, Tournee> avant,
-            String raison, List<Integer> possibles) {
+            Tournee apres, List<Integer> possibles) {
         ecran.afficherAttente(false);
-        if (possibles.isEmpty()) {
-            retrouverEtatProgramme();
-            ecran.afficherRefusAjout(raison + " Aucun livreur ne peut la "
-                    + "prendre.");
-            return;
+        String detail = DETAIL_RETOUR_APRES_LIMITE.formatted(
+                demande.livreur(), apres.obtenirHeureRetour(),
+                Plan.HEURE_LIMITE_RETOUR);
+        Integer choix = ecran.choisirLivreurPossible(demande.livreur(),
+                possibles, detail).orElse(null);
+        if (choix != null && choix == MapScreen.GARDER_LIVREUR) {
+            finirAjout(demande, avant, apres);
+        } else if (choix != null && possibles.contains(choix)) {
+            placerDemande(demande.avecLivreur(choix), avant);
+        } else {
+            annulerAjout();
         }
-        Integer livreur = ecran.choisirLivreurPossible(demande.livreur(),
-                possibles, raison).orElse(null);
-        if (livreur == null || !possibles.contains(livreur)) {
-            retrouverEtatProgramme();
-            return;
-        }
-        placerDemande(demande.avecLivreur(livreur), avant);
     }
 
     /**
@@ -586,15 +594,14 @@ public final class MainController {
 
     /**
      * Fin du changement de livreur, sur le thread de l'interface. S'il est
-     * refusé (adresse inaccessible, ou retour à l'entrepôt du nouveau livreur
-     * rendu impossible après 13 h), l'écran affiche la raison et rien n'est
-     * modifié, pas même l'historique. Sinon la commande remplace la demande par
-     * la même confiée au nouveau livreur et range les tournées recalculées.
+     * refusé (adresse inaccessible, ou tournée du nouveau livreur qui dépasse
+     * minuit), l'écran affiche la raison et rien n'est modifié, pas même
+     * l'historique. Sinon la commande remplace la demande par la même confiée
+     * au nouveau livreur et range les tournées recalculées.
      *
      * <p>
-     * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
-     * plus : seul un changement qui rend impossible une tournée possible est
-     * refusé ({@link Plan#insererDemande}).
+     * Un retour après 13 h n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param position rang de la demande dans le programme
      * @param ancienne la demande chez son ancien livreur
@@ -898,7 +905,7 @@ public final class MainController {
      */
     private void garderOrdre(String consigne) {
         historique.definirConsigneOrdre(consigne);
-        ecran.afficherConsigne(consigne);
+        ecran.afficherConsigne(consigne + obtenirAvertissementRetour());
     }
 
     /**
@@ -907,6 +914,35 @@ public final class MainController {
      */
     String obtenirConsigneOrdreGarde() {
         return historique.consigneOrdre();
+    }
+
+    /**
+     * Prévient des livreurs qui rentrent après
+     * {@link Plan#HEURE_LIMITE_RETOUR}. L'avertissement est déduit des
+     * tournées affichées, sans rien retenir : il suit donc Annuler, Rétablir,
+     * un recalcul ou un nouveau réglage du nombre de livreurs. Avec un seul
+     * livreur, seule son heure de retour est citée ; avec plusieurs, chaque
+     * livreur en retard est nommé, dans l'ordre de leur numéro.
+     *
+     * @return texte à ajouter à une consigne, commençant par une espace, ou
+     *         chaîne vide si tous les livreurs rentrent à l'heure
+     */
+    String obtenirAvertissementRetour() {
+        Map<Integer, Tournee> tournees = programme.obtenirTournees();
+        List<String> retards = tournees.entrySet().stream()
+                .filter(entree -> !entree.getValue().estPossible())
+                .sorted(Map.Entry.comparingByKey())
+                .map(entree -> tournees.size() > 1
+                        ? "livreur " + entree.getKey() + " à "
+                                + entree.getValue().obtenirHeureRetour()
+                        : entree.getValue().obtenirHeureRetour().toString())
+                .toList();
+        if (retards.isEmpty()) {
+            return "";
+        }
+        return (tournees.size() > 1 ? CONSIGNE_RETOURS_APRES_LIMITE
+                : CONSIGNE_RETOUR_APRES_LIMITE)
+                .formatted(String.join(", ", retards));
     }
 
     /**
@@ -967,16 +1003,15 @@ public final class MainController {
 
     /**
      * Fin du changement d'ordre, sur le thread de l'interface. S'il est refusé
-     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou retour à
-     * l'entrepôt rendu impossible après 13 h), l'écran affiche la raison et
-     * rien n'est modifié, pas même l'historique. Sinon la commande range, à la
-     * place des tournées d'avant, les mêmes avec la nouvelle tournée du
-     * livreur, et l'arrêt déplacé reste sélectionné.
+     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou tournée qui
+     * dépasse minuit), l'écran affiche la raison et rien n'est modifié, pas
+     * même l'historique. Sinon la commande range, à la place des tournées
+     * d'avant, les mêmes avec la nouvelle tournée du livreur, et l'arrêt
+     * déplacé reste sélectionné.
      *
      * <p>
-     * Un changement qui ne fait que garder une tournée déjà en retard est
-     * accepté : seul un changement qui rend possible une tournée impossible est
-     * refusé.
+     * Un retour après 13 h n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param livreur     numéro du livreur de la tournée
      * @param avant       tournées d'avant le changement
@@ -990,17 +1025,9 @@ public final class MainController {
             Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
             RuntimeException echec) {
         ecran.afficherAttente(false);
-        RuntimeException refus = echec;
-        if (refus == null && !apres.estPossible()
-                && avant.get(livreur).estPossible()) {
-            refus = new IllegalStateException("Changement d'ordre refusé : le "
-                    + "retour à l'entrepôt serait à "
-                    + apres.obtenirHeureRetour() + ", après "
-                    + Plan.HEURE_LIMITE_RETOUR + ".");
-        }
-        if (refus != null) {
+        if (echec != null) {
             changerEtat(new EtatTourneeCalculee());
-            signalerRefus(refus, ecran::afficherRefusOrdre,
+            signalerRefus(echec, ecran::afficherRefusOrdre,
                     "du changement d'ordre");
             return;
         }
@@ -1016,7 +1043,7 @@ public final class MainController {
 
     /**
      * Distingue les refus d'une modification de la tournée : une raison
-     * attendue (par exemple contrainte d'ordre, retour après 13 h) est
+     * attendue (par exemple contrainte d'ordre, tournée qui dépasse minuit) est
      * expliquée à l'utilisateur ; une erreur inattendue est signalée et
      * journalisée, au lieu de laisser les actions bloquées.
      *
@@ -1106,12 +1133,13 @@ public final class MainController {
 
     /**
      * Fin du déplacement, sur le thread de l'interface. S'il est refusé
-     * (adresse inaccessible, ou retour à l'entrepôt rendu impossible après
-     * 13 h), l'écran affiche la raison et rien n'est modifié, pas même
-     * l'historique. Sinon la commande remplace la demande par celle dont le
-     * point a changé de nœud, range à la place des tournées d'avant les mêmes
-     * avec la nouvelle tournée du livreur, et l'arrêt déplacé reste
-     * sélectionné.
+     * (adresse inaccessible, ou tournée qui dépasse minuit), l'écran affiche
+     * la raison et rien n'est modifié, pas même l'historique. Sinon la
+     * commande remplace la demande par celle dont le point a changé de nœud,
+     * range à la place des tournées d'avant les mêmes avec la nouvelle tournée
+     * du livreur, et l'arrêt déplacé reste sélectionné. Un retour après 13 h
+     * n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param livreur  numéro du livreur de la tournée
      * @param rang     rang de l'arrêt déplacé dans la tournée de ce livreur
@@ -1125,16 +1153,9 @@ public final class MainController {
             Map<Integer, Tournee> avant, Tournee apres,
             RuntimeException echec) {
         ecran.afficherAttente(false);
-        RuntimeException refus = echec;
-        if (refus == null && !apres.estPossible()
-                && avant.get(livreur).estPossible()) {
-            refus = new IllegalStateException("Déplacement refusé : le retour "
-                    + "à l'entrepôt serait à " + apres.obtenirHeureRetour()
-                    + ", après " + Plan.HEURE_LIMITE_RETOUR + ".");
-        }
-        if (refus != null) {
+        if (echec != null) {
             retrouverEtatProgramme();
-            signalerRefus(refus, ecran::afficherRefusDeplacement,
+            signalerRefus(echec, ecran::afficherRefusDeplacement,
                     "du déplacement d'un point");
             return;
         }

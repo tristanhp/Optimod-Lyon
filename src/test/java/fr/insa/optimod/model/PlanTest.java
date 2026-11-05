@@ -673,15 +673,66 @@ public class PlanTest {
         assertEquals(4, apres.arrets().size());
     }
 
-    /** Une insertion impossible laisse la tournée d'origine intacte. */
-    @Test(expected = IllegalStateException.class)
-    public void insertionImpossible() throws Exception {
+    /**
+     * Une insertion qui fait rentrer après 13 h n'est pas refusée : la tournée
+     * est renvoyée, signalée par {@code estPossible()}, et celle d'origine
+     * reste intacte. C'est à l'appelant de prévenir l'utilisateur.
+     */
+    @Test
+    public void insertionApres13hRenvoyeeEtSignalee() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         Noeud entrepot = plan.obtenirNoeud(1);
         Tournee avant = tourneeImposee(plan, LocalTime.of(12, 59),
                 List.of(entrepot), List.of(0));
-        plan.insererDemande(avant, new Demande(plan.obtenirNoeud(3),
-                plan.obtenirNoeud(2), 60, 60), 1);
+        Tournee apres = plan.insererDemande(avant,
+                new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60,
+                        60), 1);
+        assertEquals(4, apres.arrets().size());
+        assertFalse(apres.estPossible());
+        assertTrue(apres.obtenirHeureRetour()
+                .isAfter(Plan.HEURE_LIMITE_RETOUR));
+        assertEquals(1, avant.arrets().size());
+    }
+
+    /**
+     * Une tournée qui rentre déjà après 13 h reçoit elle aussi la demande :
+     * le retour est plus tardif, et les anciens arrêts gardent leur plage
+     * annoncée.
+     */
+    @Test
+    public void insertionDansUneTourneeDejaApres13hRenvoyee()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeDeTroisArretsAu(plan, LocalTime.of(12, 59));
+        assertFalse(avant.estPossible());
+        Tournee apres = plan.insererDemande(avant,
+                demandeDuPetitReseau(plan), 1);
+        assertEquals(avant.arrets().size() + 2, apres.arrets().size());
+        assertFalse(apres.estPossible());
+        assertTrue(apres.obtenirHeureRetour()
+                .isAfter(avant.obtenirHeureRetour()));
+        Tournee.Arret retourAvant = avant.arrets().get(
+                avant.arrets().size() - 1);
+        Tournee.Arret retourApres = apres.arrets().get(
+                apres.arrets().size() - 1);
+        assertEquals(retourAvant.debutPlage(), retourApres.debutPlage());
+        assertEquals(retourAvant.finPlage(), retourApres.finPlage());
+    }
+
+    /**
+     * Minuit reste un refus : une insertion qui ferait déborder la journée est
+     * refusée, car les heures sont des {@code LocalTime}.
+     */
+    @Test
+    public void insertionQuiDepasseMinuitRefusee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeVideA(plan, LocalTime.of(23, 59));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.insererDemande(avant, new Demande(
+                        plan.obtenirNoeud(3), plan.obtenirNoeud(2), 300, 300),
+                        1));
+        assertTrue(erreur.getMessage().contains("minuit"));
     }
 
     /** Une durée d'une journée ne doit pas être ramenée à zéro à minuit. */
@@ -882,6 +933,22 @@ public class PlanTest {
                 2, tourneeVideA(plan, LocalTime.of(12, 59)));
         assertTrue(plan.trouverLivreursPossibles(tournees,
                 demandeDuPetitReseau(plan)).isEmpty());
+    }
+
+    /**
+     * La demande ferait déborder la journée chez tous les livreurs : la liste
+     * est vide, sans exception (minuit n'est pas 13 h, aucun livreur ne peut
+     * la prendre).
+     */
+    @Test
+    public void livreursPossiblesVideSiToutDepasseMinuit() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(23, 59)),
+                2, tourneeVideA(plan, LocalTime.of(23, 59)));
+        assertTrue(plan.trouverLivreursPossibles(tournees, new Demande(
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2), 300, 300))
+                .isEmpty());
     }
 
     /**
@@ -1722,12 +1789,8 @@ public class PlanTest {
             boolean uneFaisable = false;
             for (int position = 1; position < tournee.arrets().size();
                     position++) {
-                try {
-                    uneFaisable |= plan.insererDemande(tournee, demande,
-                            position).estPossible();
-                } catch (IllegalStateException refus) {
-                    continue;
-                }
+                uneFaisable |= plan.insererDemande(tournee, demande,
+                        position).estPossible();
             }
             assertEquals("départ " + depart, uneFaisable,
                     !plan.trouverLivreursPossibles(Map.of(1, tournee),
@@ -1737,10 +1800,11 @@ public class PlanTest {
 
     /**
      * Le livreur est proposé parce que la position de moindre coût
-     * rentre à 13 h, mais une autre position est refusée.
+     * rentre à 13 h, mais une autre position le fait rentrer après 13 h :
+     * la tournée est renvoyée, signalée impossible.
      */
     @Test
-    public void livreurPossibleMaisAutrePositionRefusee()
+    public void livreurPossibleMaisAutrePositionApres13h()
             throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         Demande demande = new Demande(plan.obtenirNoeud(1),
@@ -1766,8 +1830,7 @@ public class PlanTest {
                 .plusSeconds(marge));
         assertEquals(List.of(1), plan.trouverLivreursPossibles(
                 Map.of(1, tournee), demande));
-        int positionRefusee = pire;
-        assertThrows(IllegalStateException.class,
-                () -> plan.insererDemande(tournee, demande, positionRefusee));
+        assertFalse(plan.insererDemande(tournee, demande, pire)
+                .estPossible());
     }
 }

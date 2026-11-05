@@ -9,11 +9,12 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * programme. Les actions sont celles de {@link EtatProgrammeCharge} :
  * recalculer (après confirmation), importer, modifier les demandes, régler
  * le nombre de livreurs (un livreur ajouté a une tournée vide), annuler ou
- * rétablir. Ajouter une demande retire les tournées ; en supprimer une met à
- * jour celle de son livreur (recalcul local). On peut en plus changer
- * l'ordre des arrêts d'un livreur (« Monter », « Descendre »), déplacer un
- * point de collecte ou de livraison (« Déplacer ») et sauvegarder les
- * tournées.
+ * rétablir. Ajouter ou supprimer une demande met à jour la tournée de son
+ * livreur (recalcul local). On peut en plus changer l'ordre des arrêts d'un
+ * livreur (« Monter », « Descendre »), déplacer un point de collecte ou de
+ * livraison (« Déplacer »), changer le livreur d'une demande et sauvegarder
+ * les tournées. Un livreur qui rentre après 13 h n'est pas bloqué : la
+ * consigne le signale.
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
@@ -25,12 +26,14 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
     /**
      * Garde la consigne « ordre non optimisé » tant que les tournées affichées
      * viennent d'une modification faite à la main, même après un refus,
-     * Annuler ou Rétablir.
+     * Annuler ou Rétablir. Y ajoute l'avertissement « retour après 13 h » des
+     * tournées affichées, s'il y en a.
      */
     @Override
     public String consigne(MainController controleur) {
         String ordreGarde = controleur.obtenirConsigneOrdreGarde();
-        return ordreGarde.isEmpty() ? CONSIGNE : ordreGarde;
+        return (ordreGarde.isEmpty() ? CONSIGNE : ordreGarde)
+                + controleur.obtenirAvertissementRetour();
     }
 
     /**

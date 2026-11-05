@@ -272,32 +272,44 @@ public interface MapScreen {
 
     /**
      * Explique à l'utilisateur pourquoi le changement de livreur est refusé
-     * (adresse inaccessible, retour après 13 h) ; les demandes et les tournées
-     * n'ont pas changé.
+     * (adresse inaccessible, tournée qui dépasse minuit) ; les demandes et les
+     * tournées n'ont pas changé. Un retour après 13 h n'est pas un refus : il
+     * est signalé par la consigne.
      *
      * @param detail explication du refus
      */
     void afficherRefusChangementLivreur(String detail);
 
     /**
-     * Propose à l'administrateur les livreurs qui peuvent prendre une demande
-     * dont l'ajout est refusé chez son livreur (retour après 13 h). La liste
-     * peut contenir le livreur de la demande : une autre position chez lui
-     * peut suffire. Le livreur choisi, la position est ensuite demandée par
+     * Valeur renvoyée par {@link #choisirLivreurPossible} quand
+     * l'administrateur garde le livreur choisi malgré le retour après 13 h.
+     * Les vrais livreurs commencent à 1.
+     */
+    int GARDER_LIVREUR = 0;
+
+    /**
+     * Prévient l'administrateur que l'ajout d'une demande ferait rentrer son
+     * livreur après 13 h, et lui propose les livreurs qui peuvent la prendre
+     * avant 13 h. La liste peut contenir le livreur de la demande : une autre
+     * position chez lui peut suffire. Elle peut être vide. Il peut aussi garder
+     * le livreur malgré le retard ({@link #GARDER_LIVREUR}) ou annuler l'ajout.
+     * Un livreur choisi, la position est ensuite demandée par
      * {@link #choisirPositionInsertion}.
      *
-     * @param livreurRefuse numéro du livreur chez qui l'ajout est refusé
-     * @param livreurs numéros des livreurs possibles, jamais vide
-     * @param detail explication du refus
-     * @return numéro du livreur choisi, ou vide après annulation de l'ajout
+     * @param livreur numéro du livreur qui rentrerait après 13 h
+     * @param livreurs numéros des livreurs qui rentrent avant 13 h, la liste
+     *        pouvant être vide
+     * @param detail heure de retour prévue, à montrer à l'utilisateur
+     * @return numéro du livreur choisi, {@link #GARDER_LIVREUR}, ou vide après
+     *         annulation de l'ajout
      */
-    Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+    Optional<Integer> choisirLivreurPossible(int livreur,
             List<Integer> livreurs, String detail);
 
     /**
      * Explique à l'utilisateur pourquoi l'ajout d'une demande est refusé
-     * (aucun livreur ne peut la prendre, adresse inaccessible, position
-     * invalide) ; les demandes et les tournées n'ont pas changé.
+     * (adresse inaccessible, position invalide, tournée qui dépasse minuit) ;
+     * les demandes et les tournées n'ont pas changé.
      *
      * @param detail explication du refus
      */

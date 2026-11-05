@@ -147,7 +147,8 @@ package "controller" {
     +choisirPositionInsertion(tournee) : Optional<Integer>
     +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
     +afficherRefusChangementLivreur(detail)
-    +choisirLivreurPossible(livreurRefuse, livreurs, detail) : Optional<Integer>
+    +{static} GARDER_LIVREUR : int = 0
+    +choisirLivreurPossible(livreur, livreurs, detail) : Optional<Integer>
     +afficherRefusAjout(detail)
     +definirActionNombreLivreurs(action)
     +afficherNombreLivreurs(nombre : int)

@@ -30,7 +30,7 @@ alt insertion possible
   ListeDeCommandes -> ProgrammeLivraisons : remplacerDemandeEtTournees
   ProgrammeLivraisons -> MainView : notifierObservateurs (une seule fois)
   MainController -> MainView : afficherConsigne (ordre non optimisé, deux livreurs)
-else adresse inaccessible ou retour après 13 h
+else adresse inaccessible ou tournée qui dépasse minuit
   Plan --> MainController : IllegalStateException
   MainController -> MainView : afficherRefusChangementLivreur, rien n'est modifié
 end
