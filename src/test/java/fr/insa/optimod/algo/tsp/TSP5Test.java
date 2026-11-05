@@ -16,8 +16,14 @@ import fr.insa.optimod.algo.tsp.TSP.ResultatCalculTSP;
 /** Tests du voyageur de commerce {@link TSP5} sous une limite de temps. */
 public class TSP5Test {
 
-    /** Nombre de sommets : l'entrepôt et huit couples collecte-livraison. */
-    private static final int NB_SOMMETS = 17;
+    /** Nombre de sommets : l'entrepôt et 25 couples collecte-livraison. */
+    private static final int NB_SOMMETS = 51;
+
+    /**
+     * Limite de temps en millisecondes : trop courte pour examiner toutes les
+     * solutions de 51 sommets, assez longue pour en trouver une.
+     */
+    private static final int LIMITE_MS = 100;
 
     /** Graphe de coûts tirés au hasard (graine fixe), collecte avant livraison. */
     private static GrapheDepandance graphe() {
@@ -43,19 +49,19 @@ public class TSP5Test {
      */
     @Test
     public void limiteTresCourteRenvoieUneTourneeValideNonProuvee() {
+        GrapheDepandance graphe = graphe();
         TSP5 tsp = new TSP5();
-        ResultatCalculTSP resultat = tsp.chercherSolution(1, graphe());
+        ResultatCalculTSP resultat = tsp.chercherSolution(LIMITE_MS, graphe);
         assertEquals(ResultatCalculTSP.CALCUL_TROP_LONG, resultat);
 
         Set<Integer> vus = new HashSet<>();
         for (int rang = 0; rang < NB_SOMMETS; rang++) {
             Integer sommet = tsp.obtenirSommetSolution(rang);
             assertNotNull(sommet);
-            if (sommet != 0 && sommet % 2 == 0) {
-                assertTrue("collecte avant livraison",
-                        vus.contains(sommet - 1));
-            }
-            assertTrue("sommet visité une seule fois", vus.add(sommet));
+            int dependance = graphe.getDepandance(sommet);
+            assertTrue("livraison avant collecte",
+                    dependance == -1 || vus.contains(dependance));
+            assertTrue("un sommet est visité plusieurs fois", vus.add(sommet));
         }
         assertEquals(NB_SOMMETS, vus.size());
     }

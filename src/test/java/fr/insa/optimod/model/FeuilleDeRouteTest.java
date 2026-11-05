@@ -146,7 +146,7 @@ public class FeuilleDeRouteTest {
     public void tourneeCalculeeSurLePetitPlan() throws Exception {
         Plan petit = PlansPourTests.petitPlan();
         ProgrammeLivraisons programme = new ProgrammeLivraisons(
-                getClass().getResource("/data/demandePetit2.xml").getPath(),
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
                 petit);
         Tournee tournee = petit.calculerTournees(programme).get(1);
         String html = FeuilleDeRoute.generer(petit, 1, tournee);
