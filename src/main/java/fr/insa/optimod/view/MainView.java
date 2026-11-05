@@ -23,6 +23,7 @@ import fr.insa.optimod.model.Tournee;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
@@ -298,8 +299,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setTooltip(new Tooltip("Choisissez le fichier "
                 + "XML du programme de livraisons (les demandes de collecte "
                 + "et de livraison). Il faut d'abord importer un plan."));
-        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée du "
-                + "programme de livraisons chargé."));
+        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée de chaque "
+                + "livreur. Une fois calculées, les tournées ne sont "
+                + "recalculées qu'après votre confirmation."));
         champLivreurs.setTooltip(new Tooltip("Nombre de livreurs de la "
                 + "journée (1 par défaut). Les flèches ajoutent ou retirent "
                 + "un livreur ; on ne retire que le dernier, et seulement "
@@ -458,6 +460,21 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 .setText("Annuler");
         dialogue.initOwner(getScene().getWindow());
         return dialogue.showAndWait();
+    }
+
+    @Override
+    public boolean confirmerRecalcul() {
+        ButtonType oui = new ButtonType("Oui", ButtonBar.ButtonData.YES);
+        // Non est le bouton d'annulation : Échap et la croix valent un refus.
+        ButtonType non = new ButtonType("Non",
+                ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "Les modifications manuelles et les plages horaires annoncées "
+                        + "seront perdues. Continuer ?", oui, non);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Recalculer les tournées");
+        alert.initOwner(getScene().getWindow());
+        return alert.showAndWait().filter(oui::equals).isPresent();
     }
 
     @Override
@@ -841,6 +858,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void dessinerTournees() {
         Map<Integer, Tournee> tournees = programmeObserve == null ? Map.of()
                 : programmeObserve.obtenirTournees();
+        boutonCalculer.setText(tournees.isEmpty() ? "Calculer" : "Recalculer");
         if (tournees.isEmpty()) {
             effacerListeTournee();
             return;

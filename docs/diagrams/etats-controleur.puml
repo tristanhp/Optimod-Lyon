@@ -9,7 +9,7 @@ EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatProgrammeCharge : Restaurer, champ Livreurs
 EtatCalculEnCours : boutons : aucun
-EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
+EtatTourneeCalculee : boutons : comme EtatProgrammeCharge (Calculer affiche Recalculer)
 EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
 EtatTourneeCalculee : + Changer de livreur [plusieurs livreurs]
 EtatRestauration : boutons : aucun
@@ -24,8 +24,9 @@ EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
 EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
-EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
-EtatTourneeCalculee --> EtatCalculEnCours : calculer
+EtatCalculEnCours --> choix : finirCalcul [erreur]
+EtatTourneeCalculee --> EtatCalculEnCours : calculer [confirmerRecalcul]
+EtatTourneeCalculee --> EtatTourneeCalculee : calculer [refusé] / rien ne change
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 

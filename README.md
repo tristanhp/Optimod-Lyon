@@ -243,9 +243,13 @@ déjà après 13 h accepte une demande de plus, sans proposition.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
-Annuler reste disponible. Le bouton Calculer fixe de
-nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
-calcul volontaire. Le support multi-livreurs reste à intégrer.
+Annuler reste disponible. Une fois les tournées calculées, le bouton *Calculer*
+devient *Recalculer* : il n'est jamais lancé automatiquement et demande une
+confirmation, car les modifications manuelles et les plages annoncées seront
+perdues. *Oui* relance le TSP pour chaque livreur et fixe de nouvelles plages ;
+*Non* ne change rien. Annuler n'annule pas ce recalcul : il défait la dernière
+modification du programme. La suppression retire encore la tournée jusqu'au
+prochain calcul volontaire. Le support multi-livreurs reste à intégrer.
 
 Une fois la tournée calculée, elle est tracée sur la carte : le trait est clair
 au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de

@@ -59,6 +59,15 @@ public interface MapScreen {
     Optional<SaisieDemande> saisirDemande();
 
     /**
+     * Fait confirmer un nouveau calcul complet des tournées déjà calculées :
+     * les modifications manuelles et les plages annoncées seront perdues.
+     *
+     * @return vrai si l'administrateur accepte, faux s'il refuse ou ferme la
+     *         fenêtre
+     */
+    boolean confirmerRecalcul();
+
+    /**
      * Affiche les points choisis avant validation de la demande.
      *
      * @param collecte  point de collecte, ou null pour effacer l'aperçu
