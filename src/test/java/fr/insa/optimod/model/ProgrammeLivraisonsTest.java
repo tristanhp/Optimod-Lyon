@@ -93,10 +93,10 @@ public class ProgrammeLivraisonsTest {
     /** Les six fichiers de demandes fournis se lisent sur leur plan. */
     @Test
     public void fichiersFournis() throws Exception {
-        String[][] jeux = {{"Petit1", "petitPlan"}, {"Petit2", "petitPlan"},
-            {"Moyen3", "moyenPlan"}, {"Moyen5", "moyenPlan"},
-            {"Grand7", "grandPlan"}, {"Grand9", "grandPlan"}};
-        int[] tailles = {1, 2, 3, 5, 7, 9};
+        String[][] jeux = { { "Petit1", "petitPlan" }, { "Petit2", "petitPlan" },
+                { "Moyen3", "moyenPlan" }, { "Moyen5", "moyenPlan" },
+                { "Grand7", "grandPlan" }, { "Grand9", "grandPlan" } };
+        int[] tailles = { 1, 2, 3, 5, 7, 9 };
         for (int indice = 0; indice < jeux.length; indice++) {
             Plan plan;
             try (InputStream xml = getClass().getResourceAsStream(
@@ -124,7 +124,7 @@ public class ProgrammeLivraisonsTest {
                 ProgrammeLivraisons.lireHeure("08:00"));
         assertEquals(LocalTime.of(8, 0, 30),
                 ProgrammeLivraisons.lireHeure("08:00:30"));
-        for (String invalide : new String[] {"8", "25:00", "8:x", "1:2:3:4"}) {
+        for (String invalide : new String[] { "8", "25:00", "8:x", "1:2:3:4" }) {
             assertThrows(invalide, SAXException.class,
                     () -> ProgrammeLivraisons.lireHeure(invalide));
         }
@@ -135,24 +135,24 @@ public class ProgrammeLivraisonsTest {
     public void xmlInvalidesRefuses() {
         String depot = "<entrepot adresse='342873658' heureDepart='8:0:0'/>";
         String[] invalides = {
-            "<demandeDeLivraisons>",
-            "<reseau/>",
-            "<demandeDeLivraisons/>",
-            "<demandeDeLivraisons>" + depot + depot + "</demandeDeLivraisons>",
-            "<demandeDeLivraisons><entrepot adresse='342873658'/>"
-                    + "</demandeDeLivraisons>",
-            "<demandeDeLivraisons><entrepot adresse='99'"
-                    + " heureDepart='8:0:0'/></demandeDeLivraisons>",
-            "<demandeDeLivraisons>" + depot
-                    + "<livraison adresseEnlevement='abc'/>"
-                    + "</demandeDeLivraisons>",
-            "<demandeDeLivraisons>" + depot
-                    + "<livraison adresseEnlevement='208769039'"
-                    + " adresseLivraison='25173820' dureeEnlevement='-1'"
-                    + " dureeLivraison='0'/></demandeDeLivraisons>",
-            "<!DOCTYPE demandeDeLivraisons [<!ENTITY heure '8:0:0'>]>"
-                    + "<demandeDeLivraisons>" + depot
-                    + "</demandeDeLivraisons>"
+                "<demandeDeLivraisons>",
+                "<reseau/>",
+                "<demandeDeLivraisons/>",
+                "<demandeDeLivraisons>" + depot + depot + "</demandeDeLivraisons>",
+                "<demandeDeLivraisons><entrepot adresse='342873658'/>"
+                        + "</demandeDeLivraisons>",
+                "<demandeDeLivraisons><entrepot adresse='99'"
+                        + " heureDepart='8:0:0'/></demandeDeLivraisons>",
+                "<demandeDeLivraisons>" + depot
+                        + "<livraison adresseEnlevement='abc'/>"
+                        + "</demandeDeLivraisons>",
+                "<demandeDeLivraisons>" + depot
+                        + "<livraison adresseEnlevement='208769039'"
+                        + " adresseLivraison='25173820' dureeEnlevement='-1'"
+                        + " dureeLivraison='0'/></demandeDeLivraisons>",
+                "<!DOCTYPE demandeDeLivraisons [<!ENTITY heure '8:0:0'>]>"
+                        + "<demandeDeLivraisons>" + depot
+                        + "</demandeDeLivraisons>"
         };
         for (String xml : invalides) {
             assertThrows(xml, SAXException.class, () -> lire(xml, petitPlan));
@@ -164,7 +164,8 @@ public class ProgrammeLivraisonsTest {
     public void adresseHorsPlanSignalee() {
         SAXException erreur = assertThrows(SAXException.class, () -> lire(
                 "<demandeDeLivraisons><entrepot adresse='99'"
-                + " heureDepart='8:0:0'/></demandeDeLivraisons>", petitPlan));
+                        + " heureDepart='8:0:0'/></demandeDeLivraisons>",
+                petitPlan));
         assertTrue(erreur.getMessage().contains("99"));
     }
 

@@ -30,8 +30,7 @@ class EtatProgrammeCharge implements Etat {
 
     @Override
     public void supprimerDemande(MainController controleur, int position) {
-        if (position >= 0 && position
-                < controleur.obtenirProgramme().obtenirDemandes().size()) {
+        if (position >= 0 && position < controleur.obtenirProgramme().obtenirDemandes().size()) {
             controleur.executer(new CommandeSupprimerDemande(
                     controleur.obtenirProgramme(), position));
         }

@@ -23,6 +23,7 @@ final class EtatAjoutLivraison implements Etat {
 
     /**
      * Mémorise le point de collecte choisi.
+     * 
      * @param idCollecte noeud de collecte choisi
      */
     EtatAjoutLivraison(long idCollecte) {

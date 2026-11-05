@@ -5,7 +5,8 @@ import javafx.application.Application;
 /**
  * Point d'entrée de l'interface graphique.
  *
- * <p>JavaFX refuse de démarrer quand la classe principale hérite de
+ * <p>
+ * JavaFX refuse de démarrer quand la classe principale hérite de
  * {@link Application} et que ses bibliothèques sont sur le classpath ; cette
  * classe intermédiaire contourne le problème (VS Code, jar exécutable).
  */

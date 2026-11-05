@@ -30,12 +30,12 @@ final class CommandeChangerLivreur implements Commande {
     private Map<Integer, Tournee> tourneesApres;
 
     /**
-     * @param programme demandes à modifier
-     * @param position rang de la demande dont le livreur change
-     * @param apres la demande confiée à son nouveau livreur
+     * @param programme     demandes à modifier
+     * @param position      rang de la demande dont le livreur change
+     * @param apres         la demande confiée à son nouveau livreur
      * @param tourneesAvant tournées par numéro de livreur avant le changement
      * @param tourneesApres les mêmes, avec les tournées recalculées de
-     *        l'ancien et du nouveau livreur
+     *                      l'ancien et du nouveau livreur
      */
     CommandeChangerLivreur(ProgrammeLivraisons programme, int position,
             Demande apres, Map<Integer, Tournee> tourneesAvant,

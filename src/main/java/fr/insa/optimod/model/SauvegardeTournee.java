@@ -25,10 +25,10 @@ import fr.insa.optimod.model.Tournee.TypeArret;
  * Sauvegarde XML version 1 pour le modèle actuel à un livreur.
  * Le plan est référencé, les demandes et l'ordre sont conservés.
  *
- * @param plan plan rechargé
+ * @param plan        plan rechargé
  * @param fichierPlan fichier du plan
- * @param programme programme restauré
- * @param tournee tournée recalculée sans TSP
+ * @param programme   programme restauré
+ * @param tournee     tournée recalculée sans TSP
  */
 public record SauvegardeTournee(Plan plan, Path fichierPlan,
         ProgrammeLivraisons programme, Tournee tournee) {
@@ -36,11 +36,11 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
     /**
      * Écrit une sauvegarde sans recopier le plan.
      *
-     * @param fichier destination XML
+     * @param fichier     destination XML
      * @param fichierPlan référence du plan
-     * @param programme programme courant, dont les tournées sont calculées
+     * @param programme   programme courant, dont les tournées sont calculées
      * @throws IOException si l'écriture échoue, ou si le programme a plusieurs
-     *         livreurs (le format ne gère qu'un livreur)
+     *                     livreurs (le format ne gère qu'un livreur)
      */
     public static void sauvegarder(Path fichier, Path fichierPlan,
             ProgrammeLivraisons programme) throws IOException {
@@ -142,7 +142,8 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                         + "et y revenir.");
             }
             int nombreAttendu = demandes.isEmpty()
-                    ? 1 : 2 * demandes.size() + 2;
+                    ? 1
+                    : 2 * demandes.size() + 2;
             List<TypeArret> types = new ArrayList<>();
             List<Demande> servies = new ArrayList<>();
             types.add(TypeArret.ENTREPOT);

@@ -31,7 +31,7 @@ public class MainTest {
     @Test
     public void versionOptionDoesNotLaunchGui() {
         assertFalse(Main.doitOuvrirInterface(
-                new String[] {Main.OPTION_VERSION}));
+                new String[] { Main.OPTION_VERSION }));
     }
 
     /** Avec --version, le démarrage affiche seulement le message. */
@@ -41,7 +41,7 @@ public class MainTest {
         ByteArrayOutputStream captured = new ByteArrayOutputStream();
         System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
         try {
-            Main.main(new String[] {Main.OPTION_VERSION});
+            Main.main(new String[] { Main.OPTION_VERSION });
         } finally {
             System.setOut(originalOut);
         }

@@ -39,7 +39,8 @@ public class CommandeChangerOrdreTest {
                 new Tournee.Arret(noeud(2), depart, depart,
                         TypeArret.LIVRAISON, demande),
                 new Tournee.Arret(noeud(0), retour, retour,
-                        TypeArret.ENTREPOT, null)), List.of());
+                        TypeArret.ENTREPOT, null)),
+                List.of());
     }
 
     private final Map<Integer, Tournee> avant = Map.of(1,

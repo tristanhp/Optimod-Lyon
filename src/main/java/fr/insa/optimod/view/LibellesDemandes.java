@@ -13,7 +13,7 @@ final class LibellesDemandes {
     /**
      * Décrit une demande pour la liste : son numéro et les durées de service.
      *
-     * @param rang numéro de la demande, à partir de 1
+     * @param rang    numéro de la demande, à partir de 1
      * @param demande demande à décrire
      * @return texte de la ligne
      */

@@ -112,7 +112,7 @@ public class CommandeChangerLivreurTest {
     public void lesObservateursNeVoientAucunEtatIntermediaire() {
         programme.definirTournees(avant);
         List<String> incoherences = new ArrayList<>();
-        int[] notifications = {0};
+        int[] notifications = { 0 };
         programme.ajouterObservateur(source -> {
             notifications[0]++;
             Demande courante = programme.obtenirDemandes().get(1);
