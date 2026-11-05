@@ -135,7 +135,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      *                    départ
      *                    de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
-     * @param style style de l'arrêt, rouge en cas d'alerte
+     * @param style       style de l'arrêt, rouge en cas d'alerte
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
             String style) {
@@ -200,10 +200,24 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                String style = !vide && getIndex() >= 0
-                        && getIndex() < lignesTournee.size()
-                        ? lignesTournee.get(getIndex()).style() : "";
-                setStyle(style);
+
+                if (vide || getIndex() < 0
+                        || getIndex() >= lignesTournee.size()) {
+                    setStyle("");
+                    setGraphic(null);
+                    return;
+                }
+
+                LigneTournee ligne = lignesTournee.get(getIndex());
+
+                if (ligne.rang() == -1) {
+                    setGraphic(new Rectangle(10, 10,
+                            MapCanvas.couleurLivreur(ligne.livreur() - 1)));
+                    setStyle("-fx-font-weight: bold;");
+                } else {
+                    setGraphic(null);
+                    setStyle(ligne.style());
+                }
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -681,7 +695,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void actualiserMessage() {
         message.setText(texteConfirmation.isEmpty() ? texteHorsPlage
                 : texteHorsPlage.isEmpty() ? texteConfirmation
-                : texteConfirmation + " " + texteHorsPlage);
+                        : texteConfirmation + " " + texteHorsPlage);
     }
 
     @Override
@@ -929,17 +943,26 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         lignesTournee.clear();
         for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
             int livreur = entree.getKey();
-            int dernierRang = entree.getValue().arrets().size() - 1;
+            Tournee tournee = entree.getValue();
+            int dernierRang = tournee.arrets().size() - 1;
+
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
-                lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
-                        ""));
+                lignesTournee.add(new LigneTournee(livreur, -1,
+                        dernierRang, ""));
             }
-            int rang = 0;
-            for (Tournee.Arret arret : entree.getValue().arrets()) {
-                listeTournee.getItems().add(decrireArret(arret));
-                lignesTournee.add(new LigneTournee(livreur, rang++,
-                        dernierRang, LibellesArrets.style(arret)));
+
+            if (tournee.arrets().size() <= 2) {
+                listeTournee.getItems().add("aucune demande");
+                lignesTournee.add(new LigneTournee(livreur, -2,
+                        dernierRang, ""));
+            } else {
+                int rang = 0;
+                for (Tournee.Arret arret : tournee.arrets()) {
+                    listeTournee.getItems().add(decrireArret(arret));
+                    lignesTournee.add(new LigneTournee(livreur, rang++,
+                            dernierRang, LibellesArrets.style(arret)));
+                }
             }
         }
         listeTournee.refresh();

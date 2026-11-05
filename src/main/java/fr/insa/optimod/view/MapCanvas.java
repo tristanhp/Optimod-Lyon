@@ -74,6 +74,33 @@ final class MapCanvas extends Pane {
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
 
+    /** Nombre de teintes réservées aux livreurs (le rouge d'alerte exclu). */
+    private static final double PLAGE_TEINTES = 310;
+
+    /** Première teinte des livreurs, en degrés : loin du rouge d'alerte. */
+    private static final double TEINTE_MINIMALE = 25;
+
+    /** Pas de teinte entre deux livreurs voisins (angle d'or, en degrés). */
+    private static final double PAS_TEINTE = 137.508;
+
+    /** Part de blanc mêlée à la couleur d'un livreur au départ (0 à 1). */
+    private static final double PART_BLANC_DEBUT = 0.6;
+
+    /**
+     * Renvoie la couleur attribuée à un livreur. Les teintes se suivent
+     * par l'angle d'or, donc deux livreurs voisins se distinguent, et
+     * aucune n'approche le rouge des arrêts après 13 h.
+     *
+     * @param index numéro du livreur, à partir de 0
+     * @return couleur de la tournée
+     */
+    static Color couleurLivreur(int index) {
+        double teinte = TEINTE_MINIMALE
+                + Math.floorMod((long) Math.round(index * PAS_TEINTE * 1000),
+                        (long) (PLAGE_TEINTES * 1000)) / 1000.0;
+        return Color.hsb(teinte, 0.75, 0.75);
+    }
+
     private static final Color COULEUR_CONTOUR_EVIDENCE = Color.BLACK;
 
     /** Zoom maximal (1 = plan entier visible). */
@@ -105,10 +132,10 @@ final class MapCanvas extends Pane {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
     }
 
-    /** Couleur de la tournée au départ de l'entrepôt (clair). */
+    /** Couleur de la légende au départ de l'entrepôt (clair). */
     private static final Color COULEUR_DEBUT_TOURNEE = Color.web("#8ab4f8");
 
-    /** Couleur de la tournée au retour à l'entrepôt (foncé). */
+    /** Couleur de la légende au retour à l'entrepôt (foncé). */
     private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
 
     /** Fond du numéro d'un arrêt dont l'arrivée dépasse 13 h (rouge). */
@@ -591,14 +618,20 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Trace les tronçons de chaque chemin d'un trait épais, du plus clair (au
-     * départ) au plus foncé (au retour), avec une flèche au milieu de chaque
-     * tronçon pour montrer le sens de parcours. Un tronçon parcouru plusieurs
-     * fois est tracé en traits parallèles et porte « ×N ».
+     * Trace les tronçons de chaque chemin d'un trait épais, dans la couleur
+     * du livreur, du plus clair (au départ) au plus foncé (au retour), avec
+     * une flèche au milieu de chaque tronçon pour montrer le sens de
+     * parcours. Un tronçon parcouru plusieurs fois est tracé en traits
+     * parallèles et porte « ×N ».
      */
     private void dessinerTournees(GraphicsContext contexte) {
         contexte.setLineCap(StrokeLineCap.ROUND);
-        for (Tournee tournee : tournees.values()) {
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            int numeroLivreur = entree.getKey();
+            Tournee tournee = entree.getValue();
+            Color couleur = couleurLivreur(numeroLivreur - 1);
+            Color debut = couleur.interpolate(Color.WHITE, PART_BLANC_DEBUT);
+            Color fin = couleur.darker();
             int total = tournee.chemins().stream()
                     .mapToInt(chemin -> chemin.troncons().size()).sum();
             int fait = 0;
@@ -616,8 +649,7 @@ final class MapCanvas extends Pane {
                     int nombre = passages.get(extremites);
                     int rang = dejaVus.merge(extremites, 1, Integer::sum) - 1;
                     dessinerTroncon(contexte, troncon,
-                            COULEUR_DEBUT_TOURNEE.interpolate(
-                                    COULEUR_FIN_TOURNEE, avancement),
+                            debut.interpolate(fin, avancement),
                             nombre, rang);
                     fait++;
                 }
@@ -759,7 +791,7 @@ final class MapCanvas extends Pane {
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
                         : tardif ? COULEUR_APRES_13H : Color.WHITE);
                 contexte.setStroke(tardif ? COULEUR_APRES_13H_CONTOUR
-                        : COULEUR_FIN_TOURNEE);
+                        : couleurLivreur(entree.getKey() - 1));
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
