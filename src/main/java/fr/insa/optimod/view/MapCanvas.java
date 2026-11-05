@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
@@ -60,6 +61,15 @@ final class MapCanvas extends Pane {
     private static final double MARGE_LEGENDE = 10;
     private static final double HAUTEUR_LIGNE_LEGENDE = 20;
     private static final double TAILLE_SYMBOLE_LEGENDE = 5;
+
+    /** Largeur du symbole d'une entrée de la légende, et écart entre deux. */
+    private static final double LARGEUR_SYMBOLE_LEGENDE = 26;
+    private static final double ECART_ENTREES_LEGENDE = 18;
+
+    /** Texte de chaque entrée de la légende, dans l'ordre de ses symboles. */
+    private static final String[] LIBELLES_LEGENDE = {"Entrepôt",
+        "Point de collecte", "Point de livraison", "Tournée (clair → foncé)",
+        "Tronçon repassé (×N)", "Arrêt hors plage ou après 13 h"};
 
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
@@ -186,6 +196,9 @@ final class MapCanvas extends Pane {
     /** Position du dernier événement de glissement. */
     private double dernierX;
     private double dernierY;
+
+    /** Largeur de chaque texte de la légende, mesurée au premier besoin. */
+    private double[] largeursLibelles;
 
     /** Projection du dernier dessin, utilisée pour repérer le survol. */
     private MapProjection projection;
@@ -401,7 +414,8 @@ final class MapCanvas extends Pane {
     /** Empêche de faire glisser le plan hors de la zone visible. */
     private void contenirDansLaCarte() {
         decalageX = Math.min(0, Math.max(decalageX, getWidth() * (1 - zoom)));
-        decalageY = Math.min(0, Math.max(decalageY, getHeight() * (1 - zoom)));
+        decalageY = Math.min(0,
+                Math.max(decalageY, hauteurCarte() * (1 - zoom)));
     }
 
     private double ecranX(double longitude) {
@@ -414,7 +428,8 @@ final class MapCanvas extends Pane {
 
     /** Indice de la demande dont un point est sous la souris, ou -1. */
     private int trouverDemande(double x, double y) {
-        if (plan == null || programme == null || projection == null) {
+        if (plan == null || programme == null || projection == null
+                || y >= hauteurCarte()) {
             return -1;
         }
         double portee = TAILLE_MARQUEUR + TOLERANCE_SURVOL;
@@ -433,7 +448,7 @@ final class MapCanvas extends Pane {
      * Intersection la plus proche d'un point de l'écran, ou null si trop loin.
      */
     private Noeud trouverNoeud(double x, double y) {
-        if (plan == null || projection == null) {
+        if (plan == null || projection == null || y >= hauteurCarte()) {
             return null;
         }
         Noeud plusProche = null;
@@ -535,7 +550,21 @@ final class MapCanvas extends Pane {
             return;
         }
         projection = new MapProjection(plan.obtenirNoeuds(),
-                canevas.getWidth(), canevas.getHeight(), MARGE_INTERIEURE);
+                canevas.getWidth(), hauteurCarte(), MARGE_INTERIEURE);
+        contexteGraphique.save();
+        try {
+            contexteGraphique.beginPath();
+            contexteGraphique.rect(0, 0, canevas.getWidth(), hauteurCarte());
+            contexteGraphique.clip();
+            dessinerPlanEtTournees(contexteGraphique);
+        } finally {
+            contexteGraphique.restore();
+        }
+        dessinerLegende(contexteGraphique);
+    }
+
+    /** Dessine le plan, les tournées et les points dans la zone de carte. */
+    private void dessinerPlanEtTournees(GraphicsContext contexteGraphique) {
         contexteGraphique.setStroke(COULEUR_RUE);
         contexteGraphique.setLineWidth(1);
         contexteGraphique.beginPath();
@@ -554,7 +583,6 @@ final class MapCanvas extends Pane {
                     2 * RAYON_INTERSECTION, 2 * RAYON_INTERSECTION);
         }
         dessinerTournees(contexteGraphique);
-        dessinerLegende(contexteGraphique);
         if (programme != null) {
             dessinerDemandes(contexteGraphique);
         }
@@ -574,17 +602,19 @@ final class MapCanvas extends Pane {
             int total = tournee.chemins().stream()
                     .mapToInt(chemin -> chemin.troncons().size()).sum();
             int fait = 0;
-            Map<Troncon, Integer> passages =
+            Map<Set<Noeud>, Integer> passages =
                     tournee.compterPassagesParTroncon();
-            Map<Troncon, Integer> dejaVus = new HashMap<>();
+            Map<Set<Noeud>, Integer> dejaVus = new HashMap<>();
             for (Chemin chemin : tournee.chemins()) {
                 for (Troncon troncon : chemin.troncons()) {
                     verifierDansLePlan(troncon.origine());
                     verifierDansLePlan(troncon.destination());
                     double avancement = total <= 1 ? 0
                             : (double) fait / (total - 1);
-                    int nombre = passages.get(troncon);
-                    int rang = dejaVus.merge(troncon, 1, Integer::sum) - 1;
+                    Set<Noeud> extremites = Set.of(troncon.origine(),
+                            troncon.destination());
+                    int nombre = passages.get(extremites);
+                    int rang = dejaVus.merge(extremites, 1, Integer::sum) - 1;
                     dessinerTroncon(contexte, troncon,
                             COULEUR_DEBUT_TOURNEE.interpolate(
                                     COULEUR_FIN_TOURNEE, avancement),
@@ -621,7 +651,11 @@ final class MapCanvas extends Pane {
         double longueur = Math.hypot(x2 - x1, y2 - y1);
         double ux = longueur == 0 ? 0 : (x2 - x1) / longueur;
         double uy = longueur == 0 ? 0 : (y2 - y1) / longueur;
-        double decalage = (rang - (nombre - 1) / 2.0) * ECART_PASSAGES;
+        // Le décalage est mesuré dans un sens fixe de la rue, pour qu'un
+        // aller et son retour tombent côte à côte et non l'un sur l'autre.
+        double sens = troncon.origine().identifiant()
+                < troncon.destination().identifiant() ? 1 : -1;
+        double decalage = (rang - (nombre - 1) / 2.0) * ECART_PASSAGES * sens;
         x1 -= uy * decalage;
         y1 += ux * decalage;
         x2 -= uy * decalage;
@@ -652,17 +686,17 @@ final class MapCanvas extends Pane {
      * aussi en vue d'ensemble.
      */
     private void dessinerNombresPassages(GraphicsContext contexte,
-            Map<Troncon, Integer> passages) {
-        Troncon plusLong = null;
-        for (Map.Entry<Troncon, Integer> entree : passages.entrySet()) {
-            Troncon troncon = entree.getKey();
+            Map<Set<Noeud>, Integer> passages) {
+        Set<Noeud> plusLong = null;
+        for (Map.Entry<Set<Noeud>, Integer> entree : passages.entrySet()) {
+            Set<Noeud> extremites = entree.getKey();
             if (entree.getValue() > 1) {
-                if (plusLong == null || longueurEcran(troncon)
+                if (plusLong == null || longueurEcran(extremites)
                         > longueurEcran(plusLong)) {
-                    plusLong = troncon;
+                    plusLong = extremites;
                 }
-                if (longueurEcran(troncon) >= LONGUEUR_MINIMALE_NOMBRE) {
-                    dessinerNombrePassages(contexte, troncon,
+                if (longueurEcran(extremites) >= LONGUEUR_MINIMALE_NOMBRE) {
+                    dessinerNombrePassages(contexte, extremites,
                             entree.getValue());
                 }
             }
@@ -673,24 +707,24 @@ final class MapCanvas extends Pane {
         }
     }
 
-    /** Longueur d'un tronçon à l'écran, en pixels. */
-    private double longueurEcran(Troncon troncon) {
+    /** Longueur à l'écran d'un tronçon (ses deux extrémités), en pixels. */
+    private double longueurEcran(Set<Noeud> extremites) {
+        List<Noeud> bouts = List.copyOf(extremites);
         return Math.hypot(
-                ecranX(troncon.destination().longitude())
-                        - ecranX(troncon.origine().longitude()),
-                ecranY(troncon.destination().latitude())
-                        - ecranY(troncon.origine().latitude()));
+                ecranX(bouts.get(1).longitude())
+                        - ecranX(bouts.get(0).longitude()),
+                ecranY(bouts.get(1).latitude())
+                        - ecranY(bouts.get(0).latitude()));
     }
 
     /** Écrit « ×N » au milieu d'un tronçon parcouru N fois. */
     private void dessinerNombrePassages(GraphicsContext contexte,
-            Troncon troncon, int nombre) {
-        double x1 = ecranX(troncon.origine().longitude());
-        double y1 = ecranY(troncon.origine().latitude());
-        double x2 = ecranX(troncon.destination().longitude());
-        double y2 = ecranY(troncon.destination().latitude());
-        double x = (x1 + x2) / 2;
-        double y = (y1 + y2) / 2;
+            Set<Noeud> extremites, int nombre) {
+        List<Noeud> bouts = List.copyOf(extremites);
+        double x = (ecranX(bouts.get(0).longitude())
+                + ecranX(bouts.get(1).longitude())) / 2;
+        double y = (ecranY(bouts.get(0).latitude())
+                + ecranY(bouts.get(1).latitude())) / 2;
         String texte = "×" + nombre;
         contexte.setFont(Font.font(null, FontWeight.BOLD, 11));
         contexte.setTextAlign(TextAlignment.CENTER);
@@ -815,16 +849,11 @@ final class MapCanvas extends Pane {
         contexte.setTextAlign(TextAlignment.CENTER);
         contexte.setFill(COULEUR_TEXTE);
         contexte.fillText("Entrepôt", x, basY - 5);
+        contexte.setFont(Font.getDefault());
     }
 
-    /**
-     * Dessine la légende en bas à gauche : entrepôt, collecte, livraison et,
-     * si une tournée est affichée, son tracé (du clair au foncé).
-     */
-    private void dessinerLegende(GraphicsContext contexte) {
-        String[] libelles = {"Entrepôt", "Point de collecte",
-            "Point de livraison", "Tournée (clair → foncé)",
-            "Tronçon repassé (×N)", "Arrêt hors plage ou après 13 h"};
+    /** Symboles de la légende à afficher, dans l'ordre. */
+    private List<Integer> symbolesLegende() {
         List<Integer> symboles = new ArrayList<>(List.of(0, 1, 2));
         if (!tournees.isEmpty()) {
             symboles.add(3);
@@ -835,38 +864,92 @@ final class MapCanvas extends Pane {
                 symboles.add(5);
             }
         }
-        double largeur = largeurLegende(libelles, symboles);
-        double hauteur = HAUTEUR_LIGNE_LEGENDE * symboles.size() + 8;
-        double gauche = MARGE_LEGENDE;
-        double haut = canevas.getHeight() - MARGE_LEGENDE - hauteur;
-        contexte.setFill(Color.web("#ffffff", 0.92));
-        contexte.setStroke(COULEUR_RUE);
-        contexte.setLineWidth(1);
-        contexte.fillRoundRect(gauche, haut, largeur, hauteur, 8, 8);
-        contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
-        contexte.setFont(Font.getDefault());
-        contexte.setTextAlign(TextAlignment.LEFT);
-        for (int i = 0; i < symboles.size(); i++) {
-            double cx = gauche + 16;
-            double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (i + 0.5);
-            dessinerSymboleLegende(contexte, symboles.get(i), cx, cy);
-            contexte.setFill(COULEUR_TEXTE);
-            contexte.fillText(libelles[symboles.get(i)], cx + 16, cy + 4);
-        }
+        return symboles;
     }
 
-    /** Largeur de la légende : symbole, texte le plus long et marge. */
-    private static double largeurLegende(String[] libelles,
-            List<Integer> symboles) {
-        Text mesure = new Text();
-        mesure.setFont(Font.getDefault());
-        double plusLarge = 0;
-        for (int symbole : symboles) {
-            mesure.setText(libelles[symbole]);
-            plusLarge = Math.max(plusLarge,
-                    mesure.getLayoutBounds().getWidth());
+    /** Largeur d'une entrée de la légende : symbole, texte et écart. */
+    private double largeurEntreeLegende(int symbole) {
+        if (largeursLibelles == null) {
+            Text mesure = new Text();
+            mesure.setFont(Font.getDefault());
+            largeursLibelles = new double[LIBELLES_LEGENDE.length];
+            for (int i = 0; i < LIBELLES_LEGENDE.length; i++) {
+                mesure.setText(LIBELLES_LEGENDE[i]);
+                largeursLibelles[i] = mesure.getLayoutBounds().getWidth();
+            }
         }
-        return 32 + plusLarge + 12;
+        return LARGEUR_SYMBOLE_LEGENDE + largeursLibelles[symbole]
+                + ECART_ENTREES_LEGENDE;
+    }
+
+    /**
+     * Répartit les entrées de la légende en lignes, de gauche à droite, pour
+     * qu'elles tiennent dans la largeur de la carte.
+     */
+    private List<List<Integer>> lignesLegende() {
+        double largeurMaximale = getWidth() - 2 * MARGE_LEGENDE;
+        List<List<Integer>> lignes = new ArrayList<>();
+        List<Integer> ligne = new ArrayList<>();
+        double utilise = 0;
+        for (int symbole : symbolesLegende()) {
+            double largeur = largeurEntreeLegende(symbole);
+            if (!ligne.isEmpty() && utilise + largeur > largeurMaximale) {
+                lignes.add(ligne);
+                ligne = new ArrayList<>();
+                utilise = 0;
+            }
+            ligne.add(symbole);
+            utilise += largeur;
+        }
+        lignes.add(ligne);
+        return lignes;
+    }
+
+    /**
+     * Hauteur de la bande de légende sous la carte, 0 tant qu'aucun plan
+     * n'est affiché.
+     */
+    private double hauteurLegende() {
+        if (plan == null || plan.obtenirNoeuds().isEmpty()) {
+            return 0;
+        }
+        return HAUTEUR_LIGNE_LEGENDE * lignesLegende().size() + 8;
+    }
+
+    /** Hauteur de la zone où le plan est dessiné, au-dessus de la légende. */
+    private double hauteurCarte() {
+        return Math.max(1, getHeight() - hauteurLegende());
+    }
+
+    /**
+     * Dessine la légende dans une bande sous la carte : entrepôt, collecte,
+     * livraison et, si une tournée est affichée, son tracé, les tronçons
+     * repassés et les arrêts tardifs. La bande n'empiète pas sur le plan.
+     */
+    private void dessinerLegende(GraphicsContext contexte) {
+        double hauteur = hauteurLegende();
+        if (hauteur == 0) {
+            return;
+        }
+        double haut = canevas.getHeight() - hauteur;
+        contexte.setFill(Color.WHITE);
+        contexte.fillRect(0, haut, canevas.getWidth(), hauteur);
+        contexte.setStroke(COULEUR_RUE);
+        contexte.setLineWidth(1);
+        contexte.strokeLine(0, haut, canevas.getWidth(), haut);
+        contexte.setFont(Font.getDefault());
+        contexte.setTextAlign(TextAlignment.LEFT);
+        List<List<Integer>> lignes = lignesLegende();
+        for (int numero = 0; numero < lignes.size(); numero++) {
+            double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (numero + 0.5);
+            double x = MARGE_LEGENDE;
+            for (int symbole : lignes.get(numero)) {
+                dessinerSymboleLegende(contexte, symbole, x + 10, cy);
+                contexte.setFill(COULEUR_TEXTE);
+                contexte.fillText(LIBELLES_LEGENDE[symbole], x + 26, cy + 4);
+                x += largeurEntreeLegende(symbole);
+            }
+        }
     }
 
     /** Indique si une tournée affichée parcourt un tronçon plus d'une fois. */

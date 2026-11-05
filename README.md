@@ -160,7 +160,8 @@ heures sur place imposent un retour après 20 h.
    (losange orange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
    à gauche. Survoler un point met sa demande en évidence, au-dessus de
-   l'entrepôt. Une légende en bas à gauche de la carte explique les symboles.
+   l'entrepôt. Une légende, dans une bande sous la carte, explique les
+   symboles.
 3. **Calculer** : l'application calcule la meilleure tournée de chaque
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
@@ -251,8 +252,9 @@ calcul volontaire. Le support multi-livreurs reste à intégrer.
 Une fois la tournée calculée, elle est tracée sur la carte : le trait est clair
 au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de
 chaque tronçon indique le sens, et les arrêts sont numérotés 1, 2, 3… dans
-l'ordre de passage. Un tronçon que la tournée parcourt plusieurs fois est tracé
-en traits parallèles, un par passage, et porte « ×2 », « ×3 »… (la légende le
+l'ordre de passage. Un tronçon que la tournée parcourt plusieurs fois, dans un
+sens ou dans l'autre, est tracé en traits parallèles, un par passage, et porte
+« ×2 », « ×3 »… (la légende le
 rappelle). Un arrêt dont l'arrivée sort de la plage annoncée ou dépasse 13 h
 a son numéro sur fond rouge, comme dans la liste de droite, et un retour tardif
 à l'entrepôt en rougit le contour ; la légende l'indique.
