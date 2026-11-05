@@ -1541,13 +1541,13 @@ public class MainControllerTest {
         chargerDeuxDemandes();
         ecran.actionAjouter.run();
         ecran.actionClicNoeud.accept(NOEUD_A);
-        for (String valeur : List.of("", "abc", "0", "-1", "2147483647")) {
+        for (String valeur : List.of("", "abc", "-1", "2147483647")) {
             ecran.saisie = Optional.of(new MapScreen.SaisieDemande(
                     valeur, "5", 1));
             ecran.actionClicNoeud.accept(NOEUD_B);
             assertEquals(2, demandes().size());
             assertFalse(controleur.peutAnnuler());
-            assertTrue(ecran.consigne.contains("strictement positive"));
+            assertTrue(ecran.consigne.contains("positive ou nulle"));
             assertEquals(NOEUD_A, ecran.collecteProvisoire.identifiant());
             assertEquals(NOEUD_B, ecran.livraisonProvisoire.identifiant());
         }
@@ -1563,7 +1563,7 @@ public class MainControllerTest {
         ecran.actionAjouter.run();
         ecran.actionClicNoeud.accept(NOEUD_A);
         for (MapScreen.SaisieDemande saisie : List.of(
-                new MapScreen.SaisieDemande("5", "0", 1),
+                new MapScreen.SaisieDemande("5", "-1", 1),
                 new MapScreen.SaisieDemande("5", "abc", 1),
                 new MapScreen.SaisieDemande("5", "5", 2))) {
             ecran.saisie = Optional.of(saisie);
@@ -4386,7 +4386,11 @@ public class MainControllerTest {
         assertEquals("", ecran.confirmation);
     }
 
-    /** Avec deux livreurs, Sauvegarder signale l'erreur et n'écrit rien. */
+    /**
+     * Avec deux livreurs, Sauvegarder avertit que la sauvegarde ne gère qu'un
+     * livreur, sans parler de fichier XML invalide, et n'écrit rien
+     * (TIG-107).
+     */
     @Test
     public void sauvegarderAvecDeuxLivreursSignaleSansEcrire() throws Exception {
         calculerAvecUnLivreur();
@@ -4395,7 +4399,80 @@ public class MainControllerTest {
         ecran.fichierChoisi = fichier;
         ecran.evenements.clear();
         ecran.actionSauvegarder.run();
-        assertTrue(ecran.evenements.contains("invalide"));
+        assertEquals(MainController.CONSIGNE_SAUVEGARDE_UN_LIVREUR,
+                ecran.consigne);
+        assertFalse(ecran.evenements.contains("invalide"));
+        assertEquals("", ecran.confirmation);
         assertEquals(0, fichier.length());
+    }
+
+    /**
+     * Une demande de durées nulles est ajoutée : les fichiers fournis en
+     * contiennent, elle doit pouvoir être ressaisie à l'identique (TIG-107).
+     */
+    @Test
+    public void dureesNullesAcceptees() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("0", "0", 1));
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals(3, demandes().size());
+        Demande ajoutee = demandes().get(2);
+        assertEquals(0, ajoutee.dureeCollecte());
+        assertEquals(0, ajoutee.dureeLivraison());
+    }
+
+    /**
+     * Pendant « Déplacer », un clic sur l'adresse actuelle du point dit que
+     * le point y est déjà ; un clic sur l'adresse de l'autre point de la
+     * demande rappelle que les deux doivent être différentes. Aucun ne
+     * change la tournée ni l'historique, et la saisie continue (TIG-107).
+     */
+    @Test
+    public void deplacerSurUneAdresseDeLaDemandeExpliqueLeRefus()
+            throws Exception {
+        Tournee avant = afficherUneTourneeDeDeuxDemandes();
+        Tournee.Arret arret = avant.arrets().get(1);
+        Demande demande = arret.demande();
+        Noeud autre = arret.type() == TypeArret.COLLECTE
+                ? demande.livraison()
+                : demande.collecte();
+        ecran.actionDeplacer.accept(1, 1);
+
+        ecran.actionClicNoeud.accept(arret.noeud().identifiant());
+        assertEquals(MainController.CONSIGNE_DEJA_A_CETTE_ADRESSE
+                + EtatDeplacementPoint.CONSIGNE, ecran.consigne);
+        assertSame(avant, tournees().get(1));
+        assertTrue(controleur.obtenirEtat() instanceof EtatDeplacementPoint);
+
+        ecran.actionClicNoeud.accept(autre.identifiant());
+        assertEquals(MainController.CONSIGNE_MEME_ADRESSE
+                + EtatDeplacementPoint.CONSIGNE, ecran.consigne);
+        assertSame(avant, tournees().get(1));
+        assertTrue(controleur.obtenirEtat() instanceof EtatDeplacementPoint);
+        assertFalse(controleur.peutAnnuler());
+    }
+
+    /**
+     * Une erreur inattendue pendant la restauration (ici un nom de fichier
+     * qu'aucun chemin ne peut représenter) ramène à l'état d'avant avec un
+     * message, comme un fichier invalide : l'application ne reste pas
+     * bloquée sur « Restauration en cours » (TIG-107).
+     */
+    @Test
+    public void restaurationErreurInattendueRevientALEtatDAvant()
+            throws Exception {
+        chargerDeuxDemandes();
+        Etat avant = controleur.obtenirEtat();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        ecran.fichierChoisi = new File("sauvegarde\0.xml");
+        ecran.actionRestaurer.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatRestauration);
+        executerArrierePlan();
+        assertSame(avant, controleur.obtenirEtat());
+        assertSame(programme, controleur.obtenirProgramme());
+        assertFalse(ecran.attente);
+        assertTrue(ecran.evenements.contains("invalide"));
     }
 }
