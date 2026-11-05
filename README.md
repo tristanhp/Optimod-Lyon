@@ -162,9 +162,10 @@ arrêts arrivent après 13 h.
 2. **Importer les demandes** : choisir un fichier de demandes. L'entrepôt
    (losange orange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
-   à gauche. Survoler un point met sa demande en évidence, au-dessus de
-   l'entrepôt. Une légende, dans une bande sous la carte, explique les
-   symboles.
+   à gauche. Choisir une demande dans la liste la met en évidence sur la
+   carte ; survoler un point met sa demande en évidence, au-dessus de
+   l'entrepôt, sans changer la demande choisie dans la liste. Une légende,
+   dans une bande sous la carte, explique les symboles.
 3. **Calculer** : l'application calcule la meilleure tournée de chaque
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est

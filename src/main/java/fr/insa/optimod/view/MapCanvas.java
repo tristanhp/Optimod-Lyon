@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.Chemin;
@@ -233,9 +232,8 @@ final class MapCanvas extends Pane {
     /** Indice de la demande mise en évidence, ou -1. */
     private int demandeEnEvidence = -1;
 
-    /** Prévenu de l'indice de la demande survolée (-1 hors d'un point). */
-    private IntConsumer surSurvol = indice -> {
-    };
+    /** Indice de la demande choisie dans la liste, ou -1. */
+    private int demandeSelectionnee = -1;
 
     /** Prévenu de l'identifiant de l'intersection cliquée. */
     private LongConsumer surClicNoeud = idNoeud -> {
@@ -292,9 +290,11 @@ final class MapCanvas extends Pane {
                         evenement.getScreenY());
             }
         });
-        setOnMouseMoved(evenement -> signalerSurvol(
-                trouverDemande(evenement.getX(), evenement.getY())));
-        setOnMouseExited(evenement -> signalerSurvol(-1));
+        setOnMouseMoved(evenement -> mettreEnEvidence(
+                demandeAMettreEnEvidence(
+                        trouverDemande(evenement.getX(), evenement.getY()),
+                        demandeSelectionnee)));
+        setOnMouseExited(evenement -> mettreEnEvidence(demandeSelectionnee));
     }
 
     /**
@@ -384,15 +384,6 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Définit l'action déclenchée quand la souris passe sur une demande.
-     *
-     * @param action reçoit l'indice de la demande, ou -1 en dehors
-     */
-    void definirSurSurvol(IntConsumer action) {
-        surSurvol = action;
-    }
-
-    /**
      * Définit l'action déclenchée par un clic sur une intersection.
      *
      * @param action reçoit l'identifiant du noeud le plus proche du clic
@@ -402,20 +393,36 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Met en évidence la collecte et la livraison d'une demande.
+     * Retient la demande choisie dans la liste et la met en évidence. Le
+     * survol d'une autre demande la remplace à l'écran le temps du survol,
+     * sans changer ce choix.
      *
      * @param indice indice de la demande, ou -1 pour aucune
      */
-    void mettreEnEvidence(int indice) {
+    void selectionnerDemande(int indice) {
+        demandeSelectionnee = indice;
+        mettreEnEvidence(indice);
+    }
+
+    /**
+     * Demande à mettre en évidence : celle que la souris survole, sinon celle
+     * choisie dans la liste. Le survol ne remplace jamais le choix fait par
+     * un clic (TIG-107).
+     *
+     * @param survolee     indice de la demande survolée, ou -1
+     * @param selectionnee indice de la demande choisie, ou -1
+     * @return indice de la demande à mettre en évidence, ou -1
+     */
+    static int demandeAMettreEnEvidence(int survolee, int selectionnee) {
+        return survolee >= 0 ? survolee : selectionnee;
+    }
+
+    /** Met en évidence la collecte et la livraison d'une demande, ou -1. */
+    private void mettreEnEvidence(int indice) {
         if (indice != demandeEnEvidence) {
             demandeEnEvidence = indice;
             dessinerCarte();
         }
-    }
-
-    private void signalerSurvol(int indice) {
-        mettreEnEvidence(indice);
-        surSurvol.accept(indice);
     }
 
     /** Revient à la vue d'ensemble du plan. */
@@ -511,6 +518,7 @@ final class MapCanvas extends Pane {
         tournees = Map.of();
         messageErreur.setVisible(false);
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         zoom = 1;
         decalageX = 0;
         decalageY = 0;
@@ -526,6 +534,7 @@ final class MapCanvas extends Pane {
     void afficherProgramme(ProgrammeLivraisons nouveauProgramme) {
         programme = nouveauProgramme;
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         dessinerCarte();
     }
 
@@ -539,6 +548,7 @@ final class MapCanvas extends Pane {
         messageErreur.setVisible(false);
         detailsArret.hide();
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         zoom = 1;
         decalageX = 0;
         decalageY = 0;
