@@ -267,6 +267,30 @@ public interface MapScreen {
     void afficherRefusChangementLivreur(String detail);
 
     /**
+     * Propose à l'administrateur les livreurs qui peuvent prendre une demande
+     * dont l'ajout est refusé chez son livreur (retour après 13 h). La liste
+     * peut contenir le livreur de la demande : une autre position chez lui
+     * peut suffire. Le livreur choisi, la position est ensuite demandée par
+     * {@link #choisirPositionInsertion}.
+     *
+     * @param livreurRefuse numéro du livreur chez qui l'ajout est refusé
+     * @param livreurs numéros des livreurs possibles, jamais vide
+     * @param detail explication du refus
+     * @return numéro du livreur choisi, ou vide après annulation de l'ajout
+     */
+    Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+            List<Integer> livreurs, String detail);
+
+    /**
+     * Explique à l'utilisateur pourquoi l'ajout d'une demande est refusé
+     * (aucun livreur ne peut la prendre, adresse inaccessible, position
+     * invalide) ; les demandes et les tournées n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusAjout(String detail);
+
+    /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.
      *
      * @param action action à exécuter

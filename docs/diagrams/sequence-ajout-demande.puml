@@ -39,9 +39,21 @@ alt insertion possible
   ListeDeCommandes -> ProgrammeLivraisons : ajouterDemande, definirTournees
   ProgrammeLivraisons -> MainView : notifierObservateurs
   MainController -> MainView : signalerArretsHorsPlage
-else position choisie impossible
+else retour après 13 h à la position choisie
   Plan --> MainController : IllegalStateException
-  MainController -> MainView : conserver tournée, afficherErreurCalcul
+  MainController -> Plan : trouverLivreursPossibles(tournées, demande)
+  note right : Moindre coût de chaque livreur,\nrien n'est inséré ni modifié.
+  Plan --> MainController : livreurs qui rentrent avant 13 h
+  alt aucun livreur possible
+    MainController -> MainView : afficherRefusAjout, rien n'est modifié
+  else livreurs possibles
+    MainController -> MainView : choisirLivreurPossible(livreur refusé, livreurs, raison)
+    MainView --> MainController : livreur choisi, ou annulation sans mutation
+    note right : Le livreur choisi, la position est\nredemandée : retour à choisirPositionInsertion.
+  end
+else autre refus (position invalide, adresse inaccessible)
+  Plan --> MainController : IllegalArgumentException ou IllegalStateException
+  MainController -> MainView : afficherRefusAjout, rien n'est modifié
 end
 MainController -> MainView : afficherPointsProvisoires(null, null)
 note right : Aperçu effacé à la validation,\nà l'annulation ou en cas d'échec.
