@@ -817,7 +817,8 @@ public final class MainController {
      */
     void choisirPointADeplacer(int livreur, int rang) {
         Tournee tournee = programme.obtenirTournees().get(livreur);
-        if (tournee == null || rang < 1 || rang >= tournee.arrets().size() - 1) {
+        if (tournee == null || rang < 1
+                || rang >= tournee.arrets().size() - 1) {
             ecran.afficherConsigne(CONSIGNE_AUCUN_POINT);
         } else {
             changerEtat(new EtatDeplacementPoint(livreur, rang));

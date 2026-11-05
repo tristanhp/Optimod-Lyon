@@ -3,16 +3,22 @@ package fr.insa.optimod.algo.tsp;
 import java.util.Collection;
 import java.util.Iterator;
 
+/** Ajoute une borne inférieure : somme des arcs sortants les moins chers. */
 public class TSP2 extends TSP1 {
 
     @Override
-    protected int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus) {
+    protected int calculerBorneInferieure(Integer sommetCourant,
+            Collection<Integer> nonVus) {
         /*
-         * Cette fonction d’évaluation calcule une borne inférieure de la solution
+         * Cette fonction d’évaluation calcule une borne inférieure de la
+         * solution
          * actuelle.
-         * Pour le sommet courant, elle prend le chemin le plus court vers un autre
-         * sommet non vus (ou 0, s'il reste que 0) et pour tous les autres sommets non
-         * vus, elle prends le chemin le plus court vers un autre sommet non vus ou 0.
+         * Pour le sommet courant, elle prend le chemin le plus court vers un
+         * autre
+         * sommet non vus (ou 0, s'il reste que 0) et pour tous les autres
+         * sommets non
+         * vus, elle prends le chemin le plus court vers un autre sommet non vus
+         * ou 0.
          * Tous ces cout sont additionés pour obtenir une borne inferieur.
          */
         if (nonVus.size() == 1) {
@@ -45,8 +51,9 @@ public class TSP2 extends TSP1 {
         Iterator<Integer> it = new IteratorSeq(listeSommet, sommet, g);
         while (it.hasNext()) {
             int next = it.next();
-            if (g.obtenirCoutArc(sommet, next) < min)
+            if (g.obtenirCoutArc(sommet, next) < min) {
                 min = g.obtenirCoutArc(sommet, next);
+            }
         }
         return min;
     }

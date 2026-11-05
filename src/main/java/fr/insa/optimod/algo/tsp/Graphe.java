@@ -28,7 +28,8 @@ public interface Graphe {
      *
      * @param indiceSommet      sommet
      * @param indiceDestination sommet
-     * @return true si <code>(indiceSommet,indiceDestination)</code> est un arc de
+     * @return true si <code>(indiceSommet,indiceDestination)</code> est un arc
+     *        de
      *         <code>this</code>
      */
     public abstract boolean estArc(int indiceSommet, int indiceDestination);

@@ -6,9 +6,11 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
+/** Tests de {@link GrapheComplet}. */
 public class GrapheCompleTest {
     GrapheComplet grapheComplet;
 
+    /** Construit le graphe utilisé par les tests. */
     @Before
     public void initialisation() {
         grapheComplet = new GrapheComplet(10);
@@ -26,7 +28,9 @@ public class GrapheCompleTest {
         assertTrue(grapheComplet.obtenirCoutArc(3, 7) == 37);
     }
 
-    /** Un arc est entre deux sommets différents et pas 2 fois le meme sommet. */
+    /**
+     * Un arc est entre deux sommets différents et pas 2 fois le meme sommet.
+     */
     @Test
     public void testEstArcGrapheComplet() {
         // Un arc

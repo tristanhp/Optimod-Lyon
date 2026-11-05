@@ -180,7 +180,8 @@ final class MapCanvas extends Pane {
         getChildren().addAll(canevas, messageErreur);
         setOnScroll(evenement -> {
             if (evenement.getDeltaY() != 0) {
-                zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1 / FACTEUR_MOLETTE,
+                zoomer(evenement.getDeltaY() > 0 ? FACTEUR_MOLETTE : 1
+                        / FACTEUR_MOLETTE,
                         evenement.getX(), evenement.getY());
             }
         });
@@ -346,7 +347,8 @@ final class MapCanvas extends Pane {
 
     /** Zoome autour d'un point de l'écran, de façon à ce qu'il reste fixe. */
     private void zoomer(double facteur, double x, double y) {
-        double nouveauZoom = Math.max(1, Math.min(ZOOM_MAXIMAL, zoom * facteur));
+        double nouveauZoom = Math.max(1, Math.min(ZOOM_MAXIMAL, zoom
+                * facteur));
         double rapport = nouveauZoom / zoom;
         decalageX = x - (x - decalageX) * rapport;
         decalageY = y - (y - decalageY) * rapport;
@@ -386,7 +388,9 @@ final class MapCanvas extends Pane {
         return -1;
     }
 
-    /** Intersection la plus proche d'un point de l'écran, ou null si trop loin. */
+    /**
+     * Intersection la plus proche d'un point de l'écran, ou null si trop loin.
+     */
     private Noeud trouverNoeud(double x, double y) {
         if (plan == null || projection == null) {
             return null;
@@ -433,7 +437,8 @@ final class MapCanvas extends Pane {
     /**
      * Superpose les demandes au plan : collectes en carré, livraisons en rond.
      *
-     * @param nouveauProgramme demandes à dessiner, ou {@code null} pour les retirer
+     * @param nouveauProgramme demandes à dessiner, ou {@code null} pour les
+     *        retirer
      */
     void afficherProgramme(ProgrammeLivraisons nouveauProgramme) {
         programme = nouveauProgramme;
@@ -482,7 +487,8 @@ final class MapCanvas extends Pane {
     private void dessinerCarteComplete() {
         GraphicsContext contexteGraphique = canevas.getGraphicsContext2D();
         contexteGraphique.setFill(COULEUR_FOND);
-        contexteGraphique.fillRect(0, 0, canevas.getWidth(), canevas.getHeight());
+        contexteGraphique.fillRect(0, 0, canevas.getWidth(),
+                canevas.getHeight());
         if (plan == null || plan.obtenirNoeuds().isEmpty()) {
             projection = null;
             return;
@@ -501,7 +507,8 @@ final class MapCanvas extends Pane {
         contexteGraphique.stroke();
         contexteGraphique.setFill(COULEUR_INTERSECTION);
         for (Noeud noeud : plan.obtenirNoeuds()) {
-            contexteGraphique.fillOval(ecranX(noeud.longitude()) - RAYON_INTERSECTION,
+            contexteGraphique.fillOval(ecranX(noeud.longitude())
+                    - RAYON_INTERSECTION,
                     ecranY(noeud.latitude()) - RAYON_INTERSECTION,
                     2 * RAYON_INTERSECTION, 2 * RAYON_INTERSECTION);
         }
@@ -661,9 +668,11 @@ final class MapCanvas extends Pane {
     }
 
     /** Dessine la collecte (carré) et la livraison (rond) d'une demande. */
-    private void dessinerDemande(GraphicsContext contexte, int indice, boolean enEvidence) {
+    private void dessinerDemande(GraphicsContext contexte, int indice,
+            boolean enEvidence) {
         Demande demande = programme.obtenirDemandes().get(indice);
-        double taille = enEvidence ? TAILLE_MARQUEUR * TAILLE_EN_EVIDENCE : TAILLE_MARQUEUR;
+        double taille = enEvidence ? TAILLE_MARQUEUR * TAILLE_EN_EVIDENCE
+                : TAILLE_MARQUEUR;
         contexte.setFill(couleurDemande(indice));
         contexte.setStroke(COULEUR_CONTOUR_EVIDENCE);
         contexte.setLineWidth(2);

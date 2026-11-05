@@ -8,12 +8,14 @@ import java.util.HashMap;
 import org.junit.Before;
 import org.junit.Test;
 
+/** Tests de {@link GrapheDepandance}. */
 public class GrapheDepandanceTest {
     private final int nbSommets = 10;
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
     GrapheDepandance grapheDepandance;
 
+    /** Construit le graphe utilisé par les tests. */
     @Before
     public void initialisation() {
         int iseed = 1;
@@ -21,14 +23,15 @@ public class GrapheDepandanceTest {
         cout = new int[nbSommets][nbSommets];
         for (int i = 0; i < nbSommets; i++) {
             for (int j = 0; j < nbSommets; j++) {
-                if (i == j)
+                if (i == j) {
                     cout[i][j] = -1;
-                else {
+                } else {
                     int it = 16807 * (iseed % 127773) - 2836 * (iseed / 127773);
-                    if (it > 0)
+                    if (it > 0) {
                         iseed = it;
-                    else
+                    } else {
                         iseed = 2147483647 + it;
+                    }
                     cout[i][j] = COUT_MIN + iseed % (COUT_MAX - COUT_MIN + 1);
                 }
             }
@@ -55,7 +58,9 @@ public class GrapheDepandanceTest {
         assertTrue(grapheDepandance.obtenirCoutArc(3, 7) == 37);
     }
 
-    /** Un arc est entre deux sommets différents et pas 2 fois le meme sommet. */
+    /**
+     * Un arc est entre deux sommets différents et pas 2 fois le meme sommet.
+     */
     @Test
     public void testEstArcGrapheDepandance() {
         // Un arc
