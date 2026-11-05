@@ -95,6 +95,7 @@ package "model" {
     prouveeOptimale : boolean
     +obtenirHeureRetour() : LocalTime
     +estPossible() : boolean
+    +compterPassagesParTroncon() : Map<Set<Noeud>, Integer>
   }
   class "Tournee.Arret" as Arret <<record>> {
     noeud : Noeud

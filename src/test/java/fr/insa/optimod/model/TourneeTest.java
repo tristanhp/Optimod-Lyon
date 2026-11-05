@@ -7,6 +7,8 @@ import static org.junit.Assert.assertTrue;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.junit.Test;
 
@@ -136,5 +138,59 @@ public class TourneeTest {
         assertTrue(new Arret(A, LocalTime.of(12, 0), LocalTime.of(12, 5),
                 TypeArret.COLLECTE, DEMANDE, arret.debutPlage(),
                 arret.finPlage()).estHorsPlage());
+    }
+
+    /** Un tronçon repris dans deux chemins est compté deux fois. */
+    @Test
+    public void tronconReprisDeuxFois() {
+        Troncon allerAB = new Troncon(A, B, 100, "rue A");
+        Troncon allerBE = new Troncon(B, ENTREPOT, 100, "rue B");
+        Tournee tournee = new Tournee(tourneeRevenantA(
+                LocalTime.of(9, 0)).arrets(), List.of(
+                new Chemin(200, List.of(allerAB, allerBE)),
+                new Chemin(200, List.of(allerBE, allerAB))), true);
+        Map<Set<Noeud>, Integer> passages =
+                tournee.compterPassagesParTroncon();
+        assertEquals(Integer.valueOf(2), passages.get(Set.of(A, B)));
+        assertEquals(Integer.valueOf(2), passages.get(Set.of(B, ENTREPOT)));
+        assertEquals(2, passages.size());
+    }
+
+    /** Un aller-retour sur une rue compte pour deux passages, sens ignoré. */
+    @Test
+    public void allerRetourCompteDeuxPassages() {
+        Troncon allerAB = new Troncon(A, B, 100, "rue A");
+        Troncon retourBA = new Troncon(B, A, 100, "rue A");
+        Tournee tournee = new Tournee(tourneeRevenantA(
+                LocalTime.of(9, 0)).arrets(), List.of(
+                new Chemin(100, List.of(allerAB)),
+                new Chemin(100, List.of(retourBA))), true);
+        Map<Set<Noeud>, Integer> passages =
+                tournee.compterPassagesParTroncon();
+        assertEquals(Integer.valueOf(2), passages.get(Set.of(A, B)));
+        assertEquals(Integer.valueOf(2), passages.get(Set.of(B, A)));
+        assertEquals(1, passages.size());
+    }
+
+    /** Deux tronçons différents ne sont pas confondus. */
+    @Test
+    public void tronconsDifferentsComptesSeparement() {
+        Troncon allerAB = new Troncon(A, B, 100, "rue A");
+        Troncon allerBE = new Troncon(B, ENTREPOT, 100, "rue B");
+        Tournee tournee = new Tournee(tourneeRevenantA(
+                LocalTime.of(9, 0)).arrets(), List.of(
+                new Chemin(200, List.of(allerAB, allerBE))), true);
+        Map<Set<Noeud>, Integer> passages =
+                tournee.compterPassagesParTroncon();
+        assertEquals(Integer.valueOf(1), passages.get(Set.of(A, B)));
+        assertEquals(Integer.valueOf(1), passages.get(Set.of(B, ENTREPOT)));
+        assertEquals(2, passages.size());
+    }
+
+    /** Une tournée sans chemin n'a aucun tronçon compté. */
+    @Test
+    public void tourneeSansCheminSansPassage() {
+        assertTrue(Tournee.vide(ENTREPOT, LocalTime.of(8, 0))
+                .compterPassagesParTroncon().isEmpty());
     }
 }
