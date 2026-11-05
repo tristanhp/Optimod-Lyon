@@ -274,8 +274,8 @@ public final class Plan {
                 ? " (ligne " + erreur.getLineNumber() + ")" : "";
         String message;
         if (original.contains("DOCTYPE")) {
-            message = "Les déclarations DOCTYPE sont interdites dans les "
-                    + "fichiers de l'application.";
+            message = "Ce fichier contient une déclaration de type de "
+                    + "document, interdite pour des raisons de sécurité.";
         } else if (original.contains("Premature end of file")
                 && erreur.getLineNumber() <= 1
                 && erreur.getColumnNumber() <= 1) {

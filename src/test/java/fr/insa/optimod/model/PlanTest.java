@@ -1976,7 +1976,7 @@ public class PlanTest {
 
     /** Mots qui trahissent un message technique en anglais. */
     private static final List<String> MOTS_TECHNIQUES = List.of("For input",
-            "empty String", "is not allowed", "Premature", "DOCTYPE is",
+            "empty String", "is not allowed", "Premature", "DOCTYPE",
             "must", "Content", "No such file", "prolog", "markup",
             "Exception", "null");
 
@@ -2151,7 +2151,7 @@ public class PlanTest {
         String message = erreurDeLecture("<?xml version=\"1.0\"?>"
                 + "<!DOCTYPE reseau [<!ENTITY x \"y\">]><reseau/>");
         verifierMessageFrancais(message);
-        assertTrue(message, message.contains("DOCTYPE"));
+        assertTrue(message, message.contains("type de document"));
     }
 
     /** Une image renommée en .xml est refusée avec un message français. */

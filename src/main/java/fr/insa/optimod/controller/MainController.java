@@ -397,8 +397,9 @@ public final class MainController {
             Runnable suite;
             try {
                 suite = travail.get();
-            } catch (RuntimeException | StackOverflowError
-                    | OutOfMemoryError erreur) {
+            } catch (RuntimeException | Error erreur) {
+                // Toute erreur, même une Error (pile ou mémoire épuisée sur
+                // un fichier piégé), doit rendre la main à l'interface.
                 suite = () -> signalerErreurInattendue(erreur);
             }
             Runnable suiteRetenue = suite;
@@ -408,7 +409,7 @@ public final class MainController {
                 }
                 try {
                     suiteRetenue.run();
-                } catch (RuntimeException erreur) {
+                } catch (RuntimeException | StackOverflowError erreur) {
                     signalerErreurInattendue(erreur);
                 }
             });
