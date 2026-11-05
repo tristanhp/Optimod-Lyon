@@ -66,7 +66,7 @@ public class CommandesDemandesTest {
     /** Tournée vide partant de l'entrepôt à cette heure. */
     private static Tournee tourneeVide(LocalTime depart) {
         return new Tournee(List.of(new Tournee.Arret(noeud(0), depart, depart,
-                TypeArret.ENTREPOT, null)), List.of());
+                TypeArret.ENTREPOT, null)), List.of(), true);
     }
 
     /**

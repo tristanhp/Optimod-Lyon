@@ -46,6 +46,7 @@ final class EtatCalculEnCours implements Etat {
         controleur.arreterAttente();
         if (tournees != null) {
             controleur.rangerTournees(tournees);
+            controleur.retenirConsigneNonProuvee(tournees);
             controleur.changerEtat(new EtatTourneeCalculee());
             controleur.confirmerCalcul(tournees);
         } else {

@@ -48,7 +48,7 @@ public class CommandeDeplacerPointTest {
                         TypeArret.COLLECTE, demande),
                 new Tournee.Arret(demande.livraison(), DEPART, DEPART,
                         TypeArret.LIVRAISON, demande),
-                entrepot(retour)), List.of());
+                entrepot(retour)), List.of(), true);
     }
 
     private final Map<Integer, Tournee> tourneesAvant = Map.of(1,

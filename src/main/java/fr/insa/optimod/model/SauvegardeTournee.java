@@ -174,7 +174,7 @@ public record SauvegardeTournee(Plan plan, Path fichierPlan,
                 passages.add(arret);
             }
             return new SauvegardeTournee(plan, fichierPlan, programme,
-                    new Tournee(passages, tournee.chemins()));
+                    new Tournee(passages, tournee.chemins(), false));
         } catch (IOException | DateTimeException | IllegalArgumentException
                 | IllegalStateException erreur) {
             throw new SAXException("Impossible de restaurer la tournée : "

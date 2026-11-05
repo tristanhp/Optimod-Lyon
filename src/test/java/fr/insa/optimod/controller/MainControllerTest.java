@@ -379,7 +379,7 @@ public class MainControllerTest {
                         LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
                 new Tournee.Arret(ENTREPOT, retour, retour,
                         TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
     }
 
     private static final Tournee TOURNEE = tourneeRevenantA(
@@ -923,6 +923,77 @@ public class MainControllerTest {
         assertEquals(TOURNEES, tournees());
         assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
+    }
+
+    /** Tournée du faux calcul dont le voyageur de commerce a été coupé. */
+    private static Tournee nonProuvee(Tournee tournee) {
+        return new Tournee(tournee.arrets(), tournee.chemins(), false);
+    }
+
+    /**
+     * Un calcul complet dont la limite de temps a été atteinte affiche
+     * « Solution non prouvée optimale » ; prouvé optimal, il n'affiche que la
+     * consigne de l'état.
+     */
+    @Test
+    public void calculNonProuveOptimalAfficheLaConsigne() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+
+        tourneesCalculees = Map.of(1, nonProuvee(TOURNEE));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("10 s"));
+    }
+
+    /** Avec plusieurs livreurs, la consigne nomme ceux non prouvés. */
+    @Test
+    public void calculNonProuveOptimalNommeLesLivreurs() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(3);
+        tourneesCalculees = Map.of(1, TOURNEE, 2, nonProuvee(TOURNEE),
+                3, nonProuvee(TOURNEE));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE_LIVREURS
+                .formatted("2, 3"), ecran.consigne);
+    }
+
+    /**
+     * La consigne « non prouvée optimale » est retrouvée après Annuler et
+     * Rétablir d'une modification, et remplacée par « ordre non optimisé »
+     * tant que la modification est appliquée.
+     */
+    @Test
+    public void consigneNonProuveeRetrouveeApresAnnulerEtRetablir()
+            throws Exception {
+        controleur = new MainController(ecran, (plan, programme) -> {
+            Map<Integer, Tournee> tournees = new java.util.TreeMap<>();
+            plan.calculerTournees(programme).forEach(
+                    (livreur, tournee) -> tournees.put(livreur,
+                            nonProuvee(tournee)));
+            return tournees;
+        }, Runnable::run, Runnable::run);
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(ressource("/data/demandePetit2.xml"));
+        ecran.actionCalculer.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+
+        ecran.actionSupprimer.accept(0);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+
+        ecran.actionRefaire.run();
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
     }
 
     /** Rétablir retrouve la tournée recalculée. */
@@ -1607,7 +1678,7 @@ public class MainControllerTest {
                 LocalTime.of(11, 0), LocalTime.of(11, 5), TypeArret.ENTREPOT,
                 null, LocalTime.of(8, 0), LocalTime.of(10, 0));
         controleur.obtenirProgramme().definirTournees(
-                Map.of(1, new Tournee(List.of(arret), List.of())));
+                Map.of(1, new Tournee(List.of(arret), List.of(), true)));
         controleur.retrouverEtatProgramme();
         assertEquals(List.of(arret), ecran.horsPlage);
         controleur.obtenirProgramme().definirTournees(TOURNEES);
@@ -1672,7 +1743,8 @@ public class MainControllerTest {
         assertTrue(fichier.length() > 0);
         ecran.actionSupprimer.accept(0);
         ecran.actionRestaurer.run();
-        assertEquals(avant, tournees().get(1));
+        assertEquals(avant.arrets(), tournees().get(1).arrets());
+        assertEquals(avant.chemins(), tournees().get(1).chemins());
         assertEquals(1, demandes().size());
         assertFalse(controleur.peutAnnuler());
         assertFalse(controleur.peutRefaire());
@@ -2095,7 +2167,8 @@ public class MainControllerTest {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         int rang = descendreUnArretPermis(avant);
         ecran.actionMonter.accept(1, rang + 1);
-        assertEquals(avant, tournees().get(1));
+        assertEquals(avant.arrets(), tournees().get(1).arrets());
+        assertEquals(avant.chemins(), tournees().get(1).chemins());
     }
 
     /**
