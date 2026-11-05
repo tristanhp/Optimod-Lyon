@@ -940,13 +940,14 @@ public final class MainController {
     }
 
     /**
-     * Genere les feuilles de route de la tournée calculée dans le fichier choisi.
+     * Genere les feuilles de route de la tournée calculée dans le fichier choisi
+     * par l'utilisateur.
      */
     public void genererFeuilleDeRoute() {
         for (Entry<Integer, Tournee> livreur : programme.obtenirTournees().entrySet()) {
             ecran.choisirFichierGenerationFeuilleDeRoute(livreur.getKey()).ifPresent(fichier -> {
                 try (FileWriter sortie = new FileWriter(fichier)) {
-                    genererFeuilleDeRouteHTMLPourLivreur(sortie, livreur.getValue());
+                    genererFeuilleDeRouteHTMLPourLivreur(sortie, livreur.getValue(), livreur.getKey());
                 } catch (IOException erreur) {
                     ecran.afficherErreurXml(erreur.getMessage());
                 }
@@ -954,7 +955,17 @@ public final class MainController {
         }
     }
 
-    private void genererFeuilleDeRouteHTMLPourLivreur(FileWriter fileOutpuWriter, Tournee tournee) throws IOException {
+    /**
+     * Genere une feuille de route HTML à fileOutputWriter de la tournee
+     *
+     * @param fileOutpuWriter Outil java qui ecrit la feuille de route au fichier
+     *                        selectionne
+     * @param tournee         La tournne dont la feuille de route sera écrite
+     * @param nb              l'id du livreur
+     * @throws IOException
+     */
+    private void genererFeuilleDeRouteHTMLPourLivreur(FileWriter fileOutpuWriter, Tournee tournee, int nb)
+            throws IOException {
         fileOutpuWriter.write("<!DOCTYPE html>\r\n" + //
                 "<html>\r\n" + //
                 "\r\n" + //
@@ -981,7 +992,7 @@ public final class MainController {
                 "\r\n" + //
                 "<body>\r\n" + //
                 "\r\n" + //
-                "    <h1 class=\"aligncenter\">Livreur n°N</h1>\r\n" + //
+                "    <h1 class=\"aligncenter\">Livreur n°" + nb + "</h1>\r\n" + //
                 "    <p> </p>\r\n" + //
                 "\r\n" + //
                 "    <h2>Heure de départ prévue de l'entrepot : 08:00</h2>\r\n" + //
