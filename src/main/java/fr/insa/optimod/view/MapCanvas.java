@@ -109,7 +109,10 @@ final class MapCanvas extends Pane {
     /** Écart entre deux passages sur un même tronçon, en pixels. */
     private static final double ECART_PASSAGES = 3.5;
 
-    /** Longueur d'écran en dessous de laquelle « ×N » n'est pas écrit. */
+    /**
+     * Longueur d'écran en dessous de laquelle « ×N » n'est écrit que sur le
+     * plus long tronçon repassé.
+     */
     private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
 
     /** Rouge d'un arrêt hors plage ou après l'heure limite. */
@@ -580,11 +583,7 @@ final class MapCanvas extends Pane {
                     fait++;
                 }
             }
-            passages.forEach((troncon, nombre) -> {
-                if (nombre > 1) {
-                    dessinerNombrePassages(contexte, troncon, nombre);
-                }
-            });
+            dessinerNombresPassages(contexte, passages);
         }
         contexte.setLineCap(StrokeLineCap.BUTT);
     }
@@ -638,16 +637,49 @@ final class MapCanvas extends Pane {
         contexte.fillPolygon(abscisses, ordonnees, 3);
     }
 
-    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois, s'il est long. */
+    /**
+     * Écrit « ×N » sur les tronçons repassés assez longs à l'écran, et
+     * toujours sur le plus long d'entre eux, pour que le doublement se lise
+     * aussi en vue d'ensemble.
+     */
+    private void dessinerNombresPassages(GraphicsContext contexte,
+            Map<Troncon, Integer> passages) {
+        Troncon plusLong = null;
+        for (Map.Entry<Troncon, Integer> entree : passages.entrySet()) {
+            Troncon troncon = entree.getKey();
+            if (entree.getValue() > 1) {
+                if (plusLong == null || longueurEcran(troncon)
+                        > longueurEcran(plusLong)) {
+                    plusLong = troncon;
+                }
+                if (longueurEcran(troncon) >= LONGUEUR_MINIMALE_NOMBRE) {
+                    dessinerNombrePassages(contexte, troncon,
+                            entree.getValue());
+                }
+            }
+        }
+        if (plusLong != null
+                && longueurEcran(plusLong) < LONGUEUR_MINIMALE_NOMBRE) {
+            dessinerNombrePassages(contexte, plusLong, passages.get(plusLong));
+        }
+    }
+
+    /** Longueur d'un tronçon à l'écran, en pixels. */
+    private double longueurEcran(Troncon troncon) {
+        return Math.hypot(
+                ecranX(troncon.destination().longitude())
+                        - ecranX(troncon.origine().longitude()),
+                ecranY(troncon.destination().latitude())
+                        - ecranY(troncon.origine().latitude()));
+    }
+
+    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois. */
     private void dessinerNombrePassages(GraphicsContext contexte,
             Troncon troncon, int nombre) {
         double x1 = ecranX(troncon.origine().longitude());
         double y1 = ecranY(troncon.origine().latitude());
         double x2 = ecranX(troncon.destination().longitude());
         double y2 = ecranY(troncon.destination().latitude());
-        if (Math.hypot(x2 - x1, y2 - y1) < LONGUEUR_MINIMALE_NOMBRE) {
-            return;
-        }
         double x = (x1 + x2) / 2;
         double y = (y1 + y2) / 2;
         String texte = "×" + nombre;
