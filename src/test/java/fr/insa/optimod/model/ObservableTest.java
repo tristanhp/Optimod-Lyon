@@ -24,7 +24,10 @@ public class ObservableTest {
     private final Compteur observable = new Compteur();
     private final List<String> appels = new ArrayList<>();
 
-    /** Les observateurs sont prévenus dans l'ordre d'inscription, avec la source. */
+    /**
+     * Les observateurs sont prévenus dans l'ordre d'inscription, avec la
+     * source.
+     */
     @Test
     public void previentLesObservateursDansLOrdre() {
         observable.ajouterObservateur(source -> {

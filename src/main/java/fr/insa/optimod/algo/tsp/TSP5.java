@@ -2,6 +2,7 @@ package fr.insa.optimod.algo.tsp;
 
 import java.util.Collection;
 
+/** Borne inférieure par arbre couvrant minimal (algorithme de Prim). */
 public class TSP5 extends TSP3 {
 
     /**
@@ -14,8 +15,10 @@ public class TSP5 extends TSP3 {
      * @return le cout de l'arbre couvrant minimal
      */
     @Override
-    protected int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus) {
-        // Si tous les sommets ont été visités, on calcule uniquement le coût du retour
+    protected int calculerBorneInferieure(Integer sommetCourant,
+            Collection<Integer> nonVus) {
+        // Si tous les sommets ont été visités, on calcule uniquement le coût du
+        // retour
         // au dépôt (sommet 0)
         if (nonVus.isEmpty()) {
             int coutRetour = g.obtenirCoutArc(sommetCourant, 0);
@@ -23,7 +26,8 @@ public class TSP5 extends TSP3 {
         }
 
         int borne = 0;
-        java.util.List<Integer> sommetsRestants = new java.util.ArrayList<>(nonVus);
+        java.util.List<Integer> sommetsRestants =
+                new java.util.ArrayList<>(nonVus);
         int n = g.obtenirNombreSommets();
 
         // Tableaux pour l'algorithme de Prim sur les sommets non vus
@@ -52,7 +56,8 @@ public class TSP5 extends TSP3 {
             int prochainSommet = -1;
             int minCout = Integer.MAX_VALUE;
 
-            // Recherche du sommet non visité le plus proche de l'arbre en construction
+            // Recherche du sommet non visité le plus proche de l'arbre en
+            // construction
             for (int sommet : sommetsRestants) {
                 if (!dansArbre[sommet] && minCoutVersSommet[sommet] < minCout) {
                     minCout = minCoutVersSommet[sommet];
@@ -79,7 +84,8 @@ public class TSP5 extends TSP3 {
             }
         }
 
-        // 2. Ajout de l'arête minimale sortante du sommet courant vers l'ensemble des
+        // 2. Ajout de l'arête minimale sortante du sommet courant vers
+        // l'ensemble des
         // sommets non vus
         int minCoutCourant = Integer.MAX_VALUE;
         for (int sommet : sommetsRestants) {

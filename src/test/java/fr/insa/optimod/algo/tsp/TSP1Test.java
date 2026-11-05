@@ -7,42 +7,46 @@ import java.util.HashMap;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+/** Tests du voyageur de commerce {@link TSP1}. */
 public class TSP1Test {
-    private static final int nbSommets = 10;
+    private static final int NB_SOMMETS = 10;
     private static final int COUT_MAX = 40;
     private static final int COUT_MIN = 10;
     private static GrapheDepandance grapheDepandance;
     private static TSP1 tsp1;
 
+    /** Prépare le graphe et le voyageur de commerce utilisés par les tests. */
     @BeforeClass
     public static void initialisation() {
         // Executé avant chaque test
         int iseed = 1;
         int cout[][];
-        cout = new int[nbSommets][nbSommets];
-        for (int i = 0; i < nbSommets; i++) {
-            for (int j = 0; j < nbSommets; j++) {
-                if (i == j)
+        cout = new int[NB_SOMMETS][NB_SOMMETS];
+        for (int i = 0; i < NB_SOMMETS; i++) {
+            for (int j = 0; j < NB_SOMMETS; j++) {
+                if (i == j) {
                     cout[i][j] = -1;
-                else {
+                } else {
                     int it = 16807 * (iseed % 127773) - 2836 * (iseed / 127773);
-                    if (it > 0)
+                    if (it > 0) {
                         iseed = it;
-                    else
+                    } else {
                         iseed = 2147483647 + it;
+                    }
                     cout[i][j] = COUT_MIN + iseed % (COUT_MAX - COUT_MIN + 1);
                 }
             }
         }
         HashMap<Integer, Integer> depandance = new HashMap<>();
-        for (int livraison = 2; livraison < nbSommets; livraison += 2) {
+        for (int livraison = 2; livraison < NB_SOMMETS; livraison += 2) {
             depandance.put(livraison, livraison - 1);
         }
 
-        grapheDepandance = new GrapheDepandance(nbSommets, cout, depandance);
+        grapheDepandance = new GrapheDepandance(NB_SOMMETS, cout, depandance);
 
         tsp1 = new TSP1();
-        tsp1.chercherSolution(10000, grapheDepandance); // Graphe à 10 sommet et temps limite =10s
+        // Graphe à 10 sommet et temps limite =10s
+        tsp1.chercherSolution(10000, grapheDepandance);
     }
 
     /** TSP1 renvoie le cout de la meilleur solution. */
@@ -50,10 +54,12 @@ public class TSP1Test {
     public void testTSP1() {
         // Test TSP1 sur un graphe complet à 10 sommet et vérifie le resultat
         int somme = 0;
-        for (int i = 1; i < nbSommets; i++) {
-            somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(i - 1), tsp1.obtenirSommetSolution(i));
+        for (int i = 1; i < NB_SOMMETS; i++) {
+            somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(
+                    i - 1), tsp1.obtenirSommetSolution(i));
         }
-        somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(nbSommets - 1), 0);
+        somme += grapheDepandance.obtenirCoutArc(tsp1.obtenirSommetSolution(
+                NB_SOMMETS - 1), 0);
         assertEquals(somme, tsp1.obtenirCoutSolution());
     }
 
@@ -67,7 +73,8 @@ public class TSP1Test {
     /** Test de la fonction croisementArc de TSP1 */
     @Test
     public void testCroisementArc() {
-        // TSP1 n'utilise pas la fonction croisementArc, elle renvoie toujours false
+        // TSP1 n'utilise pas la fonction croisementArc, elle renvoie toujours
+        // false
         assertEquals(false, tsp1.croisementArc(null, null, null, null));
     }
 }

@@ -15,7 +15,8 @@ public class IteratorSeq implements Iterator<Integer> {
     private int nombreCandidats;
 
     /**
-     * Cree un iterateur pour iterer sur l'ensemble des sommets de sommetsNonVisites
+     * Cree un iterateur pour iterer sur l'ensemble des sommets de
+     * sommetsNonVisites
      * qui sont
      * successeurs de sommetCourant dans le graphe graphe,
      * dans l'odre d'apparition dans <code>sommetsNonVisites</code>
@@ -24,13 +25,15 @@ public class IteratorSeq implements Iterator<Integer> {
      * @param sommetCourant     le sommet courant
      * @param graphe            le graphe
      */
-    public IteratorSeq(Collection<Integer> sommetsNonVisites, int sommetCourant, Graphe graphe) {
+    public IteratorSeq(Collection<Integer> sommetsNonVisites, int sommetCourant,
+            Graphe graphe) {
         this.candidats = new Integer[sommetsNonVisites.size()];
         Iterator<Integer> iterateurSommets = sommetsNonVisites.iterator();
         while (iterateurSommets.hasNext()) {
             Integer sommetCandidat = iterateurSommets.next();
-            if (graphe.estArc(sommetCourant, sommetCandidat))
+            if (graphe.estArc(sommetCourant, sommetCandidat)) {
                 candidats[nombreCandidats++] = sommetCandidat;
+            }
         }
     }
 
