@@ -542,12 +542,12 @@ final class MapCanvas extends Pane {
                     2 * RAYON_INTERSECTION, 2 * RAYON_INTERSECTION);
         }
         dessinerTournees(contexteGraphique);
+        dessinerLegende(contexteGraphique);
         if (programme != null) {
             dessinerDemandes(contexteGraphique);
         }
         dessinerNumerosArrets(contexteGraphique);
         dessinerPointsProvisoires(contexteGraphique);
-        dessinerLegende(contexteGraphique);
     }
 
     /**
@@ -744,9 +744,11 @@ final class MapCanvas extends Pane {
         double y = ecranY(depot.latitude());
         double[] abscisses = {x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT};
         double[] ordonnees = {y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y};
+        boolean retourTardif = existeRetourTardif();
         contexte.setFill(COULEUR_ENTREPOT);
-        contexte.setStroke(COULEUR_CONTOUR_ENTREPOT);
-        contexte.setLineWidth(3);
+        contexte.setStroke(retourTardif ? COULEUR_ARRET_TARDIF
+                : COULEUR_CONTOUR_ENTREPOT);
+        contexte.setLineWidth(retourTardif ? 5 : 3);
         contexte.strokePolygon(abscisses, ordonnees, 4);
         contexte.fillPolygon(abscisses, ordonnees, 4);
         dessinerEtiquetteEntrepot(contexte, x, y - TAILLE_ENTREPOT - 6);
@@ -787,11 +789,11 @@ final class MapCanvas extends Pane {
             if (existePassageRepete()) {
                 symboles.add(4);
             }
-            if (existeArretTardif()) {
+            if (existeArretTardif() || existeRetourTardif()) {
                 symboles.add(5);
             }
         }
-        double largeur = 210;
+        double largeur = largeurLegende(libelles, symboles);
         double hauteur = HAUTEUR_LIGNE_LEGENDE * symboles.size() + 8;
         double gauche = MARGE_LEGENDE;
         double haut = canevas.getHeight() - MARGE_LEGENDE - hauteur;
@@ -811,6 +813,20 @@ final class MapCanvas extends Pane {
         }
     }
 
+    /** Largeur de la légende : symbole, texte le plus long et marge. */
+    private static double largeurLegende(String[] libelles,
+            List<Integer> symboles) {
+        Text mesure = new Text();
+        mesure.setFont(Font.getDefault());
+        double plusLarge = 0;
+        for (int symbole : symboles) {
+            mesure.setText(libelles[symbole]);
+            plusLarge = Math.max(plusLarge,
+                    mesure.getLayoutBounds().getWidth());
+        }
+        return 32 + plusLarge + 12;
+    }
+
     /** Indique si une tournée affichée parcourt un tronçon plus d'une fois. */
     private boolean existePassageRepete() {
         return tournees.values().stream().anyMatch(tournee -> tournee
@@ -818,10 +834,25 @@ final class MapCanvas extends Pane {
                 .anyMatch(nombre -> nombre > 1));
     }
 
-    /** Indique si une tournée affichée a un arrêt hors plage ou après 13 h. */
+    /**
+     * Indique si une tournée affichée a un arrêt numéroté hors plage ou après
+     * 13 h (le retour à l'entrepôt est signalé par le contour du losange).
+     */
     private boolean existeArretTardif() {
-        return tournees.values().stream().anyMatch(tournee -> tournee.arrets()
-                .stream().anyMatch(MapCanvas::estTardif));
+        return tournees.values().stream().anyMatch(tournee -> {
+            List<Tournee.Arret> arrets = tournee.arrets();
+            return arrets.subList(1, Math.max(1, arrets.size() - 1)).stream()
+                    .anyMatch(MapCanvas::estTardif);
+        });
+    }
+
+    /** Indique si une tournée affichée revient à l'entrepôt trop tard. */
+    private boolean existeRetourTardif() {
+        return tournees.values().stream().anyMatch(tournee -> {
+            List<Tournee.Arret> arrets = tournee.arrets();
+            return arrets.size() > 1
+                    && estTardif(arrets.get(arrets.size() - 1));
+        });
     }
 
     /** Dessine le symbole de la ligne i de la légende, centré en (cx, cy). */
