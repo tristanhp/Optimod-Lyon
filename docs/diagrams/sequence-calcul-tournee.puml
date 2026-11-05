@@ -42,6 +42,7 @@ group Thread de l'interface
     L -> V : mettreAJour(programme)
     V --> U : arrêts et heures de passage, par livreur
     C -> C : historique.memoriserTournees(tournees)
+    note right of C : oublie les commandes annulées :\nplus rien à rétablir (TIG-107)
     C -> C : changerEtat(new EtatTourneeCalculee())
     note right of C : un retour après 13:00 n'est pas une erreur :\nla tournée est affichée, les arrêts en retard\nsont repérés par Arret.estApresHeureLimite()
   else Adresse inaccessible ou aucun ordre trouvé

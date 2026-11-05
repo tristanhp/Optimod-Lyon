@@ -62,7 +62,10 @@ avant le code et relu dans la PR.
    remet celles d'après, sans recalcul. Quand l'utilisateur calcule après une
    modification ou une annulation, `ListeDeCommandes.memoriserTournees`
    transmet les nouvelles tournées aux deux commandes voisines de l'état
-   actuel, ce qui garde le comportement de l'ancien cache.
+   actuel, ce qui garde le comportement de l'ancien cache. Depuis TIG-107,
+   le calcul oublie plutôt les commandes annulées, comme une nouvelle
+   commande : seule la dernière commande appliquée reçoit les tournées, et
+   Rétablir ne peut plus effacer un calcul.
 8. **Écran** : `MapScreen.afficherTournee` et `effacerTournee` sont retirées ;
    `MainView` relit les tournées du programme à chaque notification. Avec
    plusieurs livreurs, la liste porte un titre par livreur.
