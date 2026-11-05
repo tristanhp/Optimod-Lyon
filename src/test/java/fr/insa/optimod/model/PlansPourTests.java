@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
-
 /**
  * Plans partagés par les tests des algorithmes.
  */
@@ -32,9 +31,9 @@ final class PlansPourTests {
     /**
      * Construit un tronçon XML.
      *
-     * @param origine id du noeud de départ
+     * @param origine     id du noeud de départ
      * @param destination id du noeud d'arrivée
-     * @param longueur longueur en mètres
+     * @param longueur    longueur en mètres
      * @return l'élément XML du tronçon
      */
     private static String troncon(long origine, long destination,

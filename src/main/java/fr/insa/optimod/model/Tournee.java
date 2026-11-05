@@ -15,7 +15,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
  * premier arrêt est le départ de l'entrepôt, le dernier le retour à
  * l'entrepôt.
  *
- * @param arrets arrêts dans l'ordre de passage
+ * @param arrets  arrêts dans l'ordre de passage
  * @param chemins chemin entre l'arrêt {@code i} et l'arrêt {@code i + 1}
  */
 public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
@@ -33,13 +33,13 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
     /**
      * Arrêt de la tournée et ses heures de passage.
      *
-     * @param noeud adresse de l'arrêt
-     * @param arrivee heure d'arrivée
-     * @param depart heure de départ (arrivée plus durée sur place)
-     * @param type entrepôt, point de collecte ou point de livraison
-     * @param demande demande servie à cet arrêt, {@code null} à l'entrepôt
+     * @param noeud      adresse de l'arrêt
+     * @param arrivee    heure d'arrivée
+     * @param depart     heure de départ (arrivée plus durée sur place)
+     * @param type       entrepôt, point de collecte ou point de livraison
+     * @param demande    demande servie à cet arrêt, {@code null} à l'entrepôt
      * @param debutPlage début de la plage annoncée, inclus
-     * @param finPlage fin de la plage annoncée, incluse
+     * @param finPlage   fin de la plage annoncée, incluse
      */
     public record Arret(Noeud noeud, LocalTime arrivee, LocalTime depart,
             TypeArret type, Demande demande, LocalTime debutPlage,
@@ -48,15 +48,15 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
         /**
          * Crée un arrêt.
          *
-         * @param noeud adresse de l'arrêt
-         * @param arrivee heure d'arrivée
-         * @param depart heure de départ
-         * @param type entrepôt, point de collecte ou point de livraison
-         * @param demande demande servie, {@code null} à l'entrepôt
+         * @param noeud      adresse de l'arrêt
+         * @param arrivee    heure d'arrivée
+         * @param depart     heure de départ
+         * @param type       entrepôt, point de collecte ou point de livraison
+         * @param demande    demande servie, {@code null} à l'entrepôt
          * @param debutPlage début de la plage annoncée, inclus
-         * @param finPlage fin de la plage annoncée, incluse
+         * @param finPlage   fin de la plage annoncée, incluse
          * @throws IllegalArgumentException si l'entrepôt a une demande, ou
-         *         si une collecte ou une livraison n'en a pas
+         *                                  si une collecte ou une livraison n'en a pas
          */
         public Arret {
             Objects.requireNonNull(noeud, "noeud");
@@ -75,10 +75,10 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
          * Crée un arrêt dont la plage annoncée est d'une heure de part et
          * d'autre de l'heure d'arrivée.
          *
-         * @param noeud adresse de l'arrêt
+         * @param noeud   adresse de l'arrêt
          * @param arrivee heure d'arrivée
-         * @param depart heure de départ
-         * @param type entrepôt, point de collecte ou point de livraison
+         * @param depart  heure de départ
+         * @param type    entrepôt, point de collecte ou point de livraison
          * @param demande demande servie, {@code null} à l'entrepôt
          */
         public Arret(Noeud noeud, LocalTime arrivee, LocalTime depart,
@@ -125,7 +125,7 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
     /**
      * Crée une tournée en copiant les listes.
      *
-     * @param arrets arrêts dans l'ordre de passage
+     * @param arrets  arrêts dans l'ordre de passage
      * @param chemins chemins entre arrêts consécutifs
      */
     public Tournee {
@@ -138,7 +138,7 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      * l'entrepôt, et aucun chemin. Visible dans le package (programme de
      * livraisons, plan, tests).
      *
-     * @param entrepot adresse de l'entrepôt
+     * @param entrepot    adresse de l'entrepôt
      * @param heureDepart heure de départ de l'entrepôt
      * @return la tournée vide
      */

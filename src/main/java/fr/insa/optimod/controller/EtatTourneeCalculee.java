@@ -15,6 +15,22 @@ import fr.insa.optimod.controller.MapScreen.Action;
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE = "Tournée prête. Vous pouvez modifier le "
+            + "programme (ajouter, supprimer, déplacer, réordonner, "
+            + "changer de livreur).";
+
+    /**
+     * Garde la consigne « ordre non optimisé » tant que les tournées affichées
+     * viennent d'une modification faite à la main, même après un refus,
+     * Annuler ou Rétablir.
+     */
+    @Override
+    public String consigne(MainController controleur) {
+        String ordreGarde = controleur.obtenirConsigneOrdreGarde();
+        return ordreGarde.isEmpty() ? CONSIGNE : ordreGarde;
+    }
+
     @Override
     public void sauvegarder(MainController controleur) {
         controleur.sauvegarderTournee();
@@ -63,6 +79,16 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         controleur.changerLivreurDemande(position);
     }
 
+    /**
+     * Génère une feuille de route HTML par livreur dans le dossier choisi par
+     * l'utilisateur : numéro du livreur, heures de départ et de retour, arrêts
+     * dans l'ordre et itinéraire rue par rue.
+     */
+    @Override
+    public void genererFeuillesDeRoute(MainController controleur) {
+        controleur.genererFeuillesDeRoute();
+    }
+
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
@@ -71,6 +97,7 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
         actions.add(Action.SAUVEGARDER);
+        actions.add(Action.GENERER_FEUILLES_ROUTE);
         if (controleur.obtenirProgramme().obtenirNombreLivreurs() > 1) {
             actions.add(Action.CHANGER_LIVREUR);
         }

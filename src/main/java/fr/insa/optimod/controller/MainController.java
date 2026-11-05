@@ -2,6 +2,8 @@ package fr.insa.optimod.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -16,12 +18,13 @@ import java.util.logging.Logger;
 
 import org.xml.sax.SAXException;
 
-import fr.insa.optimod.model.ProgrammeLivraisons;
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
-import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.FeuilleDeRoute;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
+import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
+import fr.insa.optimod.model.Tournee;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -29,18 +32,21 @@ import fr.insa.optimod.model.SauvegardeTournee;
  * puis lance le calcul de la tournée quand l'utilisateur clique sur
  * « Calculer ».
  *
- * <p>Les clics sont délégués à l'état courant ({@link Etat}, design pattern
+ * <p>
+ * Les clics sont délégués à l'état courant ({@link Etat}, design pattern
  * State) : c'est lui qui décide si l'action est permise et quel est l'état
  * suivant. Le contrôleur fournit aux états les opérations élémentaires (lire
  * un fichier, lancer le calcul, mettre à jour l'écran).
  *
- * <p>Les tournées calculées sont rangées dans le programme de livraisons, une
+ * <p>
+ * Les tournées calculées sont rangées dans le programme de livraisons, une
  * par livreur ; la vue les observe. Les modifications des demandes passent
  * par des commandes annulables ({@link Commande}, design pattern Command),
  * qui gardent les tournées d'avant et d'après : annuler ou rétablir une
  * modification remet les tournées correspondantes sans les recalculer.
  *
- * <p>Supprimer une demande quand les tournées sont calculées ne relance pas le
+ * <p>
+ * Supprimer une demande quand les tournées sont calculées ne relance pas le
  * voyageur de commerce : seule la tournée du livreur de la demande est
  * recalculée localement, en gardant l'ordre de ses autres arrêts
  * ({@link #supprimerDemandeEnGardantLOrdre}).
@@ -48,8 +54,7 @@ import fr.insa.optimod.model.SauvegardeTournee;
 public final class MainController {
 
     /** Journal des échecs du recalcul local, pour les retrouver après coup. */
-    private static final Logger JOURNAL =
-            Logger.getLogger(MainController.class.getName());
+    private static final Logger JOURNAL = Logger.getLogger(MainController.class.getName());
 
     /**
      * Consigne affichée quand la tournée ne vient pas du voyageur de commerce
@@ -103,8 +108,7 @@ public final class MainController {
     private final MapScreen ecran;
 
     /** Calcul des tournées ({@link Plan#calculerTournees} hors tests). */
-    private final BiFunction<Plan, ProgrammeLivraisons,
-            Map<Integer, Tournee>> calculTournees;
+    private final BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calculTournees;
 
     /** Exécute le calcul hors du thread de l'interface. */
     private final Executor arrierePlan;
@@ -140,16 +144,16 @@ public final class MainController {
      * Crée le contrôleur, le branche aux boutons de l'écran et le place dans
      * l'état initial (seul l'import d'un plan est possible).
      *
-     * @param ecran écran à piloter
-     * @param calculTournees calcul des tournées d'un programme sur un plan
-     *        ({@code Plan::calculerTournees} ; remplaçable dans les tests)
-     * @param arrierePlan exécute le calcul hors du thread de l'interface
+     * @param ecran                écran à piloter
+     * @param calculTournees       calcul des tournées d'un programme sur un plan
+     *                             ({@code Plan::calculerTournees} ; remplaçable
+     *                             dans les tests)
+     * @param arrierePlan          exécute le calcul hors du thread de l'interface
      * @param interfaceUtilisateur exécute les mises à jour de la vue sur le
-     *        thread de l'interface
+     *                             thread de l'interface
      */
     public MainController(MapScreen ecran,
-            BiFunction<Plan, ProgrammeLivraisons,
-                    Map<Integer, Tournee>> calculTournees,
+            BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calculTournees,
             Executor arrierePlan, Executor interfaceUtilisateur) {
         this.ecran = ecran;
         this.calculTournees = calculTournees;
@@ -163,12 +167,9 @@ public final class MainController {
                 position -> etat.supprimerDemande(this, position));
         ecran.definirActionClicNoeud(
                 idNoeud -> etat.cliquerNoeud(this, idNoeud));
-        ecran.definirActionMonterArret((livreur, rang) ->
-                etat.changerOrdre(this, livreur, rang, -1));
-        ecran.definirActionDescendreArret((livreur, rang) ->
-                etat.changerOrdre(this, livreur, rang, 1));
-        ecran.definirActionDeplacerPoint((livreur, rang) ->
-                etat.deplacerPoint(this, livreur, rang));
+        ecran.definirActionMonterArret((livreur, rang) -> etat.changerOrdre(this, livreur, rang, -1));
+        ecran.definirActionDescendreArret((livreur, rang) -> etat.changerOrdre(this, livreur, rang, 1));
+        ecran.definirActionDeplacerPoint((livreur, rang) -> etat.deplacerPoint(this, livreur, rang));
         ecran.definirActionChangerLivreur(
                 position -> etat.changerLivreur(this, position));
         ecran.definirActionAnnuler(() -> etat.annuler(this));
@@ -177,6 +178,8 @@ public final class MainController {
         ecran.definirActionRestaurer(() -> etat.restaurer(this));
         ecran.definirActionErreurDessin(
                 detail -> etat.erreurDessin(this, detail));
+        ecran.definirActionGenererFeuillesDeRoute(
+                () -> etat.genererFeuillesDeRoute(this));
         changerEtat(new EtatInitial());
     }
 
@@ -196,13 +199,15 @@ public final class MainController {
     }
 
     /**
-     * Passe dans un nouvel état et met à jour les boutons de l'écran.
+     * Passe dans un nouvel état, met à jour les boutons de l'écran et affiche
+     * la consigne de cet état.
      *
      * @param nouvelEtat état suivant
      */
     void changerEtat(Etat nouvelEtat) {
         etat = nouvelEtat;
         ecran.activerActions(etat.actionsPermises(this));
+        ecran.afficherConsigne(etat.consigne(this));
     }
 
     /**
@@ -229,6 +234,7 @@ public final class MainController {
             plan = nouveauPlan;
             fichierPlan = fichier.toPath();
             ecran.afficherPlan(plan);
+            ecran.afficherConfirmation("Plan chargé.");
             return Lecture.REUSSIE;
         } catch (IOException | SAXException | IllegalArgumentException e) {
             plan = null;
@@ -254,6 +260,10 @@ public final class MainController {
             programme = new ProgrammeLivraisons(fichier.getPath(), plan);
             oublierModifications();
             ecran.afficherProgramme(programme);
+            ecran.signalerArretsHorsPlage(List.of());
+            int nombre = programme.obtenirDemandes().size();
+            ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
+                    : nombre + " demandes chargées.");
             return Lecture.REUSSIE;
         } catch (IOException | SAXException e) {
             ecran.afficherErreurXml(e.getMessage());
@@ -269,7 +279,7 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         ProgrammeLivraisons programmeCalcule = programme;
-        ecran.afficherConsigne(""); // efface la consigne d'un recalcul local
+        ecran.afficherConfirmation("");
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
@@ -314,7 +324,7 @@ public final class MainController {
     /**
      * Affiche les points choisis sans modifier le programme.
      *
-     * @param collecte point de collecte, ou null pour effacer l'aperçu
+     * @param collecte  point de collecte, ou null pour effacer l'aperçu
      * @param livraison point de livraison, ou null avant le second clic
      */
     void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -330,20 +340,40 @@ public final class MainController {
      * Comme pour la suppression, le calcul se fait avant la commande : annuler
      * et rétablir ne recalculent rien.
      *
+     * <p>Si l'insertion est refusée parce que le livreur rentrerait après
+     * 13 h, l'administrateur se voit proposer les livreurs qui peuvent prendre
+     * la demande ({@link Plan#trouverLivreursPossibles}), y compris celui de
+     * la demande, puisqu'une autre position peut suffire. Le livreur choisi,
+     * il choisit la position dans sa tournée, comme à l'ajout. S'il n'y a
+     * aucun livreur possible, ou s'il annule, l'ajout est abandonné : rien
+     * n'est modifié.
+     *
      * @param demande demande validée
      */
     void ajouterDemande(Demande demande) {
         Map<Integer, Tournee> avant = programme.obtenirTournees();
-        Commande commande = new CommandeAjouterDemande(programme, demande);
-        Tournee tourneeLivreur = avant.get(demande.livreur());
-        if (tourneeLivreur == null) {
-            executer(commande);
+        if (!avant.containsKey(demande.livreur())) {
+            executer(new CommandeAjouterDemande(programme, demande));
             return;
         }
+        placerDemande(demande, avant);
+    }
+
+    /**
+     * Fait choisir la position de la demande dans la tournée de son livreur,
+     * puis l'insère hors du thread de l'interface. Un refus pour cause de
+     * retour après 13 h mène à la proposition d'autres livreurs
+     * ({@link #proposerLivreurs}), qui peut rappeler cette méthode.
+     *
+     * @param demande demande à insérer chez son livreur
+     * @param avant tournées d'avant l'ajout, par livreur
+     */
+    private void placerDemande(Demande demande, Map<Integer, Tournee> avant) {
+        Tournee tourneeLivreur = avant.get(demande.livreur());
         Integer position = ecran.choisirPositionInsertion(tourneeLivreur)
                 .orElse(null);
         if (position == null) {
-            retrouverEtatProgramme();
+            annulerAjout();
             return;
         }
         Plan planCalcule = plan;
@@ -354,24 +384,103 @@ public final class MainController {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
                         demande, positionEffective(planCalcule,
                                 tourneeLivreur, demande, position));
-                interfaceUtilisateur.execute(() -> {
-                    ecran.afficherAttente(false);
-                    Map<Integer, Tournee> tournees = new TreeMap<>(avant);
-                    tournees.put(demande.livreur(), apres);
-                    commande.memoriserTourneesAvant(avant);
-                    commande.memoriserTourneesApres(
-                            Collections.unmodifiableMap(tournees));
-                    executer(commande);
-                    afficherConsigneOrdreNonOptimise(demande.livreur());
-                });
+                interfaceUtilisateur.execute(
+                        () -> finirAjout(demande, avant, apres));
+            } catch (IllegalStateException refus) {
+                chercherLivreurs(planCalcule, demande, avant, refus);
             } catch (RuntimeException erreur) {
-                interfaceUtilisateur.execute(() -> {
-                    ecran.afficherAttente(false);
-                    retrouverEtatProgramme();
-                    ecran.afficherErreurCalcul(erreur.getMessage());
-                });
+                interfaceUtilisateur.execute(() -> refuserAjout(erreur));
             }
         });
+    }
+
+    /**
+     * Cherche les livreurs possibles après un refus, hors du thread de
+     * l'interface, puis les propose sur ce thread.
+     *
+     * @param planCalcule plan sur lequel chercher
+     * @param demande demande refusée
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param refus cause du refus chez le livreur de la demande
+     */
+    private void chercherLivreurs(Plan planCalcule, Demande demande,
+            Map<Integer, Tournee> avant, IllegalStateException refus) {
+        List<Integer> possibles;
+        try {
+            possibles = planCalcule.trouverLivreursPossibles(avant, demande);
+        } catch (RuntimeException erreur) {
+            interfaceUtilisateur.execute(() -> refuserAjout(erreur));
+            return;
+        }
+        String raison = refus.getMessage() != null ? refus.getMessage()
+                : "L'ajout de la demande est impossible.";
+        interfaceUtilisateur.execute(
+                () -> proposerLivreurs(demande, avant, raison, possibles));
+    }
+
+    /**
+     * Sur le thread de l'interface, après un refus : sans livreur possible le
+     * refus est expliqué ; sinon l'administrateur choisit un livreur, puis la
+     * position chez lui ({@link #placerDemande}). Sans choix, l'ajout est
+     * abandonné. Dans tous les cas où l'ajout s'arrête, rien n'est modifié,
+     * pas même l'historique.
+     *
+     * @param demande demande refusée
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param raison cause du refus chez le livreur de la demande
+     * @param possibles livreurs qui peuvent prendre la demande avant 13 h
+     */
+    private void proposerLivreurs(Demande demande, Map<Integer, Tournee> avant,
+            String raison, List<Integer> possibles) {
+        ecran.afficherAttente(false);
+        if (possibles.isEmpty()) {
+            retrouverEtatProgramme();
+            ecran.afficherRefusAjout(raison + " Aucun livreur ne peut la "
+                    + "prendre.");
+            return;
+        }
+        Integer livreur = ecran.choisirLivreurPossible(demande.livreur(),
+                possibles, raison).orElse(null);
+        if (livreur == null || !possibles.contains(livreur)) {
+            retrouverEtatProgramme();
+            return;
+        }
+        placerDemande(demande.avecLivreur(livreur), avant);
+    }
+
+    /**
+     * Fin de l'ajout, sur le thread de l'interface : la commande range la
+     * demande et les tournées recalculées. Les tournées des autres livreurs
+     * sont reprises telles quelles.
+     *
+     * @param demande demande ajoutée, chez son livreur définitif
+     * @param avant tournées d'avant l'ajout, par livreur
+     * @param apres tournée du livreur de la demande, après l'insertion
+     */
+    private void finirAjout(Demande demande, Map<Integer, Tournee> avant,
+            Tournee apres) {
+        ecran.afficherAttente(false);
+        Map<Integer, Tournee> tournees = new TreeMap<>(avant);
+        tournees.put(demande.livreur(), apres);
+        Commande commande = new CommandeAjouterDemande(programme, demande);
+        commande.memoriserTourneesAvant(avant);
+        commande.memoriserTourneesApres(Collections.unmodifiableMap(tournees));
+        executer(commande);
+        afficherConsigneOrdreNonOptimise(demande.livreur());
+    }
+
+    /**
+     * Fin d'un ajout refusé, sur le thread de l'interface : la raison attendue
+     * est expliquée, une erreur inattendue est signalée et journalisée
+     * ({@link #signalerRefus}). Rien n'est modifié.
+     *
+     * @param erreur cause du refus
+     */
+    private void refuserAjout(RuntimeException erreur) {
+        ecran.afficherAttente(false);
+        retrouverEtatProgramme();
+        signalerRefus(erreur, ecran::afficherRefusAjout,
+                "de l'ajout d'une demande");
     }
 
     /**
@@ -383,7 +492,8 @@ public final class MainController {
     private static int positionEffective(Plan plan, Tournee tournee,
             Demande demande, int choix) {
         return choix == MapScreen.POSITION_MOINDRE_COUT
-                ? plan.trouverPositionMoindreCout(tournee, demande) : choix;
+                ? plan.trouverPositionMoindreCout(tournee, demande)
+                : choix;
     }
 
     /**
@@ -399,7 +509,8 @@ public final class MainController {
      * ({@link #finirChangementLivreur}).
      *
      * @param position rang dans le programme de la demande ; une position
-     *        invalide est ignorée, de même que tout appel avec un seul livreur
+     *                 invalide est ignorée, de même que tout appel avec un seul
+     *                 livreur
      */
     void changerLivreurDemande(int position) {
         List<Demande> demandes = programme.obtenirDemandes();
@@ -452,16 +563,17 @@ public final class MainController {
      * modifié, pas même l'historique. Sinon la commande remplace la demande par
      * la même confiée au nouveau livreur et range les tournées recalculées.
      *
-     * <p>Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
+     * <p>
+     * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
      * plus : seul un changement qui rend impossible une tournée possible est
      * refusé ({@link Plan#insererDemande}).
      *
      * @param position rang de la demande dans le programme
      * @param ancienne la demande chez son ancien livreur
      * @param nouvelle la demande chez son nouveau livreur
-     * @param avant tournées d'avant le changement
-     * @param apres tournées d'après, ou {@code null} en cas de refus
-     * @param echec cause du refus, ou {@code null}
+     * @param avant    tournées d'avant le changement
+     * @param apres    tournées d'après, ou {@code null} en cas de refus
+     * @param echec    cause du refus, ou {@code null}
      */
     private void finirChangementLivreur(int position, Demande ancienne,
             Demande nouvelle, Map<Integer, Tournee> avant,
@@ -475,7 +587,7 @@ public final class MainController {
         }
         executer(new CommandeChangerLivreur(programme, position, nouvelle,
                 avant, apres));
-        ecran.afficherConsigne(CONSIGNE_ORDRE_GARDE_LIVREURS.formatted(
+        garderOrdre(CONSIGNE_ORDRE_GARDE_LIVREURS.formatted(
                 ancienne.livreur(), nouvelle.livreur()));
     }
 
@@ -497,18 +609,27 @@ public final class MainController {
     void executer(Commande commande) {
         historique.executer(commande);
         retrouverEtatProgramme();
+        ecran.afficherConfirmation(commande.confirmation());
     }
 
     /** Annule la dernière modification des demandes. */
     void annulerCommande() {
-        historique.annuler();
+        Commande annulee = historique.annuler();
         retrouverEtatProgramme();
+        if (annulee != null) {
+            ecran.afficherConfirmation(
+                    "Annulé : " + annulee.description() + ".");
+        }
     }
 
     /** Rétablit la dernière modification annulée. */
     void refaireCommande() {
-        historique.refaire();
+        Commande retablie = historique.refaire();
         retrouverEtatProgramme();
+        if (retablie != null) {
+            ecran.afficherConfirmation(
+                    "Rétabli : " + retablie.description() + ".");
+        }
     }
 
     /** @return vrai s'il reste une modification à annuler */
@@ -521,6 +642,30 @@ public final class MainController {
         return historique.peutRefaire();
     }
 
+    /** Abandonne l'ajout d'une demande et le dit à l'utilisateur. */
+    void annulerAjout() {
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Ajout annulé.");
+    }
+
+    /** Abandonne le déplacement d'un point et le dit à l'utilisateur. */
+    void annulerDeplacement() {
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Déplacement annulé.");
+    }
+
+    /**
+     * Confirme que les tournées sont calculées, en nommant le nombre de
+     * livreurs s'il y en a plusieurs.
+     *
+     * @param tournees tournées calculées, par numéro de livreur
+     */
+    void confirmerCalcul(Map<Integer, Tournee> tournees) {
+        ecran.afficherConfirmation(tournees.size() > 1
+                ? "Tournées calculées pour " + tournees.size() + " livreurs."
+                : "Tournée calculée.");
+    }
+
     /**
      * Revient à l'état qui correspond au programme actuel :
      * {@link EtatTourneeCalculee} si ses tournées sont calculées, sinon
@@ -528,7 +673,6 @@ public final class MainController {
      */
     void retrouverEtatProgramme() {
         ecran.afficherPointsProvisoires(null, null);
-        ecran.afficherConsigne("");
         if (programme.obtenirTournees().isEmpty()) {
             changerEtat(new EtatProgrammeCharge());
         } else {
@@ -545,7 +689,9 @@ public final class MainController {
             try {
                 SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
                         programme);
+                ecran.afficherConfirmation("Tournée sauvegardée.");
             } catch (IOException erreur) {
+                ecran.afficherConfirmation("");
                 ecran.afficherErreurXml(erreur.getMessage());
             }
         });
@@ -559,8 +705,7 @@ public final class MainController {
             ecran.afficherAttente(true);
             arrierePlan.execute(() -> {
                 try {
-                    SauvegardeTournee sauvegarde =
-                            SauvegardeTournee.restaurer(fichier.toPath());
+                    SauvegardeTournee sauvegarde = SauvegardeTournee.restaurer(fichier.toPath());
                     interfaceUtilisateur.execute(() -> {
                         plan = sauvegarde.plan();
                         fichierPlan = sauvegarde.fichierPlan();
@@ -571,6 +716,7 @@ public final class MainController {
                         rangerTournees(Map.of(1, sauvegarde.tournee()));
                         ecran.afficherAttente(false);
                         retrouverEtatProgramme();
+                        ecran.afficherConfirmation("Tournée restaurée.");
                     });
                 } catch (SAXException erreur) {
                     interfaceUtilisateur.execute(() -> {
@@ -594,7 +740,7 @@ public final class MainController {
      * de l'interface ({@link #finirSuppression}).
      *
      * @param position rang dans le programme de la demande à supprimer ; une
-     *        position invalide est ignorée
+     *                 position invalide est ignorée
      */
     void supprimerDemandeEnGardantLOrdre(int position) {
         List<Demande> demandes = programme.obtenirDemandes();
@@ -627,11 +773,11 @@ public final class MainController {
      * sont retirées de l'écran) et l'utilisateur en est informé.
      *
      * @param position rang de la demande à supprimer
-     * @param livreur numéro du livreur de la demande supprimée
-     * @param avant tournées d'avant la suppression
-     * @param locale tournée recalculée du livreur, ou {@code null} en cas
-     *        d'échec
-     * @param echec cause de l'échec, ou {@code null}
+     * @param livreur  numéro du livreur de la demande supprimée
+     * @param avant    tournées d'avant la suppression
+     * @param locale   tournée recalculée du livreur, ou {@code null} en cas
+     *                 d'échec
+     * @param echec    cause de l'échec, ou {@code null}
      */
     private void finirSuppression(int position, int livreur,
             Map<Integer, Tournee> avant, Tournee locale,
@@ -662,9 +808,29 @@ public final class MainController {
      * @param livreur numéro du livreur dont la tournée a changé
      */
     private void afficherConsigneOrdreNonOptimise(int livreur) {
-        ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
+        garderOrdre(programme.obtenirNombreLivreurs() > 1
                 ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
                 : CONSIGNE_ORDRE_GARDE);
+    }
+
+    /**
+     * Affiche la consigne « ordre non optimisé » et la retient pour l'état
+     * actuel de l'historique : Annuler, Rétablir ou un refus la retrouveront
+     * tant que les tournées affichées gardent cet ordre.
+     *
+     * @param consigne consigne à afficher
+     */
+    private void garderOrdre(String consigne) {
+        historique.definirConsigneOrdre(consigne);
+        ecran.afficherConsigne(consigne);
+    }
+
+    /**
+     * @return consigne « ordre non optimisé » des tournées affichées, vide si
+     *         elles viennent du voyageur de commerce
+     */
+    String obtenirConsigneOrdreGarde() {
+        return historique.consigneOrdre();
     }
 
     /**
@@ -685,7 +851,8 @@ public final class MainController {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue du recalcul local",
                     echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
-                    ? echec.getMessage() : echec.getClass().getSimpleName());
+                    ? echec.getMessage()
+                    : echec.getClass().getSimpleName());
         }
     }
 
@@ -699,10 +866,10 @@ public final class MainController {
      * l'interface ({@link #finirChangementOrdre}). Les tournées des autres
      * livreurs ne changent pas.
      *
-     * @param livreur numéro du livreur de l'arrêt sélectionné
-     * @param rang rang de l'arrêt sélectionné dans la tournée de ce livreur
+     * @param livreur  numéro du livreur de l'arrêt sélectionné
+     * @param rang     rang de l'arrêt sélectionné dans la tournée de ce livreur
      * @param decalage {@code -1} pour monter l'arrêt, {@code 1} pour le
-     *        descendre
+     *                 descendre
      */
     void changerOrdreTournee(int livreur, int rang, int decalage) {
         Map<Integer, Tournee> avant = programme.obtenirTournees();
@@ -730,16 +897,18 @@ public final class MainController {
      * place des tournées d'avant, les mêmes avec la nouvelle tournée du
      * livreur, et l'arrêt déplacé reste sélectionné.
      *
-     * <p>Un changement qui ne fait que garder une tournée déjà en retard est
+     * <p>
+     * Un changement qui ne fait que garder une tournée déjà en retard est
      * accepté : seul un changement qui rend possible une tournée impossible est
      * refusé.
      *
-     * @param livreur numéro du livreur de la tournée
-     * @param avant tournées d'avant le changement
-     * @param apres tournée du livreur avec le nouvel ordre, ou {@code null} en
-     *        cas de refus
+     * @param livreur     numéro du livreur de la tournée
+     * @param avant       tournées d'avant le changement
+     * @param apres       tournée du livreur avec le nouvel ordre, ou {@code null}
+     *                    en
+     *                    cas de refus
      * @param nouveauRang rang de l'arrêt déplacé dans la nouvelle tournée
-     * @param echec cause du refus, ou {@code null}
+     * @param echec       cause du refus, ou {@code null}
      */
     private void finirChangementOrdre(int livreur,
             Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
@@ -761,7 +930,7 @@ public final class MainController {
         }
         Map<Integer, Tournee> tournees = new TreeMap<>(avant);
         tournees.put(livreur, apres);
-        executer(new CommandeChangerOrdre(programme, avant,
+        executer(new CommandeChangerOrdre(programme, livreur, avant,
                 Collections.unmodifiableMap(tournees)));
         afficherConsigneOrdreNonOptimise(livreur);
         // executer réaffiche les tournées, ce qui efface la sélection de la
@@ -775,12 +944,13 @@ public final class MainController {
      * expliquée à l'utilisateur ; une erreur inattendue est signalée et
      * journalisée, au lieu de laisser les actions bloquées.
      *
-     * @param echec cause du refus
-     * @param afficher affiche la raison attendue
+     * @param echec        cause du refus
+     * @param afficher     affiche la raison attendue
      * @param modification ce qui était demandé, pour le journal
      */
     private void signalerRefus(RuntimeException echec,
             Consumer<String> afficher, String modification) {
+        ecran.afficherConfirmation("");
         if (echec instanceof IllegalArgumentException
                 || echec instanceof IllegalStateException) {
             afficher.accept(echec.getMessage());
@@ -788,7 +958,8 @@ public final class MainController {
             JOURNAL.log(Level.SEVERE, "Erreur inattendue lors "
                     + modification, echec);
             ecran.afficherErreurCalcul(echec.getMessage() != null
-                    ? echec.getMessage() : echec.getClass().getSimpleName());
+                    ? echec.getMessage()
+                    : echec.getClass().getSimpleName());
         }
     }
 
@@ -800,9 +971,9 @@ public final class MainController {
      * l'explique.
      *
      * @param livreur numéro du livreur de l'arrêt sélectionné, ou {@code -1}
-     *        si aucun arrêt n'est sélectionné
-     * @param rang rang de l'arrêt dans la tournée de ce livreur, ou
-     *        {@code -1} si aucun arrêt n'est sélectionné
+     *                si aucun arrêt n'est sélectionné
+     * @param rang    rang de l'arrêt dans la tournée de ce livreur, ou
+     *                {@code -1} si aucun arrêt n'est sélectionné
      */
     void choisirPointADeplacer(int livreur, int rang) {
         Tournee tournee = programme.obtenirTournees().get(livreur);
@@ -811,7 +982,6 @@ public final class MainController {
             ecran.afficherConsigne(CONSIGNE_AUCUN_POINT);
         } else {
             changerEtat(new EtatDeplacementPoint(livreur, rang));
-            ecran.afficherConsigne(EtatDeplacementPoint.CONSIGNE);
         }
     }
 
@@ -825,7 +995,7 @@ public final class MainController {
      * ({@link #finirDeplacement}).
      *
      * @param livreur numéro du livreur de l'arrêt à déplacer
-     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     * @param rang    rang de l'arrêt à déplacer dans la tournée de ce livreur
      * @param idNoeud nœud cliqué, nouvelle adresse du point
      */
     void deplacerPoint(int livreur, int rang, long idNoeud) {
@@ -867,13 +1037,13 @@ public final class MainController {
      * avec la nouvelle tournée du livreur, et l'arrêt déplacé reste
      * sélectionné.
      *
-     * @param livreur numéro du livreur de la tournée
-     * @param rang rang de l'arrêt déplacé dans la tournée de ce livreur
+     * @param livreur  numéro du livreur de la tournée
+     * @param rang     rang de l'arrêt déplacé dans la tournée de ce livreur
      * @param ancienne demande dont un point est déplacé
-     * @param avant tournées d'avant le déplacement
-     * @param apres tournée du livreur avec le point déplacé, ou {@code null}
-     *        en cas de refus
-     * @param echec cause du refus, ou {@code null}
+     * @param avant    tournées d'avant le déplacement
+     * @param apres    tournée du livreur avec le point déplacé, ou {@code null}
+     *                 en cas de refus
+     * @param echec    cause du refus, ou {@code null}
      */
     private void finirDeplacement(int livreur, int rang, Demande ancienne,
             Map<Integer, Tournee> avant, Tournee apres,
@@ -920,11 +1090,35 @@ public final class MainController {
         changerEtat(new EtatInitial());
     }
 
-    /**
-     * Oublie l'historique et la consigne : le plan ou les demandes changent.
-     */
+    /** Oublie l'historique : le plan ou les demandes changent. */
     private void oublierModifications() {
         historique.vider();
-        ecran.afficherConsigne("");
+    }
+
+    /**
+     * Écrit une feuille de route HTML par livreur dans le dossier choisi par
+     * l'utilisateur ({@link FeuilleDeRoute}). Ne fait rien si le choix du
+     * dossier est annulé.
+     */
+    void genererFeuillesDeRoute() {
+        ecran.choisirDossierFeuillesDeRoute().ifPresent(dossier -> {
+            try {
+                Map<Integer, Tournee> tournees = programme.obtenirTournees();
+                for (Map.Entry<Integer, Tournee> tournee
+                        : tournees.entrySet()) {
+                    Files.writeString(dossier.toPath().resolve(
+                            FeuilleDeRoute.nomFichier(tournee.getKey())),
+                            FeuilleDeRoute.generer(plan, tournee.getKey(),
+                                    tournee.getValue()),
+                            StandardCharsets.UTF_8);
+                }
+                ecran.afficherConfirmation(tournees.size() == 1
+                        ? "Feuille de route générée dans " + dossier + "."
+                        : tournees.size() + " feuilles de route générées dans "
+                                + dossier + ".");
+            } catch (IOException | IllegalArgumentException erreur) {
+                ecran.afficherErreurXml(erreur.getMessage());
+            }
+        });
     }
 }

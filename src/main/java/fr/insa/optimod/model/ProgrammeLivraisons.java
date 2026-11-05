@@ -23,7 +23,8 @@ import org.xml.sax.SAXException;
  * de demandes) et, une fois calculées, les tournées des livreurs. Chaque
  * modification prévient les observateurs (design pattern Observer).
  *
- * <p>Les livreurs sont numérotés à partir de 1 ; il y en a un au départ, à
+ * <p>
+ * Les livreurs sont numérotés à partir de 1 ; il y en a un au départ, à
  * qui toutes les demandes d'un fichier sont confiées. Quand des tournées
  * existent, il y en a une par livreur, et les deux arrêts de chaque demande du
  * livreur <i>k</i> sont dans la tournée <i>k</i>, la collecte avant la
@@ -36,11 +37,11 @@ public final class ProgrammeLivraisons extends Observable {
      * Demande de livraison : un colis à récupérer au point de collecte puis à
      * déposer au point de livraison, par un livreur.
      *
-     * @param collecte point de collecte
-     * @param livraison point de livraison
-     * @param dureeCollecte durée sur place à la collecte, en secondes
+     * @param collecte       point de collecte
+     * @param livraison      point de livraison
+     * @param dureeCollecte  durée sur place à la collecte, en secondes
      * @param dureeLivraison durée sur place à la livraison, en secondes
-     * @param livreur numéro du livreur qui sert la demande (à partir de 1)
+     * @param livreur        numéro du livreur qui sert la demande (à partir de 1)
      */
     public record Demande(Noeud collecte, Noeud livraison, int dureeCollecte,
             int dureeLivraison, int livreur) {
@@ -48,13 +49,13 @@ public final class ProgrammeLivraisons extends Observable {
         /**
          * Crée une demande.
          *
-         * @param collecte point de collecte
-         * @param livraison point de livraison
-         * @param dureeCollecte durée sur place à la collecte, en secondes
+         * @param collecte       point de collecte
+         * @param livraison      point de livraison
+         * @param dureeCollecte  durée sur place à la collecte, en secondes
          * @param dureeLivraison durée sur place à la livraison, en secondes
-         * @param livreur numéro du livreur (à partir de 1)
+         * @param livreur        numéro du livreur (à partir de 1)
          * @throws IllegalArgumentException si une durée est négative ou si le
-         *         numéro de livreur est inférieur à 1
+         *                                  numéro de livreur est inférieur à 1
          */
         public Demande {
             Objects.requireNonNull(collecte, "collecte");
@@ -71,9 +72,9 @@ public final class ProgrammeLivraisons extends Observable {
         /**
          * Crée une demande confiée au livreur 1.
          *
-         * @param collecte point de collecte
-         * @param livraison point de livraison
-         * @param dureeCollecte durée sur place à la collecte, en secondes
+         * @param collecte       point de collecte
+         * @param livraison      point de livraison
+         * @param dureeCollecte  durée sur place à la collecte, en secondes
          * @param dureeLivraison durée sur place à la livraison, en secondes
          * @throws IllegalArgumentException si une durée est négative
          */
@@ -108,11 +109,11 @@ public final class ProgrammeLivraisons extends Observable {
     /**
      * Crée un programme d'un seul livreur.
      *
-     * @param entrepot adresse de l'entrepôt
+     * @param entrepot    adresse de l'entrepôt
      * @param heureDepart heure de départ de l'entrepôt
-     * @param demandes demandes à traiter, dans l'ordre
+     * @param demandes    demandes à traiter, dans l'ordre
      * @throws IllegalArgumentException si une demande est confiée à un autre
-     *         livreur que le livreur 1
+     *                                  livreur que le livreur 1
      */
     public ProgrammeLivraisons(Noeud entrepot, LocalTime heureDepart,
             List<Demande> demandes) {
@@ -128,10 +129,10 @@ public final class ProgrammeLivraisons extends Observable {
      * Lit un fichier de demandes. Les adresses doivent être des nœuds du plan.
      *
      * @param cheminFichierXml chemin du fichier XML
-     * @param plan plan où se trouvent les adresses
-     * @throws IOException si le fichier est illisible
+     * @param plan             plan où se trouvent les adresses
+     * @throws IOException  si le fichier est illisible
      * @throws SAXException si le XML ou ses données sont invalides, ou si une
-     *         adresse est absente du plan
+     *                      adresse est absente du plan
      */
     public ProgrammeLivraisons(String cheminFichierXml, Plan plan)
             throws IOException, SAXException {
@@ -142,10 +143,10 @@ public final class ProgrammeLivraisons extends Observable {
      * Lit des demandes depuis un flux XML.
      *
      * @param fluxXml contenu XML des demandes
-     * @param plan plan où se trouvent les adresses
-     * @throws IOException si le flux est illisible
+     * @param plan    plan où se trouvent les adresses
+     * @throws IOException  si le flux est illisible
      * @throws SAXException si le XML ou ses données sont invalides, ou si une
-     *         adresse est absente du plan
+     *                      adresse est absente du plan
      */
     public ProgrammeLivraisons(InputStream fluxXml, Plan plan)
             throws IOException, SAXException {
@@ -254,11 +255,11 @@ public final class ProgrammeLivraisons extends Observable {
      * Insère une demande et prévient les observateurs.
      *
      * @param position rang de la nouvelle demande, entre 0 et le nombre de
-     *        demandes
-     * @param demande demande à ajouter
+     *                 demandes
+     * @param demande  demande à ajouter
      * @throws IndexOutOfBoundsException si la position est hors de la liste
-     * @throws IllegalArgumentException si le livreur de la demande n'existe
-     *         pas
+     * @throws IllegalArgumentException  si le livreur de la demande n'existe
+     *                                   pas
      */
     public void ajouterDemande(int position, Demande demande) {
         verifierLivreur(demande);
@@ -284,11 +285,11 @@ public final class ProgrammeLivraisons extends Observable {
      * autre livreur) et prévient les observateurs.
      *
      * @param position rang de la demande à remplacer
-     * @param demande nouvelle demande
+     * @param demande  nouvelle demande
      * @return la demande remplacée
      * @throws IndexOutOfBoundsException si la position est hors de la liste
-     * @throws IllegalArgumentException si le livreur de la demande n'existe
-     *         pas
+     * @throws IllegalArgumentException  si le livreur de la demande n'existe
+     *                                   pas
      */
     public Demande remplacerDemande(int position, Demande demande) {
         verifierLivreur(demande);
@@ -317,7 +318,7 @@ public final class ProgrammeLivraisons extends Observable {
      *
      * @param nombre nouveau nombre de livreurs
      * @throws IllegalArgumentException si le nombre est inférieur à 1 ou si
-     *         un livreur retiré a encore des demandes
+     *                                  un livreur retiré a encore des demandes
      */
     public void definirNombreLivreurs(int nombre) {
         if (nombre < 1) {
@@ -331,8 +332,7 @@ public final class ProgrammeLivraisons extends Observable {
         }
         if (!tournees.isEmpty()) {
             tournees.tailMap(nombre + 1).clear();
-            for (int livreur = nombreLivreurs + 1; livreur <= nombre;
-                    livreur++) {
+            for (int livreur = nombreLivreurs + 1; livreur <= nombre; livreur++) {
                 tournees.put(livreur, Tournee.vide(entrepot, heureDepart));
             }
         }
@@ -357,9 +357,9 @@ public final class ProgrammeLivraisons extends Observable {
      * les tournées.
      *
      * @param nouvellesTournees une tournée par livreur, de 1 au nombre de
-     *        livreurs, ou aucune
+     *                          livreurs, ou aucune
      * @throws IllegalArgumentException s'il ne manque ou s'il y a en trop
-     *         une tournée de livreur
+     *                                  une tournée de livreur
      */
     public void definirTournees(Map<Integer, Tournee> nouvellesTournees) {
         verifierTournees(nouvellesTournees);
@@ -374,14 +374,15 @@ public final class ProgrammeLivraisons extends Observable {
      * qu'<b>une fois</b>, quand les demandes et les tournées sont cohérentes.
      * Si la demande ou les tournées sont refusées, rien n'est modifié.
      *
-     * @param position rang de la demande à remplacer
-     * @param demande nouvelle demande
+     * @param position          rang de la demande à remplacer
+     * @param demande           nouvelle demande
      * @param nouvellesTournees une tournée par livreur, de 1 au nombre de
-     *        livreurs, ou aucune
+     *                          livreurs, ou aucune
      * @return la demande remplacée
      * @throws IndexOutOfBoundsException si la position est hors de la liste
-     * @throws IllegalArgumentException si le livreur de la demande n'existe
-     *         pas, ou s'il manque ou s'il y a en trop une tournée de livreur
+     * @throws IllegalArgumentException  si le livreur de la demande n'existe
+     *                                   pas, ou s'il manque ou s'il y a en trop une
+     *                                   tournée de livreur
      */
     public Demande remplacerDemandeEtTournees(int position, Demande demande,
             Map<Integer, Tournee> nouvellesTournees) {
@@ -415,7 +416,7 @@ public final class ProgrammeLivraisons extends Observable {
      *
      * @param livreur numéro du livreur
      * @param tournee sa nouvelle tournée
-     * @throws IllegalStateException si aucune tournée n'est calculée
+     * @throws IllegalStateException    si aucune tournée n'est calculée
      * @throws IllegalArgumentException si le livreur n'existe pas
      */
     public void definirTournee(int livreur, Tournee tournee) {

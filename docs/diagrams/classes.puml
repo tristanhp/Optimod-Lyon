@@ -16,6 +16,7 @@ package "model" {
     +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
     +insererDemande(tournee, demande, position) : Tournee
     +trouverPositionMoindreCout(tournee, demande) : int
+    +trouverLivreursPossibles(tournees, demande) : List<Integer>
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     +calculerTourneeAvecPointDeplace(tournee : Tournee, rang : int, nouveau : Noeud) : Tournee
@@ -82,6 +83,10 @@ package "model" {
     livreur : int
     +avecLivreur(autreLivreur : int) : Demande
   }
+  class FeuilleDeRoute <<utilitaire>> {
+    +{static} generer(plan : Plan, livreur : int, tournee : Tournee) : String
+    +{static} nomFichier(livreur : int) : String
+  }
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
@@ -128,12 +133,16 @@ package "controller" {
     ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
   interface MapScreen {
+    +afficherConsigne(consigne : String)
+    +afficherConfirmation(confirmation : String)
     +saisirDemande() : Optional<SaisieDemande>
     +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
     +{static} POSITION_MOINDRE_COUT : int = 0
     +choisirPositionInsertion(tournee) : Optional<Integer>
     +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
     +afficherRefusChangementLivreur(detail)
+    +choisirLivreurPossible(livreurRefuse, livreurs, detail) : Optional<Integer>
+    +afficherRefusAjout(detail)
     +signalerArretsHorsPlage(arrets)
   }
   class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
@@ -141,7 +150,9 @@ package "controller" {
     dureeLivraison : String
     livreur : int
   }
-  interface Etat
+  interface Etat {
+    +consigne(controleur : MainController) : String
+  }
   class EtatInitial
   class EtatPlanCharge
   class EtatProgrammeCharge
@@ -154,6 +165,8 @@ package "controller" {
   interface Commande {
     +executer()
     +annuler()
+    +confirmation() : String
+    +description() : String
     +memoriserTourneesAvant(tournees : Map<Integer, Tournee>)
     +memoriserTourneesApres(tournees : Map<Integer, Tournee>)
   }
@@ -207,6 +220,8 @@ EtatCalculEnCours ..|> Etat
 EtatRestauration ..|> Etat
 MainController ..> SauvegardeTournee
 SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
+MainController ..> FeuilleDeRoute
+FeuilleDeRoute ..> Tournee : arrêts et chemins
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
 EtatDeplacementPoint ..|> Etat

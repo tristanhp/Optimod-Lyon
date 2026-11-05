@@ -39,6 +39,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Déplacer un point de collecte ou de livraison | fait |
 | Changer le livreur d'une demande (annulable) | fait |
 | Régler le nombre de livreurs | à faire |
+| Générer les feuilles de route (un fichier HTML par livreur, imprimable) | fait |
 | Sauvegarder et restaurer la tournée d'un livreur (XML) | fait (un livreur) |
 
 ## Installer le projet
@@ -117,6 +118,20 @@ Ne pas lancer `MainApp` directement : JavaFX exige de passer par
 `AppLauncher`.
 
 ### Utiliser
+
+**Guidage** : sous la barre d'outils, une bande bleue dit à chaque étape ce
+qu'il faut faire (importer un plan, importer les demandes, calculer, modifier
+la tournée…) ; elle change toute seule quand on passe à l'étape suivante.
+En bas de la fenêtre, une phrase en vert confirme ce qui vient d'être fait
+(« Demande ajoutée au livreur 2. », « Annulé : suppression d'une demande du
+livreur 1. »). Survoler un bouton affiche une infobulle ; un bouton grisé n'en
+affiche pas, c'est la consigne qui dit alors quoi faire d'abord.
+
+**Feuilles de route** : une fois la tournée calculée, *Générer les feuilles de
+route* demande un dossier et y écrit un fichier `feuille-de-route-livreur-N.html`
+par livreur : heures de départ et de retour, arrêts dans l'ordre (type, adresse,
+plage annoncée, heures, durée sur place) et itinéraire rue par rue entre deux
+arrêts. La page s'imprime depuis le navigateur.
 
 **Sauvegarde et restauration (modèle actuel : un livreur)** : après un calcul,
 cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
@@ -200,7 +215,14 @@ la position qui fait rentrer le livreur le plus tôt (collecte et livraison
 côte à côte) : l'administrateur garde la main, le calcul n'a lieu que s'il
 choisit cette entrée, et Annuler le défait. Le même dialogue sert à l'ajout
 d'une demande et au changement de livreur.
-Un ajout impossible avant 13 h est refusé sans modifier le programme.
+Si l'insertion fait rentrer le livreur après 13 h, l'application cherche les
+livreurs qui peuvent prendre la demande avant 13 h (en essayant la position
+*Moindre coût* chez chacun, sans rien insérer) et les propose, le livreur
+d'origine compris : une autre position chez lui peut suffire. L'administrateur
+choisit un livreur, puis la position dans sa tournée ; un nouveau refus rouvre
+la proposition. S'il annule, ou si aucun livreur ne peut la prendre, l'ajout est
+refusé avec un message et le programme n'est pas modifié. Une tournée qui rentre
+déjà après 13 h accepte une demande de plus, sans proposition.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
@@ -248,6 +270,7 @@ Termes principaux et leur traduction dans le code :
 | Durée sur place | Temps passé à récupérer ou déposer, en secondes | `dureeCollecte`, `dureeLivraison` |
 | Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h ; une par livreur | `Tournee`, `ProgrammeLivraisons.obtenirTournees()` |
 | Arrêt, heure de passage | Un point de la tournée (entrepôt, collecte ou livraison) et ses heures d'arrivée et de départ | `Tournee.Arret` |
+| Feuille de route | Page HTML imprimable d'un livreur : arrêts dans l'ordre, heures de passage et itinéraire rue par rue | `FeuilleDeRoute` |
 | Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
 | Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
 | Tournée possible | Tournée qui respecte toutes les règles, dont le retour avant 13 h | `Tournee.estPossible()` |

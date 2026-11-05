@@ -33,7 +33,8 @@ public class TourneeTest {
                 new Arret(A, depart, depart, TypeArret.COLLECTE, DEMANDE),
                 new Arret(B, depart, depart, TypeArret.LIVRAISON, DEMANDE),
                 new Arret(ENTREPOT, retour, retour, TypeArret.ENTREPOT,
-                        null)), List.of());
+                        null)),
+                List.of());
     }
 
     /** Une tournée vide part de l'entrepôt et n'a aucun chemin. */

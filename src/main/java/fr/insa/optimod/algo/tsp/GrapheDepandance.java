@@ -22,8 +22,7 @@ public class GrapheDepandance implements Graphe {
      * @param cout       la matrice de cout du graphe
      * @param depandance la liste de depandance du graphe
      */
-    public GrapheDepandance(int nbSommets, int[][] cout, HashMap<Integer,
-            Integer> depandance) {
+    public GrapheDepandance(int nbSommets, int[][] cout, HashMap<Integer, Integer> depandance) {
         this.nbSommets = nbSommets;
         this.cout = cout.clone();
         this.depandance = new HashMap<>(depandance);

@@ -2,8 +2,8 @@ package fr.insa.optimod.controller;
 
 import java.util.Map;
 
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 
 /**
@@ -30,7 +30,7 @@ final class CommandeAjouterDemande implements Commande {
 
     /**
      * @param programme demandes à modifier
-     * @param demande demande à ajouter
+     * @param demande   demande à ajouter
      */
     CommandeAjouterDemande(ProgrammeLivraisons programme, Demande demande) {
         this.programme = programme;
@@ -57,6 +57,16 @@ final class CommandeAjouterDemande implements Commande {
         programme.effacerTournees();
         programme.retirerDemande(position);
         programme.definirTournees(tourneesAvant);
+    }
+
+    @Override
+    public String confirmation() {
+        return "Demande ajoutée au livreur " + demande.livreur() + ".";
+    }
+
+    @Override
+    public String description() {
+        return "ajout d'une demande au livreur " + demande.livreur();
     }
 
     @Override

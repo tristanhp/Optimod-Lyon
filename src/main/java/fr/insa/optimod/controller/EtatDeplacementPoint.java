@@ -25,11 +25,16 @@ final class EtatDeplacementPoint implements Etat {
 
     /**
      * @param livreur numéro du livreur de l'arrêt à déplacer
-     * @param rang rang de l'arrêt à déplacer dans la tournée de ce livreur
+     * @param rang    rang de l'arrêt à déplacer dans la tournée de ce livreur
      */
     EtatDeplacementPoint(int livreur, int rang) {
         this.livreur = livreur;
         this.rang = rang;
+    }
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
     }
 
     @Override
@@ -43,7 +48,7 @@ final class EtatDeplacementPoint implements Etat {
     @Override
     public void deplacerPoint(MainController controleur, int livreurSelectionne,
             int rangSelectionne) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerDeplacement();
     }
 
     @Override

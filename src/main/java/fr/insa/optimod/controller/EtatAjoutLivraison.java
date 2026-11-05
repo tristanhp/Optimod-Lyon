@@ -23,10 +23,16 @@ final class EtatAjoutLivraison implements Etat {
 
     /**
      * Mémorise le point de collecte choisi.
+     *
      * @param idCollecte noeud de collecte choisi
      */
     EtatAjoutLivraison(long idCollecte) {
         this.idCollecte = idCollecte;
+    }
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
     }
 
     @Override
@@ -39,12 +45,12 @@ final class EtatAjoutLivraison implements Etat {
 
     @Override
     public void ajouterDemande(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
     public void annuler(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
@@ -78,7 +84,7 @@ final class EtatAjoutLivraison implements Etat {
             } catch (IllegalArgumentException erreur) {
                 controleur.afficherConsigne(erreur.getMessage());
             }
-        }, controleur::retrouverEtatProgramme);
+        }, controleur::annulerAjout);
     }
 
     @Override

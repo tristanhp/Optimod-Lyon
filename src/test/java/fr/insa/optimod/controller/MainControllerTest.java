@@ -33,12 +33,12 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import fr.insa.optimod.controller.MapScreen.Action;
+import fr.insa.optimod.model.Noeud;
+import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.TypeArret;
-import fr.insa.optimod.model.Noeud;
-import fr.insa.optimod.model.Plan;
 
 /**
  * Tests de {@link MainController} avec un faux écran, des exécuteurs
@@ -60,11 +60,14 @@ public class MainControllerTest {
         private BiConsumer<Integer, Integer> actionDeplacer;
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
+        private Runnable actionGenererFeuillesDeRoute;
         private LongConsumer actionClicNoeud;
         private Consumer<String> actionErreurDessin;
         private String erreurCarte;
         private String consigne = "";
+        private String confirmation = "";
         private File fichierChoisi;
+        private File dossierChoisi;
         private final List<String> evenements = new ArrayList<>();
         private Plan planAffiche;
         private ProgrammeLivraisons programmeAffiche;
@@ -79,15 +82,31 @@ public class MainControllerTest {
         private int livreurActuelPropose;
         private int nombreDeLivreursProposes;
         private String refusChangementLivreur;
+        /** Réponses successives aux propositions de livreur après un refus. */
+        private final Queue<Optional<Integer>> livreursPossiblesChoisis =
+                new ArrayDeque<>();
+        /** Listes de livreurs proposées après un refus, dans l'ordre. */
+        private final List<List<Integer>> livreursProposes = new ArrayList<>();
+        private final List<Integer> livreursRefuses = new ArrayList<>();
+        private String detailProposition;
+        private String refusAjout;
         private int livreurSelectionne = -1;
         private int arretSelectionne = -1;
         private Optional<SaisieDemande> saisie = Optional.of(
                 new SaisieDemande("5", "5", 1));
         private List<Tournee.Arret> horsPlage = List.of();
         private Optional<Integer> positionInsertion = Optional.of(1);
+        /**
+         * Réponses successives au choix de position, avant de revenir à
+         * {@link #positionInsertion} quand la file est vide.
+         */
+        private final Queue<Optional<Integer>> positionsEnFile =
+                new ArrayDeque<>();
+        private int nombreDePositionsProposees;
         private Noeud collecteProvisoire;
         private Noeud livraisonProvisoire;
-        private Runnable pendantSaisie = () -> { };
+        private Runnable pendantSaisie = () -> {
+        };
 
         @Override
         public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -97,7 +116,9 @@ public class MainControllerTest {
 
         @Override
         public Optional<Integer> choisirPositionInsertion(Tournee tournee) {
-            return positionInsertion;
+            nombreDePositionsProposees++;
+            return positionsEnFile.isEmpty() ? positionInsertion
+                    : positionsEnFile.remove();
         }
 
         @Override
@@ -194,6 +215,11 @@ public class MainControllerTest {
         }
 
         @Override
+        public void afficherConfirmation(String texte) {
+            confirmation = texte;
+        }
+
+        @Override
         public Optional<File> choisirFichierPlan() {
             return Optional.ofNullable(fichierChoisi);
         }
@@ -285,6 +311,23 @@ public class MainControllerTest {
         }
 
         @Override
+        public Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+                List<Integer> livreurs, String detail) {
+            livreursRefuses.add(livreurRefuse);
+            livreursProposes.add(List.copyOf(livreurs));
+            detailProposition = detail;
+            evenements.add("livreurs possibles");
+            return livreursPossiblesChoisis.isEmpty() ? Optional.empty()
+                    : livreursPossiblesChoisis.remove();
+        }
+
+        @Override
+        public void afficherRefusAjout(String detail) {
+            refusAjout = detail;
+            evenements.add("refus ajout");
+        }
+
+        @Override
         public void definirActionErreurDessin(Consumer<String> action) {
             actionErreurDessin = action;
         }
@@ -293,6 +336,16 @@ public class MainControllerTest {
         public void afficherErreurCarte(String detail) {
             erreurCarte = detail;
             evenements.add("erreur carte");
+        }
+
+        @Override
+        public void definirActionGenererFeuillesDeRoute(Runnable action) {
+            actionGenererFeuillesDeRoute = action;
+        }
+
+        @Override
+        public Optional<File> choisirDossierFeuillesDeRoute() {
+            return Optional.ofNullable(dossierChoisi);
         }
     }
 
@@ -312,7 +365,8 @@ public class MainControllerTest {
                 new Tournee.Arret(ENTREPOT, LocalTime.of(8, 0),
                         LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
                 new Tournee.Arret(ENTREPOT, retour, retour,
-                        TypeArret.ENTREPOT, null)), List.of());
+                        TypeArret.ENTREPOT, null)),
+                List.of());
     }
 
     private static final Tournee TOURNEE = tourneeRevenantA(
@@ -335,18 +389,18 @@ public class MainControllerTest {
             Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME, Action.CALCULER,
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
             Action.CHANGER_ORDRE, Action.DEPLACER_POINT, Action.RESTAURER,
-            Action.SAUVEGARDER);
+            Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
      * peut annuler.
      */
-    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION =
-            EnumSet.of(Action.IMPORTER_PLAN, Action.IMPORTER_PROGRAMME,
-                    Action.CALCULER, Action.AJOUTER_DEMANDE,
-                    Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
-                    Action.DEPLACER_POINT, Action.RESTAURER,
-                    Action.SAUVEGARDER, Action.ANNULER);
+    private static final Set<Action> MODIFIABLE_APRES_SUPPRESSION = EnumSet.of(Action.IMPORTER_PLAN,
+            Action.IMPORTER_PROGRAMME,
+            Action.CALCULER, Action.AJOUTER_DEMANDE,
+            Action.SUPPRIMER_DEMANDE, Action.CHANGER_ORDRE,
+            Action.DEPLACER_POINT, Action.RESTAURER,
+            Action.SAUVEGARDER, Action.ANNULER, Action.GENERER_FEUILLES_ROUTE);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -363,8 +417,7 @@ public class MainControllerTest {
     @Before
     public void creer() {
         ecran = new EcranFactice();
-        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul =
-                (plan, programme) -> {
+        BiFunction<Plan, ProgrammeLivraisons, Map<Integer, Tournee>> calcul = (plan, programme) -> {
             planRecu = plan;
             lotRecu = programme;
             if (erreurDeCalcul != null) {
@@ -850,7 +903,7 @@ public class MainControllerTest {
         ecran.actionAnnuler.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
         assertEquals(TOURNEES, tournees());
-        assertEquals("", ecran.consigne);
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
     }
 
@@ -968,7 +1021,7 @@ public class MainControllerTest {
         assertEquals(NOEUD_B, ajoutee.livraison().identifiant());
         assertEquals(300,
                 ajoutee.dureeCollecte());
-        assertEquals("", ecran.consigne);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
 
         ecran.actionAnnuler.run();
@@ -1110,10 +1163,46 @@ public class MainControllerTest {
         assertNull(ecran.livraisonProvisoire);
     }
 
+    /** Une durée de livraison invalide ou un livreur inconnu est refusé. */
+    @Test
+    public void livraisonInvalideEtLivreurInconnuRefuses() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        for (MapScreen.SaisieDemande saisie : List.of(
+                new MapScreen.SaisieDemande("5", "0", 1),
+                new MapScreen.SaisieDemande("5", "abc", 1),
+                new MapScreen.SaisieDemande("5", "5", 2))) {
+            ecran.saisie = Optional.of(saisie);
+            ecran.actionClicNoeud.accept(NOEUD_B);
+            assertEquals(2, demandes().size());
+            assertFalse(controleur.peutAnnuler());
+            assertFalse(ecran.consigne.isBlank());
+        }
+        ecran.actionAnnuler.run();
+        assertNull(ecran.collecteProvisoire);
+        assertNull(ecran.livraisonProvisoire);
+    }
+
+    /** Annuler l'aperçu ne défait pas la commande précédente. */
+    @Test
+    public void annulerApercuConserveHistorique() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionAnnuler.run();
+        assertEquals(1, demandes().size());
+        assertTrue(controleur.peutAnnuler());
+        assertNull(ecran.collecteProvisoire);
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+    }
+
     /** L'ajout après calcul conserve la tournée et ne relance pas le TSP. */
     @Test
     public void insertionLocaleAnnulableSansTsp() throws Exception {
-        int[] appels = {0};
+        int[] appels = { 0 };
         controleur = new MainController(ecran, (plan, programme) -> {
             appels[0]++;
             return plan.calculerTournees(programme);
@@ -1182,8 +1271,7 @@ public class MainControllerTest {
         arrierePlan.remove().run();
         assertEquals(3, demandes().size());
         assertFalse(ecran.horsPlage.isEmpty());
-        assertTrue(ecran.horsPlage.stream().allMatch(arret ->
-                arret.obtenirDecalageSecondes() > 3600));
+        assertTrue(ecran.horsPlage.stream().allMatch(arret -> arret.obtenirDecalageSecondes() > 3600));
         ecran.actionAnnuler.run();
         assertTrue(ecran.horsPlage.isEmpty());
         ecran.actionRefaire.run();
@@ -1207,10 +1295,290 @@ public class MainControllerTest {
         assertSame(avant, tournees().get(1));
         assertEquals(2, demandes().size());
         assertFalse(controleur.peutAnnuler());
-        assertNotNull(ecran.erreurCalcul);
+        assertNotNull(ecran.refusAjout);
+        assertNull(ecran.erreurCalcul);
+        assertTrue(ecran.livreursProposes.isEmpty());
         assertFalse(ecran.attente);
         assertNull(ecran.collecteProvisoire);
         assertNull(ecran.livraisonProvisoire);
+    }
+
+    // --- Ajout impossible avant 13 h : proposer un livreur (TIG-70) ---
+
+    /**
+     * Deux livreurs. Le livreur 1 a les deux demandes et sa tournée rentre
+     * exactement à 13:00 : toute demande de plus le fait rentrer après 13 h.
+     * Le livreur 2 n'a aucune demande et part tôt : il peut en prendre une
+     * petite.
+     */
+    private void calculerAvecLivreurUnAuLimite() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Tournee deHuitHeures = tournees().get(1);
+        long secondes = deHuitHeures.arrets().get(0).arrivee().until(
+                deHuitHeures.obtenirHeureRetour(),
+                java.time.temporal.ChronoUnit.SECONDS);
+        importerProgramme(deuxDemandesPartantA(
+                LocalTime.of(13, 0).minusSeconds(secondes)));
+        repartirEtCalculer(1);
+        assertEquals(LocalTime.of(13, 0),
+                tournees().get(1).obtenirHeureRetour());
+        assertTrue(tournees().get(1).estPossible());
+    }
+
+    /**
+     * Deux livreurs. Le livreur 1 a les deux demandes ; le départ est réglé
+     * pour qu'une petite demande (de {@link #NOEUD_A} à {@link #NOEUD_B}) le
+     * fasse rentrer à 13:00 par sa meilleure position seulement : la pire
+     * position le fait rentrer après 13 h.
+     *
+     * @return la pire position d'insertion de la demande chez le livreur 1
+     */
+    private int calculerAvecLivreurUnAuLimiteDuMoindreCout() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Plan plan = controleur.obtenirPlan();
+        Tournee tournee = tournees().get(1);
+        Demande demande = new Demande(plan.obtenirNoeud(NOEUD_A),
+                plan.obtenirNoeud(NOEUD_B), 120, 180, 1);
+        int meilleure = plan.trouverPositionMoindreCout(tournee, demande);
+        LocalTime retourMeilleur = plan.insererDemande(tournee, demande,
+                meilleure).obtenirHeureRetour();
+        int pire = meilleure;
+        LocalTime retourPire = retourMeilleur;
+        for (int position = 1; position < tournee.arrets().size();
+                position++) {
+            LocalTime retour = plan.insererDemande(tournee, demande,
+                    position).obtenirHeureRetour();
+            if (retour.isAfter(retourPire)) {
+                pire = position;
+                retourPire = retour;
+            }
+        }
+        assertTrue(retourPire.isAfter(retourMeilleur));
+        long marge = retourMeilleur.until(LocalTime.of(13, 0),
+                java.time.temporal.ChronoUnit.SECONDS);
+        importerProgramme(deuxDemandesPartantA(
+                tournee.arrets().get(0).arrivee().plusSeconds(marge)));
+        repartirEtCalculer(1);
+        assertEquals(LocalTime.of(13, 0), plan.insererDemande(
+                tournees().get(1), demande, meilleure).obtenirHeureRetour());
+        return pire;
+    }
+
+    /** Ajoute une demande de {@link #NOEUD_A} à {@link #NOEUD_B}. */
+    private void ajouterUneDemandeAuLivreur(int livreur, String dureeCollecte,
+            String dureeLivraison) {
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande(dureeCollecte,
+                dureeLivraison, livreur));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+    }
+
+    /**
+     * L'ajout est refusé chez le livreur 1 (retour après 13 h) : l'écran
+     * propose le livreur 2, que l'administrateur choisit. La demande est
+     * ajoutée chez lui, sans recalcul complet, et l'ajout s'annule et se
+     * rétablit comme un autre.
+     */
+    @Test
+    public void ajoutRefuseAutreLivreurTrouveEtChoisi() throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+        int calculsAvant = nombreDeCalculs;
+        ecran.livreursPossiblesChoisis.add(Optional.of(2));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(2)), ecran.livreursProposes);
+        assertEquals(List.of(1), ecran.livreursRefuses);
+        assertTrue(ecran.detailProposition.contains("13:00"));
+        assertNull(ecran.refusAjout);
+        assertEquals(2, ecran.nombreDePositionsProposees);
+        assertEquals(3, demandes().size());
+        assertEquals(2, demandes().get(2).livreur());
+        assertSame(avant.get(1), tournees().get(1));
+        assertEquals(4, tournees().get(2).arrets().size());
+        assertTrue(tournees().get(2).estPossible());
+        assertEquals(calculsAvant, nombreDeCalculs);
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+
+        Map<Integer, Tournee> apres = tournees();
+        ecran.actionAnnuler.run();
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        ecran.actionRefaire.run();
+        assertEquals(3, demandes().size());
+        assertSame(apres.get(2), tournees().get(2));
+        assertEquals(calculsAvant, nombreDeCalculs);
+    }
+
+    /**
+     * Personne ne peut prendre la demande avant 13 h : la liste est vide, le
+     * refus est expliqué, et demandes, tournées et historique ne changent pas.
+     */
+    @Test
+    public void ajoutRefuseSansLivreurPossible() throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+
+        ajouterUneDemandeAuLivreur(1, "300", "5");
+
+        assertNotNull(ecran.refusAjout);
+        assertTrue(ecran.refusAjout.contains("13:00"));
+        assertNull(ecran.erreurCalcul);
+        assertTrue(ecran.livreursProposes.isEmpty());
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertNull(ecran.collecteProvisoire);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * L'administrateur annule la proposition de livreur : l'ajout est
+     * abandonné sans message d'erreur, et rien n'est modifié.
+     */
+    @Test
+    public void ajoutRefuseEtAnnule() throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.livreursPossiblesChoisis.add(Optional.empty());
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(2)), ecran.livreursProposes);
+        assertNull(ecran.refusAjout);
+        assertNull(ecran.erreurCalcul);
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertNull(ecran.collecteProvisoire);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Après avoir choisi le livreur, l'administrateur annule le choix de la
+     * position : l'ajout est abandonné, rien n'est modifié.
+     */
+    @Test
+    public void annulerLaPositionApresUnRefusAbandonneLAjout()
+            throws Exception {
+        calculerAvecLivreurUnAuLimite();
+        Map<Integer, Tournee> avant = tournees();
+        ecran.positionsEnFile.add(Optional.of(1));
+        ecran.positionsEnFile.add(Optional.empty());
+        ecran.livreursPossiblesChoisis.add(Optional.of(2));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(2, ecran.nombreDePositionsProposees);
+        assertNull(ecran.refusAjout);
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertSame(avant.get(2), tournees().get(2));
+        assertFalse(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * La position choisie à la main fait rentrer après 13 h, mais la
+     * meilleure position du même livreur rentre à l'heure : le livreur est
+     * proposé lui aussi, et l'administrateur peut choisir une autre position
+     * chez lui.
+     */
+    @Test
+    public void ajoutRefuseAutrePositionChezLeMemeLivreur() throws Exception {
+        int pire = calculerAvecLivreurUnAuLimiteDuMoindreCout();
+        int calculsAvant = nombreDeCalculs;
+        ecran.positionsEnFile.add(Optional.of(pire));
+        ecran.positionsEnFile.add(Optional.of(MapScreen.POSITION_MOINDRE_COUT));
+        ecran.livreursPossiblesChoisis.add(Optional.of(1));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(1, 2)), ecran.livreursProposes);
+        assertNull(ecran.refusAjout);
+        assertEquals(3, demandes().size());
+        assertEquals(1, demandes().get(2).livreur());
+        assertEquals(LocalTime.of(13, 0),
+                tournees().get(1).obtenirHeureRetour());
+        assertTrue(tournees().get(1).estPossible());
+        assertEquals(calculsAvant, nombreDeCalculs);
+    }
+
+    /**
+     * Un nouveau refus, chez le livreur choisi, rouvre la proposition au lieu
+     * d'abandonner l'ajout.
+     */
+    @Test
+    public void nouveauRefusRouvreLaProposition() throws Exception {
+        int pire = calculerAvecLivreurUnAuLimiteDuMoindreCout();
+        ecran.positionsEnFile.add(Optional.of(pire));
+        ecran.positionsEnFile.add(Optional.of(pire));
+        ecran.positionsEnFile.add(Optional.of(MapScreen.POSITION_MOINDRE_COUT));
+        ecran.livreursPossiblesChoisis.add(Optional.of(1));
+        ecran.livreursPossiblesChoisis.add(Optional.of(1));
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertEquals(List.of(List.of(1, 2), List.of(1, 2)),
+                ecran.livreursProposes);
+        assertEquals(3, ecran.nombreDePositionsProposees);
+        assertNull(ecran.refusAjout);
+        assertEquals(3, demandes().size());
+        assertTrue(controleur.peutAnnuler());
+    }
+
+    /**
+     * Un livreur qui rentrait déjà après 13 h accepte une demande de plus
+     * ({@link Plan#insererDemande}) : l'ajout n'ouvre aucune proposition.
+     */
+    @Test
+    public void ajoutDansUneTourneeDejaEnRetardAccepte() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Tournee deHuitHeures = tournees().get(1);
+        long secondes = deHuitHeures.arrets().get(0).arrivee().until(
+                deHuitHeures.obtenirHeureRetour(),
+                java.time.temporal.ChronoUnit.SECONDS);
+        importerProgramme(deuxDemandesPartantA(
+                LocalTime.of(13, 30).minusSeconds(secondes)));
+        repartirEtCalculer(1);
+        assertFalse(tournees().get(1).estPossible());
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertTrue(ecran.livreursProposes.isEmpty());
+        assertNull(ecran.refusAjout);
+        assertEquals(3, demandes().size());
+        assertFalse(tournees().get(1).estPossible());
+        assertTrue(controleur.peutAnnuler());
+    }
+
+    /**
+     * Un refus qui n'est pas un retour après 13 h (position invalide) est
+     * expliqué sans proposer d'autre livreur.
+     */
+    @Test
+    public void positionInvalideRefuseeSansProposition() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        Map<Integer, Tournee> avant = tournees();
+        ecran.positionInsertion = Optional.of(99);
+
+        ajouterUneDemandeAuLivreur(1, "2", "3");
+
+        assertNotNull(ecran.refusAjout);
+        assertTrue(ecran.livreursProposes.isEmpty());
+        assertEquals(2, demandes().size());
+        assertSame(avant.get(1), tournees().get(1));
+        assertFalse(controleur.peutAnnuler());
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
     /** La liste des dépassements est transmise à l'écran. */
@@ -1249,7 +1617,7 @@ public class MainControllerTest {
         ecran.actionClicNoeud.accept(NOEUD_A);
         ecran.actionAjouter.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
-        assertEquals("", ecran.consigne);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
         assertEquals(2, demandes().size());
         assertEquals(MODIFIABLE, ecran.actions);
         assertNull(ecran.collecteProvisoire);
@@ -1535,7 +1903,7 @@ public class MainControllerTest {
 
         ecran.actionAnnuler.run();
         assertSame(complete, tournees().get(1));
-        assertEquals("", ecran.consigne);
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
     }
 
     /**
@@ -1639,7 +2007,7 @@ public class MainControllerTest {
 
         ecran.actionCalculer.run();
 
-        assertEquals("", ecran.consigne);
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
         assertEquals(2, nombreDeCalculs);
     }
 
@@ -2035,9 +2403,8 @@ public class MainControllerTest {
         assertEquals(avant.arrets().size(), apres.arrets().size());
         assertNotEquals(demandesAvant, demandes());
         assertEquals(apres.arrets().get(1).demande(),
-                demandes().stream().filter(d -> d.collecte().identifiant()
-                        == NOEUD_AILLEURS || d.livraison().identifiant()
-                        == NOEUD_AILLEURS).findFirst().orElseThrow());
+                demandes().stream().filter(d -> d.collecte().identifiant() == NOEUD_AILLEURS
+                        || d.livraison().identifiant() == NOEUD_AILLEURS).findFirst().orElseThrow());
         assertEquals(1, ecran.livreurSelectionne);
         assertEquals(1, ecran.arretSelectionne);
         assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
@@ -2521,5 +2888,467 @@ public class MainControllerTest {
     public void changerLivreurActifAvecPlusieursLivreurs() throws Exception {
         calculerAvecDeuxLivreurs(1);
         assertTrue(ecran.actions.contains(Action.CHANGER_LIVREUR));
+    }
+
+    // --- Guidage de l'utilisateur : une consigne par étape (TIG-105) ---
+
+    /** Dès l'ouverture, la consigne dit d'importer un plan. */
+    @Test
+    public void consigneInitialeAuDemarrage() {
+        assertEquals(EtatInitial.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("Importer le plan"));
+    }
+
+    /** Un plan chargé : la consigne nomme le bouton des demandes. */
+    @Test
+    public void consigneApresImportDuPlan() throws Exception {
+        importerPlan(ressource("/data/petitPlan.xml"));
+        assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
+        assertEquals(EtatPlanCharge.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("Importer les demandes"));
+    }
+
+    /** Un programme chargé : la consigne invite à cliquer sur Calculer. */
+    @Test
+    public void consigneApresImportDesDemandes() throws Exception {
+        chargerPlanEtLivraison();
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("Calculer"));
+    }
+
+    /** Pendant le calcul la consigne dit d'attendre, puis tournée prête. */
+    @Test
+    public void consignePendantEtApresLeCalcul() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
+        assertEquals(EtatCalculEnCours.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("Calcul en cours"));
+
+        executerArrierePlan();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("Tournée prête"));
+    }
+
+    /** Un calcul en échec ramène à la consigne du programme chargé. */
+    @Test
+    public void consigneApresUnCalculEnEchec() throws Exception {
+        chargerPlanEtLivraison();
+        erreurDeCalcul = new IllegalStateException("aucune solution");
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertNotNull(ecran.erreurCalcul);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
+    }
+
+    /** Un plan invalide ramène à la première étape, avec sa consigne. */
+    @Test
+    public void planInvalideRamenePremiereConsigne() throws Exception {
+        chargerPlanEtLivraison();
+        importerPlan(ecrire("ceci n'est pas du XML"));
+        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+        assertEquals(EtatInitial.CONSIGNE, ecran.consigne);
+    }
+
+    /** Des demandes invalides laissent la consigne de l'étape courante. */
+    @Test
+    public void demandesInvalidesGardentLaConsigne() throws Exception {
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(ecrire("ceci n'est pas du XML"));
+        assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
+        assertEquals(EtatPlanCharge.CONSIGNE, ecran.consigne);
+    }
+
+    /** Annuler le choix d'un fichier ne change ni l'étape ni la consigne. */
+    @Test
+    public void annulerLeChoixDUnFichierGardeLaConsigne() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.fichierChoisi = null;
+        ecran.actionImportPlan.run();
+        ecran.actionImportLivraison.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
+    }
+
+    /** Chaque état a une consigne en français, sans mot hors glossaire. */
+    @Test
+    public void chaqueEtatALaSienne() {
+        List<Etat> etats = List.of(new EtatInitial(), new EtatPlanCharge(),
+                new EtatProgrammeCharge(), new EtatCalculEnCours(),
+                new EtatTourneeCalculee(), new EtatRestauration(),
+                new EtatAjoutCollecte(), new EtatAjoutLivraison(NOEUD_A),
+                new EtatDeplacementPoint(1, 1));
+        for (Etat etat : etats) {
+            String consigne = etat.consigne(controleur);
+            assertFalse(etat.getClass().getSimpleName(),
+                    consigne == null || consigne.isBlank());
+            for (String interdit : List.of("pickup", "delivery", "request",
+                    "requête", "tour ", "stop")) {
+                assertFalse(etat.getClass().getSimpleName() + " : " + interdit,
+                        consigne.toLowerCase().contains(interdit));
+            }
+        }
+    }
+
+    /** Annuler la saisie d'un déplacement retrouve la tournée prête. */
+    @Test
+    public void annulerUnDeplacementRetrouveLaConsigne() throws Exception {
+        afficherUneTourneeDeDeuxDemandes();
+        ecran.actionDeplacer.accept(1, 1);
+        assertEquals(EtatDeplacementPoint.CONSIGNE, ecran.consigne);
+
+        ecran.actionDeplacer.accept(1, 1);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+        assertEquals("Déplacement annulé.", ecran.confirmation);
+    }
+
+    // --- Guidage de l'utilisateur : confirmations après action (TIG-105) ---
+
+    /** Le plan chargé est confirmé. */
+    @Test
+    public void confirmationApresImportDuPlan() throws Exception {
+        importerPlan(ressource("/data/petitPlan.xml"));
+        assertEquals("Plan chargé.", ecran.confirmation);
+    }
+
+    /** Les demandes chargées sont comptées, au singulier comme au pluriel. */
+    @Test
+    public void confirmationApresImportDesDemandes() throws Exception {
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(ressource("/data/demandePetit1.xml"));
+        assertEquals("1 demande chargée.", ecran.confirmation);
+        importerProgramme(ressource("/data/demandePetit2.xml"));
+        assertEquals("2 demandes chargées.", ecran.confirmation);
+    }
+
+    /** Le calcul confirme et nomme les livreurs s'il y en a plusieurs. */
+    @Test
+    public void confirmationApresLeCalcul() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals("Tournée calculée.", ecran.confirmation);
+
+        controleur.obtenirProgramme().definirNombreLivreurs(2);
+        tourneesCalculees = Map.of(1, TOURNEE, 2, TOURNEE);
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals("Tournées calculées pour 2 livreurs.", ecran.confirmation);
+    }
+
+    /** Une demande ajoutée avant le calcul est confirmée avec son livreur. */
+    @Test
+    public void confirmationApresAjoutSansTournee() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        assertEquals("Demande ajoutée au livreur 1.", ecran.confirmation);
+    }
+
+    /** Une demande insérée dans une tournée nomme le livreur concerné. */
+    @Test
+    public void confirmationApresAjoutDansUneTournee() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1, demandes().get(1).avecLivreur(2));
+        ecran.actionCalculer.run();
+        ecran.positionInsertion = Optional.of(1);
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("2", "3", 2));
+
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+
+        assertEquals("Demande ajoutée au livreur 2.", ecran.confirmation);
+    }
+
+    /** Annuler l'ajout en cours le dit, sans rien ajouter. */
+    @Test
+    public void confirmationQuandOnAnnuleLAjout() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionAjouter.run();
+        assertEquals("Ajout annulé.", ecran.confirmation);
+        assertEquals(2, demandes().size());
+    }
+
+    /** Une demande supprimée est confirmée avec son livreur. */
+    @Test
+    public void confirmationApresSuppression() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        assertEquals("Demande supprimée du livreur 1.", ecran.confirmation);
+    }
+
+    /** Un changement d'ordre est confirmé avec son livreur. */
+    @Test
+    public void confirmationApresChangementDOrdre() throws Exception {
+        descendreUnArretPermis(afficherUneTourneeDeDeuxDemandes());
+        assertEquals("Ordre des arrêts modifié pour le livreur 1.",
+                ecran.confirmation);
+    }
+
+    /** Un point déplacé est confirmé. */
+    @Test
+    public void confirmationApresDeplacement() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1, demandes().get(1).avecLivreur(2));
+        ecran.actionCalculer.run();
+
+        ecran.actionDeplacer.accept(2, 1);
+        ecran.actionClicNoeud.accept(NOEUD_AILLEURS);
+
+        assertEquals("Point du livreur 2 déplacé à la nouvelle adresse.",
+                ecran.confirmation);
+    }
+
+    /** Annuler puis rétablir disent ce qui a été annulé puis rétabli. */
+    @Test
+    public void confirmationAnnulerEtRetablirUneSuppression()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : suppression d'une demande du livreur 1.",
+                ecran.confirmation);
+
+        ecran.actionRefaire.run();
+        assertEquals("Rétabli : suppression d'une demande du livreur 1.",
+                ecran.confirmation);
+    }
+
+    /** Annuler un ajout dit ce qui a été annulé. */
+    @Test
+    public void confirmationAnnulerUnAjout() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : ajout d'une demande au livreur 1.",
+                ecran.confirmation);
+    }
+
+    /** Annuler un changement d'ordre dit ce qui a été annulé. */
+    @Test
+    public void confirmationAnnulerUnChangementDOrdre() throws Exception {
+        descendreUnArretPermis(afficherUneTourneeDeDeuxDemandes());
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : changement de l'ordre des arrêts du livreur 1.",
+                ecran.confirmation);
+    }
+
+    /** Annuler un déplacement dit ce qui a été annulé. */
+    @Test
+    public void confirmationAnnulerUnDeplacement() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        programme.definirNombreLivreurs(2);
+        programme.remplacerDemande(1, demandes().get(1).avecLivreur(2));
+        ecran.actionCalculer.run();
+        ecran.actionDeplacer.accept(2, 1);
+        ecran.actionClicNoeud.accept(NOEUD_AILLEURS);
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : déplacement d'un point du livreur 2.",
+                ecran.confirmation);
+    }
+
+    /** Un changement de livreur est confirmé, puis annulé. */
+    @Test
+    public void confirmationChangerLeLivreurPuisAnnuler() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+
+        ecran.actionChangerLivreur.accept(1);
+        assertEquals("Demande passée du livreur 1 au livreur 2.",
+                ecran.confirmation);
+
+        ecran.actionAnnuler.run();
+        assertEquals("Annulé : passage d'une demande du livreur 1 au "
+                + "livreur 2.", ecran.confirmation);
+    }
+
+    /** Annuler sans historique ne change pas la dernière confirmation. */
+    @Test
+    public void annulerSansHistoriqueNeConfirmeRien() throws Exception {
+        chargerDeuxDemandes();
+        String avant = ecran.confirmation;
+        ecran.actionAnnuler.run();
+        assertEquals(avant, ecran.confirmation);
+    }
+
+    // --- Corrections de la relecture de TIG-105 ---
+
+    /** Un nouvel import de demandes retire l'avertissement hors plage. */
+    @Test
+    public void nouvelImportDesDemandesEffaceLAvertissementHorsPlage()
+            throws Exception {
+        controleur = new MainController(ecran, Plan::calculerTournees,
+                arrierePlan::add, Runnable::run);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        arrierePlan.remove().run();
+        ecran.saisie = Optional.of(new MapScreen.SaisieDemande("70", "5", 1));
+        ecran.actionAjouter.run();
+        ecran.actionClicNoeud.accept(NOEUD_A);
+        ecran.actionClicNoeud.accept(NOEUD_B);
+        arrierePlan.remove().run();
+        assertFalse(ecran.horsPlage.isEmpty());
+
+        importerProgramme(ressource("/data/demandePetit2.xml"));
+
+        assertTrue(ecran.horsPlage.isEmpty());
+        assertTrue(tournees().isEmpty());
+    }
+
+    /**
+     * Après Annuler ou Rétablir, la consigne « ordre non optimisé » reste
+     * tant qu'une modification faite à la main reste appliquée, et disparaît
+     * quand les tournées sont revenues à celles du voyageur de commerce.
+     */
+    @Test
+    public void annulerEtRetablirGardentLaConsigneOrdreNonOptimise()
+            throws Exception {
+        descendreUnArretPermis(afficherUneTourneeDeDeuxDemandes());
+        descendreUnArretPermis(tournees().get(1));
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+
+        ecran.actionRefaire.run();
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionRefaire.run();
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+    }
+
+    /** Annuler un ajout en cours ne fait pas oublier l'ordre non optimisé. */
+    @Test
+    public void annulerUnAjoutGardeLaConsigneOrdreNonOptimise()
+            throws Exception {
+        descendreUnArretPermis(afficherUneTourneeDeDeuxDemandes());
+        ecran.actionAjouter.run();
+        assertEquals(EtatAjoutCollecte.CONSIGNE, ecran.consigne);
+
+        ecran.actionAjouter.run();
+
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+    }
+
+    /**
+     * Un refus ne change ni les tournées ni la consigne « ordre non
+     * optimisé », et efface la confirmation de l'action précédente, qui ne
+     * décrit plus ce qui vient de se passer.
+     */
+    @Test
+    public void refusGardeLaConsigneEtEffaceLaConfirmation() throws Exception {
+        descendreUnArretPermis(afficherUneTourneeDeDeuxDemandes());
+        assertFalse(ecran.confirmation.isEmpty());
+        int nombreDArrets = tournees().get(1).arrets().size();
+        for (int rang = 1; rang < nombreDArrets - 1; rang++) {
+            ecran.refusOrdre = null;
+            ecran.confirmation = "avant";
+            ecran.actionMonter.accept(1, rang);
+            if (ecran.refusOrdre != null) {
+                assertEquals(MainController.CONSIGNE_ORDRE_GARDE,
+                        ecran.consigne);
+                assertEquals("", ecran.confirmation);
+                return;
+            }
+        }
+        throw new AssertionError("Aucun changement d'ordre n'a été refusé.");
+    }
+
+    /** Lancer un calcul efface la confirmation de l'action précédente. */
+    @Test
+    public void calculerEffaceLaConfirmationPrecedente() throws Exception {
+        chargerDeuxDemandes();
+        ecran.confirmation = "2 demandes chargées.";
+        ecran.actionCalculer.run();
+        assertEquals("", ecran.confirmation);
+    }
+
+    /** Sauvegarder puis restaurer sont confirmés. */
+    @Test
+    public void confirmationSauvegardeEtRestauration() throws Exception {
+        controleur = new MainController(ecran);
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        ecran.fichierChoisi = dossier.newFile("sauvegarde.xml");
+
+        ecran.actionSauvegarder.run();
+        assertEquals("Tournée sauvegardée.", ecran.confirmation);
+
+        ecran.actionRestaurer.run();
+        assertEquals("Tournée restaurée.", ecran.confirmation);
+    }
+
+    // --- Feuilles de route ---
+
+    /** Calcule la tournée factice du livreur 1. */
+    private void calculerUneTournee() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+    }
+
+    /** La feuille de chaque livreur est écrite dans le dossier choisi. */
+    @Test
+    public void feuillesDeRouteEcritesDansLeDossierChoisi() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = dossier.newFolder("feuilles");
+        ecran.actionGenererFeuillesDeRoute.run();
+        File feuille = new File(ecran.dossierChoisi,
+                "feuille-de-route-livreur-1.html");
+        assertTrue(feuille.getName(), feuille.isFile());
+        assertTrue(Files.readString(feuille.toPath())
+                .contains("Livreur n°1"));
+        assertEquals("Feuille de route générée dans " + ecran.dossierChoisi
+                + ".", ecran.confirmation);
+    }
+
+    /** Annuler le choix du dossier n'écrit rien. */
+    @Test
+    public void feuillesDeRouteAnnuleesSansDossier() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = null;
+        String avant = ecran.confirmation;
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertEquals(avant, ecran.confirmation);
+    }
+
+    /** Sans tournée calculée, l'action est ignorée. */
+    @Test
+    public void feuillesDeRouteIgnoreesSansTournee() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.dossierChoisi = dossier.newFolder("feuilles");
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertEquals(0, ecran.dossierChoisi.list().length);
+    }
+
+    /** Un dossier inexistant est signalé sans planter. */
+    @Test
+    public void feuillesDeRouteDossierInexistantSignale() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = new File(dossier.getRoot(), "absent");
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertTrue(ecran.evenements.contains("invalide"));
     }
 }

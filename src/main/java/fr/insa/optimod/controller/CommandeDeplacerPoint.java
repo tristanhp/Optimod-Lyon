@@ -30,9 +30,9 @@ final class CommandeDeplacerPoint implements Commande {
     private Map<Integer, Tournee> tourneesApres;
 
     /**
-     * @param programme demandes à modifier
-     * @param position rang de la demande dont un point est déplacé
-     * @param apres la demande avec le point à son nouveau nœud
+     * @param programme     demandes à modifier
+     * @param position      rang de la demande dont un point est déplacé
+     * @param apres         la demande avec le point à son nouveau nœud
      * @param tourneesAvant tournées par numéro de livreur avant le déplacement
      * @param tourneesApres les mêmes, avec la nouvelle tournée du livreur
      */
@@ -55,6 +55,17 @@ final class CommandeDeplacerPoint implements Commande {
     @Override
     public void annuler() {
         programme.remplacerDemandeEtTournees(position, avant, tourneesAvant);
+    }
+
+    @Override
+    public String confirmation() {
+        return "Point du livreur " + apres.livreur()
+                + " déplacé à la nouvelle adresse.";
+    }
+
+    @Override
+    public String description() {
+        return "déplacement d'un point du livreur " + apres.livreur();
     }
 
     @Override

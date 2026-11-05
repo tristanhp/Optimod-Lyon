@@ -95,8 +95,7 @@ public class TSP3Test {
         ArrayList<Integer> list = new ArrayList<Integer>(Arrays.asList(1, 2, 4,
                 5, 6, 7, 8, 9));
         Integer sommetDepart = 0;
-        Iterator<Integer> iterator =
-                tsp3.creerIterateurSuccesseurs(sommetDepart, list,
+        Iterator<Integer> iterator = tsp3.creerIterateurSuccesseurs(sommetDepart, list,
                 grapheDepandance);
         if (!iterator.hasNext()) {
             return;
@@ -106,10 +105,9 @@ public class TSP3Test {
             Integer suivant = iterator.next();
             System.out.println(
                     grapheDepandance.obtenirCoutArc(sommetDepart, precedent)
-                    + " " + grapheDepandance.obtenirCoutArc(
-                            sommetDepart, suivant));
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent)
-                    <= grapheDepandance.obtenirCoutArc(
+                            + " " + grapheDepandance.obtenirCoutArc(
+                                    sommetDepart, suivant));
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
                     sommetDepart,
                     suivant));
             precedent = suivant;
@@ -124,8 +122,7 @@ public class TSP3Test {
         ArrayList<Integer> list = new ArrayList<Integer>(Arrays.asList(1, 2, 4,
                 5, 6, 7, 8, 9));
         Integer sommetDepart = 3;
-        Iterator<Integer> iterator =
-                tsp3.creerIterateurSuccesseurs(sommetDepart, list,
+        Iterator<Integer> iterator = tsp3.creerIterateurSuccesseurs(sommetDepart, list,
                 grapheDepandance);
         if (!iterator.hasNext()) {
             return;
@@ -133,8 +130,7 @@ public class TSP3Test {
         Integer precedent = iterator.next();
         while (iterator.hasNext()) {
             Integer suivant = iterator.next();
-            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent)
-                    <= grapheDepandance.obtenirCoutArc(
+            assertTrue(grapheDepandance.obtenirCoutArc(sommetDepart, precedent) <= grapheDepandance.obtenirCoutArc(
                     sommetDepart,
                     suivant));
             precedent = suivant;

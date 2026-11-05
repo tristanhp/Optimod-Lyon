@@ -10,6 +10,16 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * les demandes (ajout, suppression) et annuler ou rétablir ces modifications.
  */
 class EtatProgrammeCharge implements Etat {
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE =
+            "Cliquez sur « Calculer » pour calculer "
+            + "la tournée.";
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
 
     @Override
     public void restaurer(MainController controleur) {
@@ -25,13 +35,11 @@ class EtatProgrammeCharge implements Etat {
     @Override
     public void ajouterDemande(MainController controleur) {
         controleur.changerEtat(new EtatAjoutCollecte());
-        controleur.afficherConsigne(EtatAjoutCollecte.CONSIGNE);
     }
 
     @Override
     public void supprimerDemande(MainController controleur, int position) {
-        if (position >= 0 && position
-                < controleur.obtenirProgramme().obtenirDemandes().size()) {
+        if (position >= 0 && position < controleur.obtenirProgramme().obtenirDemandes().size()) {
             controleur.executer(new CommandeSupprimerDemande(
                     controleur.obtenirProgramme(), position));
         }

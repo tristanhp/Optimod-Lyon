@@ -9,7 +9,8 @@ import fr.insa.optimod.model.Tournee;
  * exécutées sont gardées par {@link ListeDeCommandes} pour pouvoir les annuler
  * puis les rétablir.
  *
- * <p>Une commande garde les tournées d'avant et d'après la modification :
+ * <p>
+ * Une commande garde les tournées d'avant et d'après la modification :
  * {@link #annuler()} remet celles d'avant, et rétablir (un nouvel
  * {@link #executer()}) remet celles d'après, sans recalcul.
  */
@@ -23,6 +24,23 @@ interface Commande {
 
     /** Défait la modification, en remettant le modèle dans l'état d'avant. */
     void annuler();
+
+    /**
+     * Dit à l'utilisateur ce qui vient d'être fait, une fois la commande
+     * exécutée.
+     *
+     * @return phrase complète, par exemple « Demande ajoutée au livreur 2. »
+     */
+    String confirmation();
+
+    /**
+     * Nomme la modification, pour les messages « Annulé : … » et
+     * « Rétabli : … ». Valable une fois la commande exécutée.
+     *
+     * @return groupe nominal sans majuscule ni point, par exemple « ajout
+     *         d'une demande au livreur 2 »
+     */
+    String description();
 
     /**
      * Retient les tournées calculées après coup (« Calculer ») pour l'état

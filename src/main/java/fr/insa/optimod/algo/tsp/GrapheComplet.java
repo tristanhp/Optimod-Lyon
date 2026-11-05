@@ -22,10 +22,8 @@ public class GrapheComplet implements Graphe {
         this.nombreSommets = nombreSommets;
         int graineAleatoire = 1;
         coutsArcs = new int[nombreSommets][nombreSommets];
-        for (int indiceSommet = 0; indiceSommet
-                < nombreSommets; indiceSommet++) {
-            for (int indiceDestination = 0; indiceDestination
-                    < nombreSommets; indiceDestination++) {
+        for (int indiceSommet = 0; indiceSommet < nombreSommets; indiceSommet++) {
+            for (int indiceDestination = 0; indiceDestination < nombreSommets; indiceDestination++) {
                 if (indiceSommet == indiceDestination) {
                     coutsArcs[indiceSommet][indiceDestination] = -1;
                 } else {
