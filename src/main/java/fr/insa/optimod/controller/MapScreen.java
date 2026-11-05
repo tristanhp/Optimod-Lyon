@@ -109,6 +109,8 @@ public interface MapScreen {
         IMPORTER_PROGRAMME,
         /** Bouton « Calculer ». */
         CALCULER,
+        /** Le bouton de calcul se nomme « Recalculer » (tournées calculées). */
+        RECALCULER,
         /** Bouton « Ajouter une demande » (ou annuler l'ajout en cours). */
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */

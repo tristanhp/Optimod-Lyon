@@ -23,8 +23,8 @@ import fr.insa.optimod.model.Tournee;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
-import javafx.scene.control.ButtonBar;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ComboBox;
@@ -338,6 +338,8 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setDisable(
                 !actions.contains(Action.IMPORTER_PROGRAMME));
         boutonCalculer.setDisable(!actions.contains(Action.CALCULER));
+        boutonCalculer.setText(actions.contains(Action.RECALCULER)
+                ? "Recalculer" : "Calculer");
         boutonAjouter.setDisable(!actions.contains(Action.AJOUTER_DEMANDE));
         champLivreurs.setDisable(
                 !actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
@@ -462,19 +464,36 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         return dialogue.showAndWait();
     }
 
+    /** Bouton « Oui » de la confirmation du recalcul. */
+    static final ButtonType OUI = new ButtonType("Oui",
+            ButtonBar.ButtonData.YES);
+
+    /**
+     * Bouton « Non » de la confirmation du recalcul : c'est le bouton
+     * d'annulation, donc Échap et la croix valent un refus.
+     */
+    static final ButtonType NON = new ButtonType("Non",
+            ButtonBar.ButtonData.CANCEL_CLOSE);
+
+    /**
+     * Traduit la réponse de la fenêtre de confirmation.
+     *
+     * @param reponse bouton choisi, vide si la fenêtre est fermée
+     * @return vrai seulement si l'administrateur a cliqué sur « Oui »
+     */
+    static boolean recalculAccepte(Optional<ButtonType> reponse) {
+        return reponse.filter(OUI::equals).isPresent();
+    }
+
     @Override
     public boolean confirmerRecalcul() {
-        ButtonType oui = new ButtonType("Oui", ButtonBar.ButtonData.YES);
-        // Non est le bouton d'annulation : Échap et la croix valent un refus.
-        ButtonType non = new ButtonType("Non",
-                ButtonBar.ButtonData.CANCEL_CLOSE);
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
                 "Les modifications manuelles et les plages horaires annoncées "
-                        + "seront perdues. Continuer ?", oui, non);
+                        + "seront perdues. Continuer ?", OUI, NON);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Recalculer les tournées");
         alert.initOwner(getScene().getWindow());
-        return alert.showAndWait().filter(oui::equals).isPresent();
+        return recalculAccepte(alert.showAndWait());
     }
 
     @Override
@@ -858,7 +877,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private void dessinerTournees() {
         Map<Integer, Tournee> tournees = programmeObserve == null ? Map.of()
                 : programmeObserve.obtenirTournees();
-        boutonCalculer.setText(tournees.isEmpty() ? "Calculer" : "Recalculer");
         if (tournees.isEmpty()) {
             effacerListeTournee();
             return;

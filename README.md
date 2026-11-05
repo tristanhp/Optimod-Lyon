@@ -249,7 +249,7 @@ confirmation, car les modifications manuelles et les plages annoncées seront
 perdues. *Oui* relance le TSP pour chaque livreur et fixe de nouvelles plages ;
 *Non* ne change rien. Annuler n'annule pas ce recalcul : il défait la dernière
 modification du programme. La suppression retire encore la tournée jusqu'au
-prochain calcul volontaire. Le support multi-livreurs reste à intégrer.
+prochain calcul volontaire.
 
 Une fois la tournée calculée, elle est tracée sur la carte : le trait est clair
 au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de

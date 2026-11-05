@@ -413,7 +413,7 @@ public class MainControllerTest {
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
             Action.CHANGER_ORDRE, Action.DEPLACER_POINT, Action.RESTAURER,
             Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE,
-            Action.CHANGER_NOMBRE_LIVREURS);
+            Action.CHANGER_NOMBRE_LIVREURS, Action.RECALCULER);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
@@ -426,7 +426,7 @@ public class MainControllerTest {
                     Action.DEPLACER_POINT, Action.RESTAURER,
                     Action.SAUVEGARDER, Action.ANNULER,
                     Action.GENERER_FEUILLES_ROUTE,
-                    Action.CHANGER_NOMBRE_LIVREURS);
+                    Action.CHANGER_NOMBRE_LIVREURS, Action.RECALCULER);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -838,6 +838,23 @@ public class MainControllerTest {
         assertEquals(1, ecran.nombreDeConfirmationsDeRecalcul);
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertEquals(1, arrierePlan.size());
+    }
+
+    /**
+     * Le bouton se nomme « Recalculer » seulement quand les tournées sont
+     * calculées : c'est l'état du contrôleur qui le dit, pas la vue.
+     */
+    @Test
+    public void boutonRecalculerSeulementAvecDesTournees() throws Exception {
+        chargerPlanEtLivraison();
+        assertFalse(ecran.actions.contains(Action.RECALCULER));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertTrue(ecran.actions.contains(Action.RECALCULER));
+        ecran.actionSupprimer.accept(0);
+        executerArrierePlan();
+        assertEquals(controleur.obtenirEtat() instanceof EtatTourneeCalculee,
+                ecran.actions.contains(Action.RECALCULER));
     }
 
     /** Le premier calcul ne perd rien : il ne demande pas de confirmation. */
