@@ -235,7 +235,9 @@ arrêts arrivent après 13 h.
      livreur ;
    - *Annuler* (Ctrl+Z) et *Rétablir* (Ctrl+Y) : toute modification peut être
      défaite ; si la tournée correspondante a déjà été calculée, elle
-     réapparaît sans nouveau calcul.
+     réapparaît sans nouveau calcul. Comme une nouvelle modification,
+     *Calculer* oublie les modifications annulées : *Rétablir* est alors
+     grisé.
 
 Après les clics sur la carte et la saisie des durées, choisir entre quels
 arrêts insérer la demande. La collecte puis la livraison sont insérées

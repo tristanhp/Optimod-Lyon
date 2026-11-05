@@ -116,7 +116,8 @@ Pour brancher une nouvelle modification :
    **avant** la commande, et les tournées des autres livreurs sont reprises
    telles quelles ; annuler et rétablir ne recalculent rien. Elle implémente
    `memoriserTourneesAvant` et `memoriserTourneesApres`, pour qu'un « Calculer »
-   fait après coup ne soit pas écrasé.
+   fait après coup ne soit pas écrasé. Un « Calculer » oublie les commandes
+   annulées, comme une nouvelle commande : plus rien à rétablir.
 4. **Une action dans `Etat`** (méthode par défaut qui ignore l'action,
    redéfinie dans l'état qui la permet) et ses boutons dans `MapScreen`
    (implémentés dans `MainView` et dans le faux écran des tests). Une action

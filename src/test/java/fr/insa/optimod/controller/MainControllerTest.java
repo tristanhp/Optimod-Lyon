@@ -1204,22 +1204,44 @@ public class MainControllerTest {
     }
 
     /**
-     * Les tournées calculées après une annulation sont celles de l'état
-     * d'avant la commande : annuler à nouveau après « Rétablir » les remet.
+     * Un « Calculer » fait après une annulation oublie la commande annulée :
+     * Rétablir est grisé et sans effet, et les tournées calculées restent
+     * affichées (TIG-107). Avant, Rétablir remettait la suppression avec les
+     * tournées d'avant le calcul, et les tournées calculées disparaissaient.
      */
     @Test
-    public void annulerRetrouveLaTourneeCalculeeApresAnnulation()
-            throws Exception {
+    public void calculerApresAnnulerOublieRetablir() throws Exception {
         chargerDeuxDemandes();
         ecran.actionSupprimer.accept(0);
+        ecran.actionAnnuler.run();
+        assertTrue(controleur.peutRefaire());
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertFalse(controleur.peutRefaire());
+        assertFalse(ecran.actions.contains(Action.REFAIRE));
+        ecran.actionRefaire.run();
+        assertEquals(2, demandes().size());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    /**
+     * Scénario du ticket TIG-107 : passer à 2 livreurs, annuler, calculer,
+     * puis Rétablir. Rétablir ne fait plus rien : il reste 1 livreur et sa
+     * tournée calculée, au lieu de 2 livreurs sans tournée.
+     */
+    @Test
+    public void retablirApresCalculerNeFaitPasDisparaitreLesTournees()
+            throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionNombreLivreurs.accept(2);
         ecran.actionAnnuler.run();
         ecran.actionCalculer.run();
         executerArrierePlan();
         ecran.actionRefaire.run();
-        assertTrue(tournees().isEmpty());
-        ecran.actionAnnuler.run();
-        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(1, controleur.obtenirProgramme().obtenirNombreLivreurs());
         assertEquals(TOURNEES, tournees());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
     }
 
     // --- Plusieurs livreurs (TIG-95) ---
