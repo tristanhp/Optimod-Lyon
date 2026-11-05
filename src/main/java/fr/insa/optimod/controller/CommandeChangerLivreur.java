@@ -59,6 +59,18 @@ final class CommandeChangerLivreur implements Commande {
     }
 
     @Override
+    public String confirmation() {
+        return "Demande passée du livreur " + avant.livreur()
+                + " au livreur " + apres.livreur() + ".";
+    }
+
+    @Override
+    public String description() {
+        return "passage d'une demande du livreur " + avant.livreur()
+                + " au livreur " + apres.livreur();
+    }
+
+    @Override
     public void memoriserTourneesAvant(Map<Integer, Tournee> tournees) {
         tourneesAvant = tournees;
     }

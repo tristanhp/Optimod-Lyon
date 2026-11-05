@@ -31,6 +31,11 @@ final class EtatAjoutLivraison implements Etat {
     }
 
     @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
+    @Override
     public void importerPlan(MainController controleur) {
     }
 
@@ -40,12 +45,12 @@ final class EtatAjoutLivraison implements Etat {
 
     @Override
     public void ajouterDemande(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
     public void annuler(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
@@ -79,7 +84,7 @@ final class EtatAjoutLivraison implements Etat {
             } catch (IllegalArgumentException erreur) {
                 controleur.afficherConsigne(erreur.getMessage());
             }
-        }, controleur::retrouverEtatProgramme);
+        }, controleur::annulerAjout);
     }
 
     @Override

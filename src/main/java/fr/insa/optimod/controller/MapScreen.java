@@ -288,12 +288,22 @@ public interface MapScreen {
     void definirActionClicNoeud(LongConsumer action);
 
     /**
-     * Affiche une consigne pour l'utilisateur (ex. « cliquez sur le point de
-     * collecte »).
+     * Affiche ce que l'utilisateur doit faire maintenant (ex. « cliquez sur
+     * le point de collecte »). Le contrôleur la remplace à chaque changement
+     * d'étape.
      *
      * @param consigne texte à afficher, vide pour l'effacer
      */
     void afficherConsigne(String consigne);
+
+    /**
+     * Affiche ce qui vient d'être fait (ex. « Demande ajoutée au livreur 2. »).
+     * Distinct de la consigne : elle dit où on en est, la confirmation dit
+     * ce qui s'est passé. Le texte reste affiché jusqu'à la prochaine action.
+     *
+     * @param confirmation texte à afficher, vide pour l'effacer
+     */
+    void afficherConfirmation(String confirmation);
 
     /**
      * Affiche ou retire l'état d'attente pendant le calcul.

@@ -17,6 +17,17 @@ import fr.insa.optimod.model.Tournee;
  */
 interface Etat {
 
+    /**
+     * Dit à l'utilisateur quoi faire dans cet état. Le contrôleur l'affiche
+     * à chaque entrée dans l'état ({@link MainController#changerEtat}), il
+     * n'y a donc pas de consigne à poser ailleurs.
+     *
+     * @param controleur contrôleur (pour les états dont la consigne dépend du
+     *        programme chargé)
+     * @return consigne en français, jamais vide
+     */
+    String consigne(MainController controleur);
+
     /** @param controleur contrôleur ; sauvegarde ignorée par défaut */
     default void sauvegarder(MainController controleur) {
     }

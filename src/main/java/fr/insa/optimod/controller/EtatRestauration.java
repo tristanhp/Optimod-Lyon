@@ -4,6 +4,15 @@ import java.util.Set;
 
 /** Empêche les modifications pendant la lecture et le recalcul des trajets. */
 final class EtatRestauration implements Etat {
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE =
+            "Restauration en cours… patientez.";
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
     @Override
     public void importerPlan(MainController controleur) {
     }

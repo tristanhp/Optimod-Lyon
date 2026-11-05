@@ -52,7 +52,8 @@ public class CommandeChangerOrdreTest {
     @Test
     public void executerPuisAnnulerRemetLOrdrePrecedent() {
         programme.definirTournees(avant);
-        Commande commande = new CommandeChangerOrdre(programme, avant, apres);
+        Commande commande = new CommandeChangerOrdre(programme, 1, avant,
+                apres);
         commande.executer();
         assertEquals(apres, programme.obtenirTournees());
         commande.annuler();
@@ -64,7 +65,8 @@ public class CommandeChangerOrdreTest {
     public void rejouerApresAnnulationRangeDeNouveau() {
         programme.definirTournees(avant);
         ListeDeCommandes historique = new ListeDeCommandes();
-        historique.executer(new CommandeChangerOrdre(programme, avant, apres));
+        historique.executer(new CommandeChangerOrdre(programme, 1, avant,
+                apres));
         historique.annuler();
         assertSame(avant.get(1), programme.obtenirTournees().get(1));
         historique.refaire();
@@ -77,7 +79,7 @@ public class CommandeChangerOrdreTest {
     @Test
     public void lesDemandesNeChangentPas() {
         programme.definirTournees(avant);
-        new CommandeChangerOrdre(programme, avant, apres).executer();
+        new CommandeChangerOrdre(programme, 1, avant, apres).executer();
         assertEquals(List.of(demande), programme.obtenirDemandes());
     }
 
@@ -88,7 +90,8 @@ public class CommandeChangerOrdreTest {
     @Test
     public void tourneesMemoriseesApresUnCalculRemplacentCellesDeLaCommande() {
         programme.definirTournees(avant);
-        Commande commande = new CommandeChangerOrdre(programme, avant, apres);
+        Commande commande = new CommandeChangerOrdre(programme, 1, avant,
+                apres);
         commande.executer();
         Map<Integer, Tournee> recalculees = Map.of(1,
                 tourneeRevenantA(LocalTime.of(8, 45)));

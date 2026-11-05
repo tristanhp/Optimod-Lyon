@@ -2,6 +2,7 @@ package fr.insa.optimod.controller;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
@@ -34,6 +35,16 @@ public class ListeDeCommandesTest {
             }
 
             @Override
+            public String confirmation() {
+                return nom + " fait.";
+            }
+
+            @Override
+            public String description() {
+                return nom;
+            }
+
+            @Override
             public void memoriserTourneesAvant(
                     Map<Integer, Tournee> tournees) {
                 journal.add("avant:" + nom);
@@ -45,6 +56,51 @@ public class ListeDeCommandesTest {
                 journal.add("apres:" + nom);
             }
         };
+    }
+
+    /** Annuler et rétablir rendent la commande concernée, pour la nommer. */
+    @Test
+    public void annulerEtRefaireRendentLaCommande() {
+        assertNull(historique.annuler());
+        assertNull(historique.refaire());
+        historique.executer(commande("a"));
+        assertEquals("a", historique.annuler().description());
+        assertEquals("a", historique.refaire().description());
+    }
+
+    /**
+     * La consigne « ordre non optimisé » suit l'état de l'historique : annuler
+     * et rétablir la retrouvent, une nouvelle commande oublie celles des
+     * états rétablissables, et un calcul (voyageur de commerce) l'efface.
+     */
+    @Test
+    public void consigneOrdreSuitLesEtats() {
+        assertEquals("", historique.consigneOrdre());
+        historique.executer(commande("a"));
+        historique.definirConsigneOrdre("x");
+        historique.executer(commande("b"));
+        historique.definirConsigneOrdre("y");
+
+        historique.annuler();
+        assertEquals("x", historique.consigneOrdre());
+        historique.annuler();
+        assertEquals("", historique.consigneOrdre());
+        historique.refaire();
+        assertEquals("x", historique.consigneOrdre());
+        historique.refaire();
+        assertEquals("y", historique.consigneOrdre());
+
+        historique.annuler();
+        historique.executer(commande("c"));
+        assertEquals("", historique.consigneOrdre());
+        historique.annuler();
+        assertEquals("x", historique.consigneOrdre());
+
+        historique.memoriserTournees(Map.of());
+        assertEquals("", historique.consigneOrdre());
+        historique.refaire();
+        historique.vider();
+        assertEquals("", historique.consigneOrdre());
     }
 
     /** Une liste vide n'a rien à annuler ni à rétablir. */

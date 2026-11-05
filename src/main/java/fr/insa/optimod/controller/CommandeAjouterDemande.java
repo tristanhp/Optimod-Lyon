@@ -60,6 +60,16 @@ final class CommandeAjouterDemande implements Commande {
     }
 
     @Override
+    public String confirmation() {
+        return "Demande ajoutée au livreur " + demande.livreur() + ".";
+    }
+
+    @Override
+    public String description() {
+        return "ajout d'une demande au livreur " + demande.livreur();
+    }
+
+    @Override
     public void memoriserTourneesAvant(Map<Integer, Tournee> tournees) {
         tourneesAvant = tournees;
     }

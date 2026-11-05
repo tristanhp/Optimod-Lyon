@@ -16,6 +16,11 @@ final class EtatAjoutCollecte implements Etat {
             + "(« Ajouter une demande » pour annuler).";
 
     @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
+    @Override
     public void importerPlan(MainController controleur) {
     }
 
@@ -25,12 +30,12 @@ final class EtatAjoutCollecte implements Etat {
 
     @Override
     public void ajouterDemande(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
     public void annuler(MainController controleur) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerAjout();
     }
 
     @Override
@@ -41,7 +46,6 @@ final class EtatAjoutCollecte implements Etat {
         controleur.afficherPointsProvisoires(
                 controleur.obtenirPlan().obtenirNoeud(idNoeud), null);
         controleur.changerEtat(new EtatAjoutLivraison(idNoeud));
-        controleur.afficherConsigne(EtatAjoutLivraison.CONSIGNE);
     }
 
     @Override

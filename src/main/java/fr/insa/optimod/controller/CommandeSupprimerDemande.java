@@ -59,6 +59,16 @@ final class CommandeSupprimerDemande implements Commande {
     }
 
     @Override
+    public String confirmation() {
+        return "Demande supprimée du livreur " + retiree.livreur() + ".";
+    }
+
+    @Override
+    public String description() {
+        return "suppression d'une demande du livreur " + retiree.livreur();
+    }
+
+    @Override
     public void memoriserTourneesAvant(Map<Integer, Tournee> tournees) {
         tourneesAvant = tournees;
     }

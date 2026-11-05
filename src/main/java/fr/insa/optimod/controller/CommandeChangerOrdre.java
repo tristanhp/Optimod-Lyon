@@ -17,6 +17,9 @@ final class CommandeChangerOrdre implements Commande {
 
     private final ProgrammeLivraisons programme;
 
+    /** Livreur dont la tournée change. */
+    private final int livreur;
+
     /** Tournées d'avant le changement, remises par l'annulation. */
     private Map<Integer, Tournee> tourneesAvant;
 
@@ -25,13 +28,15 @@ final class CommandeChangerOrdre implements Commande {
 
     /**
      * @param programme     programme dont les tournées changent
+     * @param livreur       numéro du livreur dont la tournée change
      * @param tourneesAvant tournées par numéro de livreur avant le changement
      * @param tourneesApres les mêmes, avec la nouvelle tournée du livreur
      */
-    CommandeChangerOrdre(ProgrammeLivraisons programme,
+    CommandeChangerOrdre(ProgrammeLivraisons programme, int livreur,
             Map<Integer, Tournee> tourneesAvant,
             Map<Integer, Tournee> tourneesApres) {
         this.programme = programme;
+        this.livreur = livreur;
         this.tourneesAvant = tourneesAvant;
         this.tourneesApres = tourneesApres;
     }
@@ -44,6 +49,16 @@ final class CommandeChangerOrdre implements Commande {
     @Override
     public void annuler() {
         programme.definirTournees(tourneesAvant);
+    }
+
+    @Override
+    public String confirmation() {
+        return "Ordre des arrêts modifié pour le livreur " + livreur + ".";
+    }
+
+    @Override
+    public String description() {
+        return "changement de l'ordre des arrêts du livreur " + livreur;
     }
 
     @Override
