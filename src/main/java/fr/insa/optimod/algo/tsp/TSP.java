@@ -13,12 +13,12 @@ public interface TSP {
         // Le temps de calcul depasse le temps maximum autorise et aucun
         // resultat non
         CALCUL_TROP_LONG_SANS_RESULTAT,
-                                        // optimal n'a ete trouve
+        // optimal n'a ete trouve
         TEMPS_LIMITE_NEGATIF, // Le temps de calcul maximum autorise est negatif
         // Le cout de la meilleur solution est superieur au cout limite
         COUT_TROP_ELEVE,
-                         // => La meilleur solution a une arrive a l'entrepot
-                         // apres 13h
+        // => La meilleur solution a une arrive a l'entrepot
+        // apres 13h
         PAS_DE_SOLUTION, // Le graphe n'admet pas de solution
         RESULTAT_OK
 
@@ -58,7 +58,7 @@ public interface TSP {
 
     /**
      * @return la duree d'exectuion en ms de <code>chercherSolution</code> de
-     *        TSP
+     *         TSP
      *         (-1 si <code>chercherSolution</code> n'a pas encore ete appele)
      */
     public long obtenirDureeCalcul();

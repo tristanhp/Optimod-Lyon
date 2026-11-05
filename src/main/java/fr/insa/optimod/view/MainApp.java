@@ -4,8 +4,8 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.controller.MainController;
+import fr.insa.optimod.model.Plan;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -14,7 +14,8 @@ import javafx.stage.Stage;
 /**
  * Application JavaFX : crée la fenêtre principale et son contrôleur.
  *
- * <p>Ne pas lancer cette classe directement depuis l'IDE : passer par
+ * <p>
+ * Ne pas lancer cette classe directement depuis l'IDE : passer par
  * {@link AppLauncher}.
  */
 public final class MainApp extends Application {

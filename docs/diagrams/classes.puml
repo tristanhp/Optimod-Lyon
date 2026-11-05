@@ -82,6 +82,10 @@ package "model" {
     livreur : int
     +avecLivreur(autreLivreur : int) : Demande
   }
+  class FeuilleDeRoute <<utilitaire>> {
+    +{static} generer(plan : Plan, livreur : int, tournee : Tournee) : String
+    +{static} nomFichier(livreur : int) : String
+  }
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
@@ -219,6 +223,8 @@ EtatCalculEnCours ..|> Etat
 EtatRestauration ..|> Etat
 MainController ..> SauvegardeTournee
 SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
+MainController ..> FeuilleDeRoute
+FeuilleDeRoute ..> Tournee : arrêts et chemins
 EtatAjoutCollecte ..|> Etat
 EtatAjoutLivraison ..|> Etat
 EtatDeplacementPoint ..|> Etat

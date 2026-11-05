@@ -9,7 +9,8 @@ import fr.insa.optimod.model.Tournee;
  * exécutées sont gardées par {@link ListeDeCommandes} pour pouvoir les annuler
  * puis les rétablir.
  *
- * <p>Une commande garde les tournées d'avant et d'après la modification :
+ * <p>
+ * Une commande garde les tournées d'avant et d'après la modification :
  * {@link #annuler()} remet celles d'avant, et rétablir (un nouvel
  * {@link #executer()}) remet celles d'après, sans recalcul.
  */

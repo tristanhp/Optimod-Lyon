@@ -8,9 +8,9 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.ProgrammeLivraisons;
+import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
 import fr.insa.optimod.model.Tournee.TypeArret;
 
@@ -75,10 +75,8 @@ public class CommandesDemandesTest {
      */
     @Test
     public void annulerEtRetablirRemettentLesTournees() {
-        Map<Integer, Tournee> avant =
-                Map.of(1, tourneeVide(LocalTime.of(8, 0)));
-        Map<Integer, Tournee> apres =
-                Map.of(1, tourneeVide(LocalTime.of(9, 0)));
+        Map<Integer, Tournee> avant = Map.of(1, tourneeVide(LocalTime.of(8, 0)));
+        Map<Integer, Tournee> apres = Map.of(1, tourneeVide(LocalTime.of(9, 0)));
         programme.definirTournees(avant);
         for (Commande commande : List.of(
                 new CommandeSupprimerDemande(programme, 0),

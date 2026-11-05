@@ -300,8 +300,8 @@ public class PlanTest {
      */
     @Test
     public void tourneesDesFichiersFournis() throws Exception {
-        String[][] jeux = {{"petitPlan", "demandePetit2"},
-            {"moyenPlan", "demandeMoyen5"}};
+        String[][] jeux = { { "petitPlan", "demandePetit2" },
+                { "moyenPlan", "demandeMoyen5" } };
         for (String[] jeu : jeux) {
             Plan plan = lirePlanFourni(jeu[0]);
             ProgrammeLivraisons programme;
@@ -323,8 +323,7 @@ public class PlanTest {
                         arrets.get(rang - 1).noeud(), arrets.get(rang).noeud());
             }
             for (Demande demande : programme.obtenirDemandes()) {
-                assertTrue(jeu[1], rang(arrets, demande.collecte())
-                        < rang(arrets, demande.livraison()));
+                assertTrue(jeu[1], rang(arrets, demande.collecte()) < rang(arrets, demande.livraison()));
             }
         }
     }
@@ -483,8 +482,8 @@ public class PlanTest {
             }
             for (Demande demande : reparties) {
                 if (demande.livreur() == entree.getKey()) {
-                    assertTrue(rangDe(arrets, demande, TypeArret.COLLECTE)
-                            < rangDe(arrets, demande, TypeArret.LIVRAISON));
+                    assertTrue(
+                            rangDe(arrets, demande, TypeArret.COLLECTE) < rangDe(arrets, demande, TypeArret.LIVRAISON));
                 }
             }
         }
@@ -573,6 +572,7 @@ public class PlanTest {
         }
         throw new AssertionError("Nœud absent de la tournée : " + noeud);
     }
+
     /** La position choisie est respectée même si elle allonge le parcours. */
     @Test
     public void insertionRespectePositionChoisie() throws Exception {
@@ -586,7 +586,8 @@ public class PlanTest {
         Tournee apres = plan.insererDemande(avant,
                 new Demande(collecte, livraison, 60, 60), 3);
         assertEquals(List.of(entrepot, collecte, livraison, collecte,
-                livraison, entrepot), apres.arrets().stream()
+                livraison, entrepot),
+                apres.arrets().stream()
                         .map(Tournee.Arret::noeud).toList());
         assertEquals(LocalTime.of(8, 8, 24), apres.obtenirHeureRetour());
         assertSame(avant.chemins().get(0), apres.chemins().get(0));
@@ -1380,8 +1381,8 @@ public class PlanTest {
         Plan plan = PlansPourTests.petitReseau();
         Tournee tournee = tourneeDeDeuxDemandes(plan, LocalTime.of(8, 0));
         int dernier = tournee.arrets().size() - 1;
-        for (int rang : new int[] {0, dernier}) {
-            for (int decalage : new int[] {-1, 1}) {
+        for (int rang : new int[] { 0, dernier }) {
+            for (int decalage : new int[] { -1, 1 }) {
                 IllegalArgumentException erreur = assertThrows(
                         IllegalArgumentException.class,
                         () -> plan.calculerTourneeOrdreChange(tournee, rang,
@@ -1455,7 +1456,8 @@ public class PlanTest {
             Tournee.Arret arret = deplacee.arrets().get(rang);
             Demande demande = arret.demande();
             assertEquals(nouveau, arret.type() == TypeArret.COLLECTE
-                    ? demande.collecte() : demande.livraison());
+                    ? demande.collecte()
+                    : demande.livraison());
             List<ArretPrevu> attendus = new ArrayList<>();
             for (int i = 0; i < adresses.size(); i++) {
                 Tournee.Arret courant = tournee.arrets().get(i);

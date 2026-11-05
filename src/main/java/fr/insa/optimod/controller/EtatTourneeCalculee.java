@@ -79,6 +79,16 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         controleur.changerLivreurDemande(position);
     }
 
+    /**
+     * Génère une feuille de route HTML par livreur dans le dossier choisi par
+     * l'utilisateur : numéro du livreur, heures de départ et de retour, arrêts
+     * dans l'ordre et itinéraire rue par rue.
+     */
+    @Override
+    public void genererFeuillesDeRoute(MainController controleur) {
+        controleur.genererFeuillesDeRoute();
+    }
+
     @Override
     public Set<Action> actionsPermises(MainController controleur) {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
@@ -87,6 +97,7 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
         actions.add(Action.SAUVEGARDER);
+        actions.add(Action.GENERER_FEUILLES_ROUTE);
         if (controleur.obtenirProgramme().obtenirNombreLivreurs() > 1) {
             actions.add(Action.CHANGER_LIVREUR);
         }

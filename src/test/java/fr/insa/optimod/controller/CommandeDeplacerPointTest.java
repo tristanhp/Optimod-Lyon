@@ -92,7 +92,7 @@ public class CommandeDeplacerPointTest {
     public void lesObservateursNeVoientAucunEtatIntermediaire() {
         programme.definirTournees(tourneesAvant);
         List<String> incoherences = new ArrayList<>();
-        int[] notifications = {0};
+        int[] notifications = { 0 };
         programme.ajouterObservateur(source -> {
             notifications[0]++;
             Demande courante = programme.obtenirDemandes().get(0);

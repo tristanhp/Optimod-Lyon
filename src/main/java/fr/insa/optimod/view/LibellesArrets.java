@@ -16,8 +16,7 @@ import fr.insa.optimod.model.Troncon;
 final class LibellesArrets {
 
     /** Format des heures de passage. */
-    private static final DateTimeFormatter HEURE =
-            DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter HEURE = DateTimeFormatter.ofPattern("HH:mm");
 
     private LibellesArrets() {
     }
@@ -51,7 +50,7 @@ final class LibellesArrets {
      * Donne l'adresse d'un nœud : les noms des rues des tronçons qui y
      * arrivent ou en partent, sans doublon, dans l'ordre alphabétique.
      *
-     * @param plan plan du nœud, ou {@code null}
+     * @param plan  plan du nœud, ou {@code null}
      * @param noeud adresse à décrire
      * @return noms des rues séparés par des virgules, ou « nœud N » si aucune
      *         rue n'a de nom
@@ -75,7 +74,7 @@ final class LibellesArrets {
      * Décrit un arrêt : type et adresse, heures de passage, plage annoncée et
      * décalage.
      *
-     * @param plan plan de l'arrêt, ou {@code null}
+     * @param plan  plan de l'arrêt, ou {@code null}
      * @param arret arrêt à décrire
      * @return texte sur plusieurs lignes
      */
