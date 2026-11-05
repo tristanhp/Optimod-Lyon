@@ -299,7 +299,7 @@ public class MainControllerTest {
         }
 
         @Override
-        public Optional<File> choisirFichierGenerationFeuilleDeRoute() {
+        public Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb) {
             return Optional.ofNullable(fichierChoisi);
         }
     }

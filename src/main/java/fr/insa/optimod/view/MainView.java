@@ -522,9 +522,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public Optional<File> choisirFichierGenerationFeuilleDeRoute() {
+    public Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb) {
         FileChooser selecteur = new FileChooser();
         selecteur.setTitle("Generer les feuilles de route de la tournee");
+        selecteur.setInitialFileName("feuille-de-route-livreur-" + nb + ".html");
         selecteur.getExtensionFilters().add(
                 new FileChooser.ExtensionFilter("Fichiers HTML", "*.html"));
         if (dernierDossier != null && dernierDossier.isDirectory()) {

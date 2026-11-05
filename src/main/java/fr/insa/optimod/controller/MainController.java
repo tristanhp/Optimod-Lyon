@@ -3,11 +3,12 @@ package fr.insa.optimod.controller;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
@@ -24,6 +25,7 @@ import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
 import fr.insa.optimod.model.Tournee;
+import fr.insa.optimod.model.Tournee.Arret;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -937,20 +939,85 @@ public final class MainController {
     /**
      * Genere les feuilles de route de la tournée calculée dans le fichier choisi.
      */
-    void genererFeuilleDeRoute() {
-        ecran.choisirFichierGenerationFeuilleDeRoute().ifPresent(fichier -> {
-            try {
-                System.out.println("GENERATION!!!");
+    public void genererFeuilleDeRoute() {
+        for (Entry<Integer, Tournee> livreur : programme.obtenirTournees().entrySet()) {
+            ecran.choisirFichierGenerationFeuilleDeRoute(livreur.getKey()).ifPresent(fichier -> {
                 try (FileWriter sortie = new FileWriter(fichier)) {
-                    sortie.write("adda");
-                } catch (FileAlreadyExistsException erreur) {
-                    throw new IOException("Le fichier existe déjà");
-                }
+                    System.out.println("GENERATION!!!");
 
-                throw new IOException("IL FAUT IGNORER CE MESSAGE !!!");
-            } catch (IOException erreur) {
-                ecran.afficherErreurXml(erreur.getMessage());
-            }
-        });
+                    genererFeuilleDeRouteHTMLPourLivreur(sortie, livreur.getValue());
+
+                } catch (IOException erreur) {
+                    ecran.afficherErreurXml(erreur.getMessage());
+                }
+            });
+        }
+    }
+
+    private void genererFeuilleDeRouteHTMLPourLivreur(FileWriter fileOutpuWriter, Tournee tournee) throws IOException {
+        fileOutpuWriter.write("<!DOCTYPE html>\r\n" + //
+                "<html>\r\n" + //
+                "\r\n" + //
+                "<head>\r\n" + //
+                "    <style>\r\n" + //
+                "        h1 {\r\n" + //
+                "            text-align: center;\r\n" + //
+                "        }\r\n" + //
+                "\r\n" + //
+                "        table {\r\n" + //
+                "            border-collapse: collapse;\r\n" + //
+                "        }\r\n" + //
+                "\r\n" + //
+                "        td,\r\n" + //
+                "        th\r\n" + //
+                "\r\n" + //
+                "        /* Mettre une bordure sur les td ET les th */\r\n" + //
+                "            {\r\n" + //
+                "            border: 1px solid black;\r\n" + //
+                "            padding: 5px;\r\n" + //
+                "        }\r\n" + //
+                "    </style>\r\n" + //
+                "</head>\r\n" + //
+                "\r\n" + //
+                "<body>\r\n" + //
+                "\r\n" + //
+                "    <h1 class=\"aligncenter\">Livreur n°N</h1>\r\n" + //
+                "    <p> </p>\r\n" + //
+                "\r\n" + //
+                "    <h2>Heure de départ prévue de l'entrepot : 08:00</h2>\r\n" + //
+                "    <h2>Heure de retour prévue de l'entrepot : 11:13:58</h2>");
+
+        fileOutpuWriter.write("<table border=\"1\", border-collapse= collapse;>\r\n" + //
+                "  <caption>Liste des Demande de Livraisons</caption>\r\n" + //
+                "  <thead>\r\n" + //
+                "    <tr>\r\n" + //
+                "      <th>Type d'arret</th>\r\n" + //
+                "      <th>Adresse</th>\r\n" + //
+                "      <th>Plage annoncée</th>\r\n" + //
+                "      <th>Heure d'arrivée</th>\r\n" + //
+                "      <th>Heure de départ</th>\r\n" + //
+                "      <th>Durée sur place</th>\r\n" + //
+                "    </tr>\r\n" + //
+                "  </thead>\r\n" + //
+                "  <tbody>");
+
+        for (Arret arret : tournee.arrets()) {
+            long decalage = Duration.between(arret.arrivee(), arret.depart()).getSeconds();
+            fileOutpuWriter.write("<tr>\r\n" + //
+                    "      <td>" + arret.type() + "</td>\r\n" + //
+                    "      <td>" + arret.noeud() + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>" + arret.debutPlage() + " - " + arret.finPlage()
+                    + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>" + arret.arrivee() + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>"
+                    + (arret.depart().equals(arret.arrivee()) ? " -- " : arret.depart()) + "</td>\r\n" + //
+                    "      <td style=\"text-align: center\";>"
+                    + (decalage == 0 ? "--" : (decalage / 60 == 0 ? "" : decalage / 60 + " min"))
+                    + (decalage % 60 == 0 ? "" : decalage % 60 + " s") + "</td>\r\n"
+                    + "    </tr>");
+        }
+        fileOutpuWriter.write("  </tbody>\r\n" + //
+                "</table>\r\n" + //
+                "  </body>");
     }
 }

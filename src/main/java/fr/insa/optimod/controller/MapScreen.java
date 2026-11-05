@@ -394,5 +394,6 @@ public interface MapScreen {
      *
      * @return destination XML, ou vide après annulation
      */
-    Optional<File> choisirFichierGenerationFeuilleDeRoute();
+    Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb);
+
 }
