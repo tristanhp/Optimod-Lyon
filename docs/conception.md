@@ -40,7 +40,7 @@ multi-livreurs n'est pas disponible : aucun contrat futur n'est supposé ici.
 
 ### Plus courts chemins
 
-A* parcourt les tronçons orientés. Une file de priorité ordonne les nœuds
+`A*` parcourt les tronçons orientés. Une file de priorité ordonne les nœuds
 par distance déjà parcourue plus estimation restante. L'heuristique est la
 distance haversine multipliée par 0,9 pour tenir compte des arrondis des
 données fournies ; cette garantie suppose des longueurs cohérentes avec
@@ -69,7 +69,7 @@ de sauvegarde vérifie aussi que les arrêts respectent les demandes.
 `Plan.insererDemande` reçoit la position choisie dans le dialogue de
 l'utilisateur. La collecte puis la livraison sont ajoutées consécutivement
 entre deux arrêts existants, sans recherche automatique d'une autre place.
-Trois chemins sont calculés par A* : arrêt précédent vers collecte,
+Trois chemins sont calculés par `A*` : arrêt précédent vers collecte,
 collecte vers livraison, livraison vers arrêt suivant. Les autres chemins
 sont réutilisés. Les horaires sont propagés sans changer les plages des
 anciens arrêts. Le décalage est mesuré par rapport au centre de la plage
