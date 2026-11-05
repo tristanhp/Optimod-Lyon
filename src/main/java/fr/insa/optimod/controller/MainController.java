@@ -196,13 +196,15 @@ public final class MainController {
     }
 
     /**
-     * Passe dans un nouvel état et met à jour les boutons de l'écran.
+     * Passe dans un nouvel état, met à jour les boutons de l'écran et affiche
+     * la consigne de cet état.
      *
      * @param nouvelEtat état suivant
      */
     void changerEtat(Etat nouvelEtat) {
         etat = nouvelEtat;
         ecran.activerActions(etat.actionsPermises(this));
+        ecran.afficherConsigne(etat.consigne(this));
     }
 
     /**
@@ -229,6 +231,7 @@ public final class MainController {
             plan = nouveauPlan;
             fichierPlan = fichier.toPath();
             ecran.afficherPlan(plan);
+            ecran.afficherConfirmation("Plan chargé.");
             return Lecture.REUSSIE;
         } catch (IOException | SAXException | IllegalArgumentException e) {
             plan = null;
@@ -254,6 +257,10 @@ public final class MainController {
             programme = new ProgrammeLivraisons(fichier.getPath(), plan);
             oublierModifications();
             ecran.afficherProgramme(programme);
+            ecran.signalerArretsHorsPlage(List.of());
+            int nombre = programme.obtenirDemandes().size();
+            ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
+                    : nombre + " demandes chargées.");
             return Lecture.REUSSIE;
         } catch (IOException | SAXException e) {
             ecran.afficherErreurXml(e.getMessage());
@@ -269,7 +276,7 @@ public final class MainController {
     void lancerCalcul() {
         Plan planCalcule = plan;
         ProgrammeLivraisons programmeCalcule = programme;
-        ecran.afficherConsigne(""); // efface la consigne d'un recalcul local
+        ecran.afficherConfirmation("");
         ecran.afficherAttente(true);
         arrierePlan.execute(() -> {
             try {
@@ -343,7 +350,7 @@ public final class MainController {
         Integer position = ecran.choisirPositionInsertion(tourneeLivreur)
                 .orElse(null);
         if (position == null) {
-            retrouverEtatProgramme();
+            annulerAjout();
             return;
         }
         Plan planCalcule = plan;
@@ -475,7 +482,7 @@ public final class MainController {
         }
         executer(new CommandeChangerLivreur(programme, position, nouvelle,
                 avant, apres));
-        ecran.afficherConsigne(CONSIGNE_ORDRE_GARDE_LIVREURS.formatted(
+        garderOrdre(CONSIGNE_ORDRE_GARDE_LIVREURS.formatted(
                 ancienne.livreur(), nouvelle.livreur()));
     }
 
@@ -497,18 +504,27 @@ public final class MainController {
     void executer(Commande commande) {
         historique.executer(commande);
         retrouverEtatProgramme();
+        ecran.afficherConfirmation(commande.confirmation());
     }
 
     /** Annule la dernière modification des demandes. */
     void annulerCommande() {
-        historique.annuler();
+        Commande annulee = historique.annuler();
         retrouverEtatProgramme();
+        if (annulee != null) {
+            ecran.afficherConfirmation(
+                    "Annulé : " + annulee.description() + ".");
+        }
     }
 
     /** Rétablit la dernière modification annulée. */
     void refaireCommande() {
-        historique.refaire();
+        Commande retablie = historique.refaire();
         retrouverEtatProgramme();
+        if (retablie != null) {
+            ecran.afficherConfirmation(
+                    "Rétabli : " + retablie.description() + ".");
+        }
     }
 
     /** @return vrai s'il reste une modification à annuler */
@@ -521,6 +537,30 @@ public final class MainController {
         return historique.peutRefaire();
     }
 
+    /** Abandonne l'ajout d'une demande et le dit à l'utilisateur. */
+    void annulerAjout() {
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Ajout annulé.");
+    }
+
+    /** Abandonne le déplacement d'un point et le dit à l'utilisateur. */
+    void annulerDeplacement() {
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Déplacement annulé.");
+    }
+
+    /**
+     * Confirme que les tournées sont calculées, en nommant le nombre de
+     * livreurs s'il y en a plusieurs.
+     *
+     * @param tournees tournées calculées, par numéro de livreur
+     */
+    void confirmerCalcul(Map<Integer, Tournee> tournees) {
+        ecran.afficherConfirmation(tournees.size() > 1
+                ? "Tournées calculées pour " + tournees.size() + " livreurs."
+                : "Tournée calculée.");
+    }
+
     /**
      * Revient à l'état qui correspond au programme actuel :
      * {@link EtatTourneeCalculee} si ses tournées sont calculées, sinon
@@ -528,7 +568,6 @@ public final class MainController {
      */
     void retrouverEtatProgramme() {
         ecran.afficherPointsProvisoires(null, null);
-        ecran.afficherConsigne("");
         if (programme.obtenirTournees().isEmpty()) {
             changerEtat(new EtatProgrammeCharge());
         } else {
@@ -545,7 +584,9 @@ public final class MainController {
             try {
                 SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
                         programme);
+                ecran.afficherConfirmation("Tournée sauvegardée.");
             } catch (IOException erreur) {
+                ecran.afficherConfirmation("");
                 ecran.afficherErreurXml(erreur.getMessage());
             }
         });
@@ -571,6 +612,7 @@ public final class MainController {
                         rangerTournees(Map.of(1, sauvegarde.tournee()));
                         ecran.afficherAttente(false);
                         retrouverEtatProgramme();
+                        ecran.afficherConfirmation("Tournée restaurée.");
                     });
                 } catch (SAXException erreur) {
                     interfaceUtilisateur.execute(() -> {
@@ -662,9 +704,29 @@ public final class MainController {
      * @param livreur numéro du livreur dont la tournée a changé
      */
     private void afficherConsigneOrdreNonOptimise(int livreur) {
-        ecran.afficherConsigne(programme.obtenirNombreLivreurs() > 1
+        garderOrdre(programme.obtenirNombreLivreurs() > 1
                 ? CONSIGNE_ORDRE_GARDE_LIVREUR.formatted(livreur)
                 : CONSIGNE_ORDRE_GARDE);
+    }
+
+    /**
+     * Affiche la consigne « ordre non optimisé » et la retient pour l'état
+     * actuel de l'historique : Annuler, Rétablir ou un refus la retrouveront
+     * tant que les tournées affichées gardent cet ordre.
+     *
+     * @param consigne consigne à afficher
+     */
+    private void garderOrdre(String consigne) {
+        historique.definirConsigneOrdre(consigne);
+        ecran.afficherConsigne(consigne);
+    }
+
+    /**
+     * @return consigne « ordre non optimisé » des tournées affichées, vide si
+     *         elles viennent du voyageur de commerce
+     */
+    String obtenirConsigneOrdreGarde() {
+        return historique.consigneOrdre();
     }
 
     /**
@@ -761,7 +823,7 @@ public final class MainController {
         }
         Map<Integer, Tournee> tournees = new TreeMap<>(avant);
         tournees.put(livreur, apres);
-        executer(new CommandeChangerOrdre(programme, avant,
+        executer(new CommandeChangerOrdre(programme, livreur, avant,
                 Collections.unmodifiableMap(tournees)));
         afficherConsigneOrdreNonOptimise(livreur);
         // executer réaffiche les tournées, ce qui efface la sélection de la
@@ -781,6 +843,7 @@ public final class MainController {
      */
     private void signalerRefus(RuntimeException echec,
             Consumer<String> afficher, String modification) {
+        ecran.afficherConfirmation("");
         if (echec instanceof IllegalArgumentException
                 || echec instanceof IllegalStateException) {
             afficher.accept(echec.getMessage());
@@ -806,11 +869,11 @@ public final class MainController {
      */
     void choisirPointADeplacer(int livreur, int rang) {
         Tournee tournee = programme.obtenirTournees().get(livreur);
-        if (tournee == null || rang < 1 || rang >= tournee.arrets().size() - 1) {
+        if (tournee == null || rang < 1
+                || rang >= tournee.arrets().size() - 1) {
             ecran.afficherConsigne(CONSIGNE_AUCUN_POINT);
         } else {
             changerEtat(new EtatDeplacementPoint(livreur, rang));
-            ecran.afficherConsigne(EtatDeplacementPoint.CONSIGNE);
         }
     }
 
@@ -919,11 +982,8 @@ public final class MainController {
         changerEtat(new EtatInitial());
     }
 
-    /**
-     * Oublie l'historique et la consigne : le plan ou les demandes changent.
-     */
+    /** Oublie l'historique : le plan ou les demandes changent. */
     private void oublierModifications() {
         historique.vider();
-        ecran.afficherConsigne("");
     }
 }

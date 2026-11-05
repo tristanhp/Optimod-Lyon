@@ -24,7 +24,8 @@ public final class Main {
      * @return le message de démarrage
      */
     public static String obtenirMessageDemarrage() {
-        return NOM_APPLICATION + " - optimisation de tournées de livraison à vélo";
+        return NOM_APPLICATION
+                + " - optimisation de tournées de livraison à vélo";
     }
 
     /**

@@ -25,6 +25,23 @@ interface Commande {
     void annuler();
 
     /**
+     * Dit à l'utilisateur ce qui vient d'être fait, une fois la commande
+     * exécutée.
+     *
+     * @return phrase complète, par exemple « Demande ajoutée au livreur 2. »
+     */
+    String confirmation();
+
+    /**
+     * Nomme la modification, pour les messages « Annulé : … » et
+     * « Rétabli : … ». Valable une fois la commande exécutée.
+     *
+     * @return groupe nominal sans majuscule ni point, par exemple « ajout
+     *         d'une demande au livreur 2 »
+     */
+    String description();
+
+    /**
      * Retient les tournées calculées après coup (« Calculer ») pour l'état
      * d'avant la commande : {@link #annuler()} les remettra.
      *

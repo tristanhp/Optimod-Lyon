@@ -33,6 +33,11 @@ final class EtatDeplacementPoint implements Etat {
     }
 
     @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
+    @Override
     public void importerPlan(MainController controleur) {
     }
 
@@ -43,7 +48,7 @@ final class EtatDeplacementPoint implements Etat {
     @Override
     public void deplacerPoint(MainController controleur, int livreurSelectionne,
             int rangSelectionne) {
-        controleur.retrouverEtatProgramme();
+        controleur.annulerDeplacement();
     }
 
     @Override

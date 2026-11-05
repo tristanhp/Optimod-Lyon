@@ -128,6 +128,8 @@ package "controller" {
     ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
   interface MapScreen {
+    +afficherConsigne(consigne : String)
+    +afficherConfirmation(confirmation : String)
     +saisirDemande() : Optional<SaisieDemande>
     +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
     +{static} POSITION_MOINDRE_COUT : int = 0
@@ -141,7 +143,9 @@ package "controller" {
     dureeLivraison : String
     livreur : int
   }
-  interface Etat
+  interface Etat {
+    +consigne(controleur : MainController) : String
+  }
   class EtatInitial
   class EtatPlanCharge
   class EtatProgrammeCharge
@@ -154,6 +158,8 @@ package "controller" {
   interface Commande {
     +executer()
     +annuler()
+    +confirmation() : String
+    +description() : String
     +memoriserTourneesAvant(tournees : Map<Integer, Tournee>)
     +memoriserTourneesApres(tournees : Map<Integer, Tournee>)
   }

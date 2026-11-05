@@ -67,14 +67,20 @@ Règles :
   action à son état courant. Nouvelle action = une méthode par défaut dans
   `Etat` (qui ignore l'action), redéfinie dans les états où elle est permise ;
   les boutons actifs viennent de `Etat.actionsPermises`. Jamais de booléen
-  d'état ni de `if (plan != null …)` dans le contrôleur.
+  d'état ni de `if (plan != null …)` dans le contrôleur. Chaque état dit à
+  l'utilisateur quoi faire par `Etat.consigne` (obligatoire, en français),
+  que `changerEtat` affiche à l'entrée : ne jamais poser la consigne d'un
+  état depuis l'extérieur, seuls les refus et avertissements passent par
+  `afficherConsigne`.
 - **Observer** (`model/Observable`, ADR 0003) : toute méthode qui modifie un
   objet observable appelle `notifierObservateurs()`. La vue s'inscrit sur le
   modèle affiché et se désinscrit de l'ancien.
 - **Command** (`controller/Commande`, ADR 0004) : toute modification du
   programme faite par l'utilisateur est une `Commande` réversible exécutée par
   `MainController.executer(...)`, pour qu'Annuler et Rétablir marchent. Ne
-  jamais modifier le modèle directement depuis un état ou la vue.
+  jamais modifier le modèle directement depuis un état ou la vue. Une
+  commande dit ce qu'elle a fait (`confirmation`, affichée après l'action) et
+  se nomme (`description`, pour « Annulé : … » et « Rétabli : … »).
 
 ## Modifier une tournée déjà calculée (cas 4)
 

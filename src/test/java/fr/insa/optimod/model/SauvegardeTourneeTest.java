@@ -99,7 +99,7 @@ public class SauvegardeTourneeTest {
                 () -> SauvegardeTournee.restaurer(fichier));
     }
 
-    /** Plusieurs livreurs ne tiennent pas dans le format : refusé à l'écriture. */
+    /** Plusieurs livreurs ne tiennent pas dans le format : refusés. */
     @Test
     public void plusieursLivreursRefuses() throws Exception {
         Path fichierPlan = dossier.newFile("plan.xml").toPath();

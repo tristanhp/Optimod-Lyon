@@ -58,6 +58,17 @@ final class CommandeDeplacerPoint implements Commande {
     }
 
     @Override
+    public String confirmation() {
+        return "Point du livreur " + apres.livreur()
+                + " déplacé à la nouvelle adresse.";
+    }
+
+    @Override
+    public String description() {
+        return "déplacement d'un point du livreur " + apres.livreur();
+    }
+
+    @Override
     public void memoriserTourneesAvant(Map<Integer, Tournee> tournees) {
         tourneesAvant = tournees;
     }

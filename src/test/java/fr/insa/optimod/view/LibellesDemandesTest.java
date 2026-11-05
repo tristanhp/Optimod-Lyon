@@ -7,8 +7,10 @@ import org.junit.Test;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 
+/** Tests de {@link LibellesDemandes}. */
 public class LibellesDemandesTest {
 
+    /** Decrit le numero et les durées sans adresse. */
     @Test
     public void decritLeNumeroEtLesDureesSansAdresse() {
         Demande demande = new Demande(new Noeud(10, 0, 0), new Noeud(20, 0, 0),
@@ -17,6 +19,7 @@ public class LibellesDemandesTest {
                 LibellesDemandes.decrire(3, demande));
     }
 
+    /** Formate les durées en minutes et secondes. */
     @Test
     public void formateLesDureesEnMinutesEtSecondes() {
         assertEquals("0 min", LibellesDemandes.formaterDuree(0));

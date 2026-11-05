@@ -3,21 +3,28 @@ package fr.insa.optimod.algo.tsp;
 import java.util.Collection;
 import java.util.Iterator;
 
+/**
+ * Voyageur de commerce par séparation et évaluation, sans borne inférieure
+ * ni élagage : version de base du code fourni.
+ */
 public class TSP1 extends TemplateTSP {
 
     @Override
-    protected int calculerBorneInferieure(Integer sommetCourant, Collection<Integer> nonVus) {
+    protected int calculerBorneInferieure(Integer sommetCourant,
+            Collection<Integer> nonVus) {
         return 0;
     }
 
     @Override
-    protected Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt, Collection<Integer> nonVus,
+    protected Iterator<Integer> creerIterateurSuccesseurs(Integer sommetCrt,
+            Collection<Integer> nonVus,
             GrapheDepandance g) {
         return new IteratorSeq(nonVus, sommetCrt, g);
     }
 
     @Override
-    protected Boolean croisementArc(Integer sommetCrt, Integer sommetVisite, Collection<Integer> nonVus,
+    protected Boolean croisementArc(Integer sommetCrt, Integer sommetVisite,
+            Collection<Integer> nonVus,
             GrapheDepandance g) {
         return false;
     }

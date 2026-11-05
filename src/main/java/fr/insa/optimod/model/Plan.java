@@ -105,16 +105,18 @@ public final class Plan {
      * il est coûteux de le relancer : un par liste de sommets d'un livreur
      * (adresses, durées, types et demandes). Un ordre trouvé à la limite de
      * temps, non prouvé optimal, n'est pas gardé : un nouveau « Calculer »
-     * cherche de nouveau un meilleur ordre. Seul le calcul complet les consulte, jamais
-     * une modification de l'utilisateur, qui garde l'ordre affiché. Le plan
-     * étant relu à chaque import, la mémoire repart de zéro avec lui. Le calcul
-     * tourne hors du thread de l'interface : la table est concurrente.
+     * cherche de nouveau un meilleur ordre. Seul le calcul complet les
+     * consulte, jamais une modification de l'utilisateur, qui garde l'ordre
+     * affiché. Le plan étant relu à chaque import, la mémoire repart de zéro
+     * avec lui. Le calcul tourne hors du thread de l'interface : la table est
+     * concurrente.
      */
     private final Map<List<Sommet>, List<Integer>> ordresMemorises =
             new ConcurrentHashMap<>();
 
     private final Map<Long, Noeud> noeuds = new LinkedHashMap<>();
-    private final Map<Noeud, List<Troncon>> tronconsSortants = new LinkedHashMap<>();
+    private final Map<Noeud, List<Troncon>> tronconsSortants =
+            new LinkedHashMap<>();
     private final List<Troncon> troncons = new ArrayList<>();
 
     /**
@@ -143,7 +145,8 @@ public final class Plan {
         documentXml.getDocumentElement().normalize();
         try {
             NodeList elementsNoeuds = documentXml.getElementsByTagName("noeud");
-            for (int indice = 0; indice < elementsNoeuds.getLength(); indice++) {
+            for (int indice = 0; indice
+                    < elementsNoeuds.getLength(); indice++) {
                 Element element = (Element) elementsNoeuds.item(indice);
                 Noeud noeud = new Noeud(
                         Long.parseLong(element.getAttribute("id")),
@@ -152,8 +155,10 @@ public final class Plan {
                 noeuds.put(noeud.identifiant(), noeud);
                 tronconsSortants.put(noeud, new ArrayList<>());
             }
-            NodeList elementsTroncons = documentXml.getElementsByTagName("troncon");
-            for (int indice = 0; indice < elementsTroncons.getLength(); indice++) {
+            NodeList elementsTroncons =
+                    documentXml.getElementsByTagName("troncon");
+            for (int indice = 0; indice
+                    < elementsTroncons.getLength(); indice++) {
                 Element element = (Element) elementsTroncons.item(indice);
                 Noeud origine = trouverNoeud(element.getAttribute("origine"));
                 Troncon troncon = new Troncon(origine,
@@ -177,7 +182,8 @@ public final class Plan {
      */
     static DocumentBuilder creerLecteurXml() {
         try {
-            DocumentBuilderFactory fabrique = DocumentBuilderFactory.newInstance();
+            DocumentBuilderFactory fabrique =
+                    DocumentBuilderFactory.newInstance();
             fabrique.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             fabrique.setFeature(
                     "http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -542,10 +548,12 @@ public final class Plan {
                 new GrapheDepandance(nombre, couts, collecteAvantLivraison));
         switch (res) {
             case PAS_DE_SOLUTION:
-                throw new IllegalStateException("Au moins un sommet du graphe est inaccessible.");
+                throw new IllegalStateException(
+                "Au moins un sommet du graphe est inaccessible.");
             case CALCUL_TROP_LONG_SANS_RESULTAT:
-                throw new IllegalStateException("Aucune tournée possible trouvée dans la limite de "
-                        + limiteTemps + " ms.");
+                throw new IllegalStateException(
+                        "Aucune tournée possible trouvée dans la limite de "
+                                + limiteTemps + " ms.");
             default:
                 // CALCUL_TROP_LONG : la meilleure solution trouvée avant la
                 // limite de temps est gardée, même si elle n'est pas prouvée
@@ -950,7 +958,8 @@ public final class Plan {
     static double heuristique(Noeud noeud, Noeud cible) {
         double latitudeA = Math.toRadians(noeud.latitude());
         double latitudeB = Math.toRadians(cible.latitude());
-        double ecartLongitude = Math.toRadians(cible.longitude() - noeud.longitude());
+        double ecartLongitude = Math.toRadians(cible.longitude()
+                - noeud.longitude());
         double h = Math.pow(Math.sin((latitudeB - latitudeA) / 2), 2)
                 + Math.cos(latitudeA) * Math.cos(latitudeB)
                         * Math.pow(Math.sin(ecartLongitude / 2), 2);
