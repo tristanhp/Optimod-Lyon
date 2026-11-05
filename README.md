@@ -139,12 +139,17 @@ dès l'ouverture et hors opération en cours, recharge le plan référencé et l
 programme, puis recalcule les trajets et les heures sans changer l'ordre des
 arrêts et sans relancer le TSP. La restauration réussie vide Annuler/Rétablir.
 Un fichier invalide, ou toute autre erreur pendant la restauration, laisse le
-travail courant intact et affiche un message. Garder le fichier du
-plan à son emplacement ; il n'est pas inclus dans la sauvegarde.
+travail courant intact et affiche un message. Le plan n'est pas inclus dans la
+sauvegarde : elle le désigne par un chemin relatif à son dossier et, s'il n'y
+est plus, le cherche par son nom à côté d'elle. Garder donc le plan dans le
+même dossier que la sauvegarde (c'est le cas de
+`demande_sauvegardee_grand.xml`, à côté de `grandPlan.xml`).
 Le [format XML](docs/sauvegarde-tournee.md) décrit les limites de cette version.
-Avec plusieurs livreurs (champ *Livreurs*), *Sauvegarder* n'ouvre pas le choix
-du fichier et n'écrit rien : la consigne avertit que la sauvegarde ne gère
-qu'un livreur pour l'instant.
+Avec plusieurs livreurs (champ *Livreurs*), *Sauvegarder* est grisé ; déclenché
+quand même, il n'ouvre pas le choix du fichier et la consigne avertit que la
+sauvegarde ne gère qu'un livreur pour l'instant. Sauvegarder par-dessus le
+fichier du plan ou des demandes chargés est refusé, et une écriture
+impossible (dossier protégé ou supprimé) est signalée comme telle.
 
 Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 (`petitPlan.xml`, `moyenPlan.xml`, `grandPlan.xml`) et des fichiers de
@@ -301,8 +306,17 @@ d'arrivée et de départ et sa plage annoncée. Si le dessin échoue (plan sans
 nœud ni tronçon, adresse de la tournée absente du plan, exception), un message
 remplace la carte et l'application revient à l'état initial.
 
-Un fichier invalide (XML mal formé, adresse absente du plan, durée négative…)
-ouvre une fenêtre qui explique l'erreur ; rien n'est perdu.
+Un fichier invalide (XML mal formé ou vide, image renommée, nombre
+illisible, longueur négative, adresse absente du plan, durée négative…) ouvre
+une fenêtre qui explique l'erreur en français, avec la ligne fautive quand
+elle est connue ; rien n'est perdu : un mauvais fichier de plan garde le plan,
+les demandes, les tournées et l'historique en cours. Un fichier de demandes
+est limité à 100 demandes, au-delà desquelles le calcul complet ne finirait
+pas en un temps raisonnable. Les plans et les demandes sont lus hors du
+thread de l'interface, avec l'indicateur d'attente : un très gros plan ne
+fige pas la fenêtre. Si une erreur inattendue se produit malgré tout, une
+alerte le signale (« Une erreur inattendue s'est produite. Votre travail est
+conservé. »), l'erreur est journalisée et l'application reste ouverte.
 
 ## Glossaire
 
@@ -368,8 +382,8 @@ Les trois design patterns :
 
 - **State** (TIG-90) : le contrôleur délègue chaque clic à son état courant
   (`EtatInitial`, `EtatPlanCharge`, `EtatProgrammeCharge`,
-  `EtatCalculEnCours`, `EtatTourneeCalculee`, `EtatAjoutCollecte`,
-  `EtatAjoutLivraison`), qui décide de ce qui est permis et des boutons
+  `EtatLectureFichier`, `EtatCalculEnCours`, `EtatTourneeCalculee`,
+  `EtatAjoutCollecte`, `EtatAjoutLivraison`…), qui décide de ce qui est permis et des boutons
   actifs ([ADR 0002](docs/adr/0002-design-pattern-state-controleur.md)).
 - **Observer** (TIG-91) : `ProgrammeLivraisons` prévient la vue quand ses
   demandes changent ; la vue se redessine seule

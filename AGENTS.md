@@ -39,7 +39,7 @@ dire ce qui échoue.
 | `model` | `Plan` (lecture du plan **et** calcul des tournées), `ProgrammeLivraisons` (+ `Demande`, tournées des livreurs), `Tournee` (+ `Arret`, `TypeArret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
 | `algo.tsp` | Voyageur de commerce : `TemplateTSP`, `TSP3`, `GrapheDepandance` | JDK |
 | `controller` | `MainController`, `MapScreen`, états `Etat*`, commandes `Commande*`, `ListeDeCommandes` | `model` |
-| `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher` | `controller`, `model`, JavaFX |
+| `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher`, `GestionnaireErreursInattendues` | `controller`, `model`, JavaFX |
 
 Règles :
 

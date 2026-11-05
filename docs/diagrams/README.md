@@ -36,8 +36,11 @@ l'action est permise, quels boutons sont actifs et quel est l'état suivant
 ```mermaid
 stateDiagram-v2
     [*] --> EtatInitial
-    EtatInitial --> EtatPlanCharge : importerPlan [valide]
-    EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [valide]
+    EtatInitial --> EtatLectureFichier : importerPlan
+    EtatLectureFichier --> EtatPlanCharge : plan valide
+    EtatPlanCharge --> EtatLectureFichier : importerProgramme
+    EtatLectureFichier --> EtatProgrammeCharge : demandes valides
+    EtatLectureFichier --> EtatInitial : fichier invalide [aucun plan avant]
     EtatProgrammeCharge --> EtatCalculEnCours : calculer
     EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
     EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur, sans tournées]
