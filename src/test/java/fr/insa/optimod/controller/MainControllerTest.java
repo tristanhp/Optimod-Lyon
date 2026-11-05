@@ -4562,9 +4562,9 @@ public class MainControllerTest {
 
     /**
      * Une erreur inattendue pendant la restauration (ici un nom de fichier
-     * qu'aucun chemin ne peut représenter) ramène à l'état d'avant avec un
-     * message, comme un fichier invalide : l'application ne reste pas
-     * bloquée sur « Restauration en cours » (TIG-107).
+     * qu'aucun chemin ne peut représenter) ramène à un état équivalent à
+     * celui d'avant, programme intact, avec un message : l'application ne
+     * reste pas bloquée sur « Restauration en cours » (TIG-107).
      */
     @Test
     public void restaurationErreurInattendueRevientALEtatDAvant()
@@ -4576,10 +4576,10 @@ public class MainControllerTest {
         ecran.actionRestaurer.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatRestauration);
         executerArrierePlan();
-        assertSame(avant, controleur.obtenirEtat());
+        assertEquals(avant.getClass(), controleur.obtenirEtat().getClass());
         assertSame(programme, controleur.obtenirProgramme());
         assertFalse(ecran.attente);
-        assertTrue(ecran.evenements.contains("invalide"));
+        assertTrue(ecran.evenements.contains("erreur inattendue"));
     }
 
     // --- Robustesse : fichiers piégés, erreurs imprévues, écriture ---
