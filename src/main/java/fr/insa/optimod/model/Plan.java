@@ -202,7 +202,7 @@ public final class Plan {
 
     /**
      * Renvoie nœuds du plan (non modifiable).
-     * 
+     *
      * @return nœuds du plan (non modifiable)
      */
     public Collection<Noeud> obtenirNoeuds() {
@@ -221,7 +221,7 @@ public final class Plan {
 
     /**
      * Renvoie tronçons du plan (non modifiable).
-     * 
+     *
      * @return tronçons du plan (non modifiable)
      */
     public List<Troncon> obtenirTroncons() {
