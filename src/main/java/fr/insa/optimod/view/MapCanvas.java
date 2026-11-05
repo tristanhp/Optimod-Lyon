@@ -49,6 +49,26 @@ final class MapCanvas extends Pane {
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
 
+    /** Palette de 6 couleurs distinctes pour les livreurs. */
+    private static final Color[] PALETTE_LIVREURS = {
+            Color.web("#1f77b4"), // Bleu
+            Color.web("#ff7f0e"), // Orange
+            Color.web("#2ca02c"), // Vert
+            Color.web("#d62728"), // Rouge
+            Color.web("#9467bd"), // Violet
+            Color.web("#8c564b") // Marron
+    };
+
+    /**
+     * Renvoie la couleur attribuée à un livreur.
+     *
+     * @param index numéro du livreur (0-indexé)
+     * @return couleur de la tournée
+     */
+    public Color couleurLivreur(int index) {
+        return PALETTE_LIVREURS[Math.abs(index) % PALETTE_LIVREURS.length];
+    }
+
     private static final Color COULEUR_CONTOUR_EVIDENCE = Color.BLACK;
 
     /** Zoom maximal (1 = plan entier visible). */
@@ -90,8 +110,7 @@ final class MapCanvas extends Pane {
     private static final Color COULEUR_APRES_13H = Color.web("#d93025");
 
     /** Contour du numéro d'un arrêt dont l'arrivée dépasse 13 h. */
-    private static final Color COULEUR_APRES_13H_CONTOUR =
-            Color.web("#8c1c13");
+    private static final Color COULEUR_APRES_13H_CONTOUR = Color.web("#8c1c13");
 
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
@@ -541,20 +560,16 @@ final class MapCanvas extends Pane {
      */
     private void dessinerTournees(GraphicsContext contexte) {
         contexte.setLineCap(StrokeLineCap.ROUND);
-        for (Tournee tournee : tournees.values()) {
-            int total = tournee.chemins().stream()
-                    .mapToInt(chemin -> chemin.troncons().size()).sum();
-            int fait = 0;
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            int numeroLivreur = entree.getKey();
+            Tournee tournee = entree.getValue();
+            Color couleurActuelle = couleurLivreur(numeroLivreur - 1);
+
             for (Chemin chemin : tournee.chemins()) {
                 for (Troncon troncon : chemin.troncons()) {
                     verifierDansLePlan(troncon.origine());
                     verifierDansLePlan(troncon.destination());
-                    double avancement = total <= 1 ? 0
-                            : (double) fait / (total - 1);
-                    dessinerTroncon(contexte, troncon,
-                            COULEUR_DEBUT_TOURNEE.interpolate(
-                                    COULEUR_FIN_TOURNEE, avancement));
-                    fait++;
+                    dessinerTroncon(contexte, troncon, couleurActuelle);
                 }
             }
         }
@@ -616,8 +631,7 @@ final class MapCanvas extends Pane {
                 boolean apres13h = arrets.get(rang).estApresHeureLimite();
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
                         : apres13h ? COULEUR_APRES_13H : Color.WHITE);
-                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR
-                        : COULEUR_FIN_TOURNEE);
+                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR : couleurLivreur(entree.getKey() - 1));
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
