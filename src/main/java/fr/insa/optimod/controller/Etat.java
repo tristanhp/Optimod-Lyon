@@ -179,11 +179,11 @@ interface Etat {
     }
 
     /**
-     * « Genere les feuilles de route de la tournee » . Ignoré par défaut.
+     * Clic sur « Générer les feuilles de route ». Ignoré par défaut.
      *
      * @param controleur contrôleur à piloter
      */
-    default void genererFeuilleDeRoute(MainController controleur) {
+    default void genererFeuillesDeRoute(MainController controleur) {
     }
 
     /**

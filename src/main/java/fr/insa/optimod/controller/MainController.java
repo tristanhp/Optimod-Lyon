@@ -1,15 +1,13 @@
 package fr.insa.optimod.controller;
 
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
@@ -20,15 +18,13 @@ import java.util.logging.Logger;
 
 import org.xml.sax.SAXException;
 
+import fr.insa.optimod.model.FeuilleDeRoute;
 import fr.insa.optimod.model.Noeud;
 import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.SauvegardeTournee;
 import fr.insa.optimod.model.Tournee;
-import fr.insa.optimod.model.Tournee.Arret;
-import fr.insa.optimod.model.Tournee.TypeArret;
-import fr.insa.optimod.model.Troncon;
 
 /**
  * Contrôleur de la page principale : importe un plan puis un programme de
@@ -182,7 +178,8 @@ public final class MainController {
         ecran.definirActionRestaurer(() -> etat.restaurer(this));
         ecran.definirActionErreurDessin(
                 detail -> etat.erreurDessin(this, detail));
-        ecran.definirActionGenereFeuilleDeRoute(() -> etat.genererFeuilleDeRoute(this));
+        ecran.definirActionGenererFeuillesDeRoute(
+                () -> etat.genererFeuillesDeRoute(this));
         changerEtat(new EtatInitial());
     }
 
@@ -1000,122 +997,29 @@ public final class MainController {
     }
 
     /**
-     * Genere les feuilles de route de la tournée calculée dans le fichier choisi
-     * par l'utilisateur.
+     * Écrit une feuille de route HTML par livreur dans le dossier choisi par
+     * l'utilisateur ({@link FeuilleDeRoute}). Ne fait rien si le choix du
+     * dossier est annulé.
      */
-    public void genererFeuilleDeRoute() {
-        for (Entry<Integer, Tournee> livreur : programme.obtenirTournees().entrySet()) {
-            ecran.choisirFichierGenerationFeuilleDeRoute(livreur.getKey()).ifPresent(fichier -> {
-                try (FileWriter sortie = new FileWriter(fichier)) {
-                    genererFeuilleDeRouteHTMLPourLivreur(sortie, livreur.getValue(), livreur.getKey());
-                } catch (IOException erreur) {
-                    ecran.afficherErreurXml(erreur.getMessage());
+    void genererFeuillesDeRoute() {
+        ecran.choisirDossierFeuillesDeRoute().ifPresent(dossier -> {
+            try {
+                Map<Integer, Tournee> tournees = programme.obtenirTournees();
+                for (Map.Entry<Integer, Tournee> tournee
+                        : tournees.entrySet()) {
+                    Files.writeString(dossier.toPath().resolve(
+                            FeuilleDeRoute.nomFichier(tournee.getKey())),
+                            FeuilleDeRoute.generer(plan, tournee.getKey(),
+                                    tournee.getValue()),
+                            StandardCharsets.UTF_8);
                 }
-            });
-        }
-    }
-
-    /**
-     * Genere une feuille de route HTML à fileOutputWriter de la tournee
-     *
-     * @param fileOutpuWriter Outil java qui ecrit la feuille de route au fichier
-     *                        selectionne
-     * @param tournee         La tournne dont la feuille de route sera écrite
-     * @param nb              l'id du livreur
-     * @throws IOException
-     */
-    private void genererFeuilleDeRouteHTMLPourLivreur(FileWriter fileOutpuWriter, Tournee tournee, int nb)
-            throws IOException {
-        fileOutpuWriter.write("<!DOCTYPE html>\r\n" + //
-                "<html>\r\n" + //
-                "\r\n" + //
-                "<head>\r\n" + //
-                "    <style>\r\n" + //
-                "        h1 {\r\n" + //
-                "            text-align: center;\r\n" + //
-                "        }\r\n" + //
-                "\r\n" + //
-                "        table {\r\n" + //
-                "            border-collapse: collapse;\r\n" + //
-                "        }\r\n" + //
-                "\r\n" + //
-                "        td,\r\n" + //
-                "        th\r\n" + //
-                "\r\n" + //
-                "        /* Mettre une bordure sur les td ET les th */\r\n" + //
-                "            {\r\n" + //
-                "            border: 1px solid black;\r\n" + //
-                "            padding: 5px;\r\n" + //
-                "        }\r\n" + //
-                "    </style>\r\n" + //
-                "</head>\r\n" + //
-                "\r\n" + //
-                "<body>\r\n" + //
-                "\r\n" + //
-                "    <h1 class=\"aligncenter\">Livreur n°" + nb + "</h1>\r\n" + //
-                "    <p> </p>\r\n" + //
-                "\r\n" + //
-                "    <h2>Heure de départ prévue de l'entrepot : " + tournee.arrets().getFirst().depart() + "</h2>\r\n" + //
-                "    <h2>Heure de retour prévue de l'entrepot : " + tournee.arrets().getLast().arrivee() + "</h2>");
-
-        fileOutpuWriter.write("<table border=\"1\", border-collapse= collapse;>\r\n" + //
-                "  <caption>Liste des Demande de Livraisons</caption>\r\n" + //
-                "  <thead>\r\n" + //
-                "    <tr>\r\n" + //
-                "      <th>Type d'arret</th>\r\n" + //
-                "      <th>Adresse</th>\r\n" + //
-                "      <th>Lien Google Maps</th>\r\n" + //
-                "      <th>Plage annoncée</th>\r\n" + //
-                "      <th>Heure d'arrivée</th>\r\n" + //
-                "      <th>Heure de départ</th>\r\n" + //
-                "      <th>Durée sur place</th>\r\n" + //
-                "    </tr>\r\n" + //
-                "  </thead>\r\n" + //
-                "  <tbody>");
-
-        for (Arret arret : tournee.arrets()) {
-            long decalage = Duration.between(arret.arrivee(), arret.depart()).getSeconds();
-            ArrayList<String> rue = new ArrayList<>();
-            Noeud id = arret.noeud();
-            for (Troncon troncon : plan.obtenirTroncons()) {
-                if (troncon.origine().equals(id) || troncon.destination().equals(id)) {
-                    if (!rue.contains(troncon.nomRue())) {
-                        rue.add(troncon.nomRue());
-                    }
-                }
+                ecran.afficherConfirmation(tournees.size() == 1
+                        ? "Feuille de route générée dans " + dossier + "."
+                        : tournees.size() + " feuilles de route générées dans "
+                                + dossier + ".");
+            } catch (IOException | IllegalArgumentException erreur) {
+                ecran.afficherErreurXml(erreur.getMessage());
             }
-            String plage, heureDepart, heureArrive;
-            if (arret.type() == TypeArret.ENTREPOT) {
-                if (arret.equals(tournee.arrets().getFirst())) {
-                    plage = arret.depart().toString();
-                    heureDepart = arret.depart().toString();
-                    heureArrive = "--";
-                } else {
-                    plage = arret.arrivee().toString();
-                    heureArrive = arret.arrivee().toString();
-                    heureDepart = "--";
-                }
-
-            } else {
-                plage = arret.debutPlage() + " - " + arret.finPlage();
-                heureArrive = arret.arrivee().toString();
-                heureDepart = (arret.depart().equals(arret.arrivee()) ? " -- " : arret.depart().toString());
-            }
-            fileOutpuWriter.write("<tr>\r\n" + //
-                    "      <td>" + arret.type() + "</td>\r\n" + //
-                    "      <td>" + rue + "</td>\r\n" + //
-                    "      <td> <a href=\"https://maps.google.com/?q=" + id.latitude() + "," + id.longitude()
-                    + "\">(" + id.latitude() + ", " + id.longitude() + ")</a></td>" + //
-                    "      <td style=\"text-align: center\";>" + plage + "</td>\r\n" + //
-                    "      <td style=\"text-align: center\";>" + heureArrive + "</td>\r\n" + //
-                    "      <td style=\"text-align: center\";>" + heureDepart + "</td>\r\n" + //
-                    "      <td style=\"text-align: center\";>"
-                    + (decalage == 0 ? "--" : (decalage / 60 == 0 ? "" : decalage / 60 + " min"))
-                    + (decalage % 60 == 0 ? "" : decalage % 60 + " s") + "</td>\r\n"
-                    + "    </tr>");
-        }
-        fileOutpuWriter.write("  </tbody>\r\n" + //
-                "</table>\r\n" + //
-                "  </body>\n");
+        });
     }
 }

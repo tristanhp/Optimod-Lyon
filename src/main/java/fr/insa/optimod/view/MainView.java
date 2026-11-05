@@ -41,6 +41,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.DirectoryChooser;
 import javafx.stage.FileChooser;
 
 /**
@@ -143,7 +144,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private Plan planAffiche;
 
     /** Dernier dossier ouvert dans le sélecteur de fichier. */
-    private File dernierDossier = new File("src\\main\\resources\\data");
+    private File dernierDossier;
 
     /** Construit la page vide. */
     MainView() {
@@ -569,7 +570,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public void definirActionGenereFeuilleDeRoute(Runnable action) {
+    public void definirActionGenererFeuillesDeRoute(Runnable action) {
         boutonFeuilleDeRoute.setOnAction(e -> action.run());
     }
 
@@ -584,20 +585,17 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
-    public Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb) {
-        FileChooser selecteur = new FileChooser();
-        selecteur.setTitle("Generer les feuilles de route de la tournee");
-        selecteur.setInitialFileName("feuille-de-route-livreur-" + nb + ".html");
-        selecteur.getExtensionFilters().add(
-                new FileChooser.ExtensionFilter("Fichiers HTML", "*.html"));
+    public Optional<File> choisirDossierFeuillesDeRoute() {
+        DirectoryChooser selecteur = new DirectoryChooser();
+        selecteur.setTitle("Dossier des feuilles de route");
         if (dernierDossier != null && dernierDossier.isDirectory()) {
             selecteur.setInitialDirectory(dernierDossier);
         }
-        File fichier = selecteur.showSaveDialog(getScene().getWindow());
-        if (fichier != null) {
-            dernierDossier = fichier.getParentFile();
+        File dossier = selecteur.showDialog(getScene().getWindow());
+        if (dossier != null) {
+            dernierDossier = dossier;
         }
-        return Optional.ofNullable(fichier);
+        return Optional.ofNullable(dossier);
     }
 
     private Optional<File> choisirFichierXml(String titre) {

@@ -379,11 +379,11 @@ public interface MapScreen {
     void definirActionRestaurer(Runnable action);
 
     /**
-     * Définit l'action de generer les feuilles de routes de la tournee.
+     * Définit l'action « Générer les feuilles de route ».
      *
-     * @param action action de restauration
+     * @param action action de génération des feuilles de route
      */
-    void definirActionGenereFeuilleDeRoute(Runnable action);
+    void definirActionGenererFeuillesDeRoute(Runnable action);
 
     /**
      * Renvoie destination XML, ou vide après annulation.
@@ -400,10 +400,10 @@ public interface MapScreen {
     Optional<File> choisirFichierRestauration();
 
     /**
-     * Renvoie destination XML, ou vide après annulation.
+     * Demande le dossier où écrire les feuilles de route.
      *
-     * @return destination XML, ou vide après annulation
+     * @return dossier choisi, ou vide après annulation
      */
-    Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb);
+    Optional<File> choisirDossierFeuillesDeRoute();
 
 }

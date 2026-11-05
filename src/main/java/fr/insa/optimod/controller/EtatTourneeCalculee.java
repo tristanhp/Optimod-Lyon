@@ -80,17 +80,13 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
     }
 
     /**
-     * Genere les feuilles de route de la tournee en HTML et l'enregistre dans le
-     * dossier choisi par l'utilisateur.
-     * Une feuille de route comprend :
-     * - uméro du livreur,
-     * - heure de départ et de retour ;
-     * - tableau ordonné des arrêts (type, adresse = noms des rues du noeud, plage
-     * annoncee, heure d'arrivee, heure de depart, duree sur place) ;
+     * Génère une feuille de route HTML par livreur dans le dossier choisi par
+     * l'utilisateur : numéro du livreur, heures de départ et de retour, arrêts
+     * dans l'ordre et itinéraire rue par rue.
      */
     @Override
-    public void genererFeuilleDeRoute(MainController controleur) {
-        controleur.genererFeuilleDeRoute();
+    public void genererFeuillesDeRoute(MainController controleur) {
+        controleur.genererFeuillesDeRoute();
     }
 
     @Override

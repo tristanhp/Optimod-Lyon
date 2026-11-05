@@ -60,13 +60,14 @@ public class MainControllerTest {
         private BiConsumer<Integer, Integer> actionDeplacer;
         private Runnable actionAnnuler;
         private Runnable actionRefaire;
-        private Runnable actionGenererFeuilleDeRoute;
+        private Runnable actionGenererFeuillesDeRoute;
         private LongConsumer actionClicNoeud;
         private Consumer<String> actionErreurDessin;
         private String erreurCarte;
         private String consigne = "";
         private String confirmation = "";
         private File fichierChoisi;
+        private File dossierChoisi;
         private final List<String> evenements = new ArrayList<>();
         private Plan planAffiche;
         private ProgrammeLivraisons programmeAffiche;
@@ -304,13 +305,13 @@ public class MainControllerTest {
         }
 
         @Override
-        public void definirActionGenereFeuilleDeRoute(Runnable action) {
-            actionGenererFeuilleDeRoute = action;
+        public void definirActionGenererFeuillesDeRoute(Runnable action) {
+            actionGenererFeuillesDeRoute = action;
         }
 
         @Override
-        public Optional<File> choisirFichierGenerationFeuilleDeRoute(int nb) {
-            return Optional.ofNullable(fichierChoisi);
+        public Optional<File> choisirDossierFeuillesDeRoute() {
+            return Optional.ofNullable(dossierChoisi);
         }
     }
 
@@ -2983,5 +2984,57 @@ public class MainControllerTest {
 
         ecran.actionRestaurer.run();
         assertEquals("Tournée restaurée.", ecran.confirmation);
+    }
+
+    // --- Feuilles de route ---
+
+    /** Calcule la tournée factice du livreur 1. */
+    private void calculerUneTournee() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+    }
+
+    /** La feuille de chaque livreur est écrite dans le dossier choisi. */
+    @Test
+    public void feuillesDeRouteEcritesDansLeDossierChoisi() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = dossier.newFolder("feuilles");
+        ecran.actionGenererFeuillesDeRoute.run();
+        File feuille = new File(ecran.dossierChoisi,
+                "feuille-de-route-livreur-1.html");
+        assertTrue(feuille.getName(), feuille.isFile());
+        assertTrue(Files.readString(feuille.toPath())
+                .contains("Livreur n°1"));
+        assertEquals("Feuille de route générée dans " + ecran.dossierChoisi
+                + ".", ecran.confirmation);
+    }
+
+    /** Annuler le choix du dossier n'écrit rien. */
+    @Test
+    public void feuillesDeRouteAnnuleesSansDossier() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = null;
+        String avant = ecran.confirmation;
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertEquals(avant, ecran.confirmation);
+    }
+
+    /** Sans tournée calculée, l'action est ignorée. */
+    @Test
+    public void feuillesDeRouteIgnoreesSansTournee() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.dossierChoisi = dossier.newFolder("feuilles");
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertEquals(0, ecran.dossierChoisi.list().length);
+    }
+
+    /** Un dossier inexistant est signalé sans planter. */
+    @Test
+    public void feuillesDeRouteDossierInexistantSignale() throws Exception {
+        calculerUneTournee();
+        ecran.dossierChoisi = new File(dossier.getRoot(), "absent");
+        ecran.actionGenererFeuillesDeRoute.run();
+        assertTrue(ecran.evenements.contains("invalide"));
     }
 }
