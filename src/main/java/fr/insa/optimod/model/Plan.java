@@ -699,7 +699,7 @@ public final class Plan {
      * Mêmes règles que {@link #calculerTournees} : {@value #VITESSE_KMH}
      * km/h, départ à l'heure de départ de la tournée actuelle. Retirer des
      * arrêts ne rallonge jamais une tournée : si elle était possible, elle le
-     * reste.
+     * reste. Les arrêts qui restent gardent leur plage annoncée.
      *
      * @param tournee tournée actuelle d'un livreur, avec la demande à retirer
      * @param demande demande à retirer
@@ -731,7 +731,8 @@ public final class Plan {
      * (arrêts retirés, ou arrêts échangés). Un trajet entre deux arrêts qui se
      * suivaient déjà dans la tournée actuelle, dans le même sens, est repris
      * tel quel ; seuls les trajets des jonctions créées par le changement sont
-     * calculés par A*.
+     * calculés par A*. Chaque arrêt garde la plage annoncée de l'arrêt dont il
+     * vient : un arrêt dont l'arrivée en sort est signalé hors plage.
      *
      * @param tournee     tournée actuelle
      * @param rangsGardes rangs dans la tournée actuelle des arrêts de la
@@ -784,8 +785,21 @@ public final class Plan {
         }
         // Le premier arrêt est l'entrepôt : il est « atteint » à l'heure de
         // départ de la tournée.
-        return calculerHeuresDePassage(arrets.get(0).arrivee(), sommets,
-                chemins, ordre, false);
+        Tournee recalculee = calculerHeuresDePassage(arrets.get(0).arrivee(),
+                sommets, chemins, ordre, false);
+        // Les plages annoncées ne bougent pas (TIG-82) : chaque arrêt garde
+        // celle de l'arrêt dont il vient, et un arrêt dont l'arrivée en sort
+        // est signalé hors plage.
+        List<Tournee.Arret> avecPlages = new ArrayList<>();
+        for (int rang = 0; rang < recalculee.arrets().size(); rang++) {
+            Tournee.Arret nouveau = recalculee.arrets().get(rang);
+            Tournee.Arret ancien = arrets.get(rangsGardes.get(rang));
+            avecPlages.add(new Tournee.Arret(nouveau.noeud(),
+                    nouveau.arrivee(), nouveau.depart(), nouveau.type(),
+                    nouveau.demande(), ancien.debutPlage(),
+                    ancien.finPlage()));
+        }
+        return new Tournee(avecPlages, recalculee.chemins(), false);
     }
 
     /**
@@ -794,7 +808,8 @@ public final class Plan {
      * arrêts gardent leur ordre. Le voyageur de commerce n'est pas relancé, et
      * A* ne tourne que sur les trois trajets autour des deux arrêts échangés ;
      * les autres trajets sont repris de la tournée actuelle, puis les heures
-     * sont recalculées.
+     * sont recalculées. Chaque arrêt garde sa plage annoncée : un arrêt
+     * retardé de plus d'une heure est signalé hors plage.
      *
      * <p>
      * La contrainte d'ordre est vérifiée <b>avant</b> le recalcul. Échanger
@@ -869,7 +884,8 @@ public final class Plan {
      * pas</b> et le voyageur de commerce n'est pas relancé. A* ne tourne que
      * sur les deux trajets autour de l'arrêt déplacé, les autres sont repris
      * de la tournée actuelle, puis les heures de passage sont refaites. Les
-     * deux arrêts de la demande reçoivent la demande déplacée.
+     * deux arrêts de la demande reçoivent la demande déplacée. Chaque arrêt,
+     * le point déplacé compris, garde sa plage annoncée.
      *
      * <p>
      * Comme le calcul complet, la méthode renvoie la tournée même si elle
@@ -923,7 +939,7 @@ public final class Plan {
                 arretsDeplaces.set(i, new Tournee.Arret(
                         i == rang ? nouveauNoeud : courant.noeud(),
                         courant.arrivee(), courant.depart(), courant.type(),
-                        deplacee));
+                        deplacee, courant.debutPlage(), courant.finPlage()));
             }
         }
         return recalculerDansLOrdre(

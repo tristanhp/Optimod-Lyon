@@ -1082,17 +1082,28 @@ public class PlanTest {
     // --- Recalcul local d'une tournée, sans relancer le TSP (TIG-101) ---
 
     /**
-     * Arrêt à fabriquer pour une tournée écrite à la main : seuls l'adresse, la
-     * durée sur place (en secondes), le type et la demande comptent, les
-     * heures sont calculées par {@link #tourneeDansLOrdre}.
+     * Arrêt à fabriquer pour une tournée écrite à la main : l'adresse, la
+     * durée sur place (en secondes), le type, la demande et la plage
+     * annoncée ; les heures sont calculées par {@link #tourneeDansLOrdre}. Une
+     * plage {@code null} est fixée au calcul : une heure de part et d'autre de
+     * l'arrivée.
      */
     private record ArretPrevu(Noeud noeud, int duree, TypeArret type,
-            Demande demande) {
+            Demande demande, LocalTime debutPlage, LocalTime finPlage) {
 
-        /** Reprend l'adresse, la durée sur place, le type et la demande. */
+        /** Arrêt neuf, dont la plage sera fixée au calcul. */
+        ArretPrevu(Noeud noeud, int duree, TypeArret type, Demande demande) {
+            this(noeud, duree, type, demande, null, null);
+        }
+
+        /**
+         * Reprend l'adresse, la durée sur place, le type, la demande et la
+         * plage annoncée : un arrêt gardé par une modification garde sa plage.
+         */
         ArretPrevu(Tournee.Arret arret) {
             this(arret.noeud(), (int) arret.arrivee().until(arret.depart(),
-                    ChronoUnit.SECONDS), arret.type(), arret.demande());
+                    ChronoUnit.SECONDS), arret.type(), arret.demande(),
+                    arret.debutPlage(), arret.finPlage());
         }
     }
 
@@ -1129,8 +1140,12 @@ public class PlanTest {
             }
             LocalTime arrivee = heure;
             heure = arrivee.plusSeconds(prevu.duree());
-            arrets.add(new Tournee.Arret(prevu.noeud(), arrivee, heure,
-                    prevu.type(), prevu.demande()));
+            arrets.add(prevu.debutPlage() == null
+                    ? new Tournee.Arret(prevu.noeud(), arrivee, heure,
+                            prevu.type(), prevu.demande())
+                    : new Tournee.Arret(prevu.noeud(), arrivee, heure,
+                            prevu.type(), prevu.demande(), prevu.debutPlage(),
+                            prevu.finPlage()));
         }
         // Ordre imposé, pas trouvé par le voyageur de commerce : non prouvé.
         return new Tournee(arrets, chemins, false);
@@ -1692,7 +1707,8 @@ public class PlanTest {
                 attendus.add(new ArretPrevu(
                         i == rang ? nouveau : prevu.noeud(), prevu.duree(),
                         prevu.type(),
-                        memeDemande ? demande : prevu.demande()));
+                        memeDemande ? demande : prevu.demande(),
+                        prevu.debutPlage(), prevu.finPlage()));
             }
             assertEquals(tourneeDansLOrdre(plan, programme.obtenirHeureDepart(),
                     attendus), deplacee);
@@ -1748,6 +1764,128 @@ public class PlanTest {
         Tournee deplacee = plan.calculerTourneeAvecPointDeplace(tournee, 1,
                 plan.obtenirNoeud(2));
         assertFalse(deplacee.estPossible());
+    }
+
+    // --- Plages annoncées gardées par le recalcul local (TIG-82, TIG-107) ---
+
+    /**
+     * Tournée de {@link #tourneeDeDeuxDemandes} (départ à 8 h) où une demande
+     * de deux heures de collecte a été ajoutée en première position : les
+     * arrêts suivants arrivent plus de deux heures après leur arrivée
+     * annoncée, ils sont hors plage. Ordre : 1, 3 (7200), 2 (60), 3, 2, 2, 3,
+     * 1.
+     */
+    private static Tournee tourneeRetardeeParUnAjout(Plan plan) {
+        Tournee apres = plan.insererDemande(
+                tourneeDeDeuxDemandes(plan, LocalTime.of(8, 0)),
+                new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 7200,
+                        60),
+                1);
+        for (int rang = 3; rang < apres.arrets().size(); rang++) {
+            assertTrue("rang " + rang, apres.arrets().get(rang).estHorsPlage());
+        }
+        return apres;
+    }
+
+    /** Arrêt d'une tournée qui sert cette demande avec ce type. */
+    private static Tournee.Arret arretDe(Tournee tournee, Demande demande,
+            TypeArret type) {
+        return tournee.arrets().stream()
+                .filter(arret -> arret.type() == type
+                        && demande.equals(arret.demande()))
+                .findFirst().orElseThrow();
+    }
+
+    /** Vérifie qu'un arrêt a gardé la plage annoncée d'un autre. */
+    private static void verifierMemePlage(Tournee.Arret attendu,
+            Tournee.Arret arret) {
+        assertEquals(attendu.debutPlage(), arret.debutPlage());
+        assertEquals(attendu.finPlage(), arret.finPlage());
+    }
+
+    /**
+     * Supprimer une demande ne change pas la plage annoncée des arrêts qui
+     * restent : ceux qu'un ajout a retardés de plus d'une heure restent
+     * signalés hors plage (avant TIG-107, les plages étaient recalées sur les
+     * nouvelles heures et le signalement disparaissait).
+     */
+    @Test
+    public void suppressionGardeLesPlagesEtLesSignalements() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeRetardeeParUnAjout(plan);
+        Demande premiere = deuxDemandesDuPetitReseau(plan).get(0);
+        Tournee sans = plan.calculerTourneeSansDemande(avant,
+                deuxDemandesDuPetitReseau(plan).get(1));
+        for (TypeArret type : List.of(TypeArret.COLLECTE,
+                TypeArret.LIVRAISON)) {
+            Tournee.Arret arret = arretDe(sans, premiere, type);
+            verifierMemePlage(arretDe(avant, premiere, type), arret);
+            assertTrue(type.toString(), arret.estHorsPlage());
+        }
+        Tournee.Arret retour = sans.arrets().get(sans.arrets().size() - 1);
+        verifierMemePlage(avant.arrets().get(avant.arrets().size() - 1),
+                retour);
+        assertTrue(retour.estHorsPlage());
+    }
+
+    /**
+     * Descendre un arrêt sous une collecte de deux heures le retarde de plus
+     * d'une heure : il garde sa plage annoncée et il est signalé hors plage.
+     * L'arrêt monté arrive à peine plus tôt : il reste dans sa plage.
+     */
+    @Test
+    public void changementDOrdreGardeLesPlagesEtSignaleUnRetard()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Demande premiere = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 120);
+        Demande longue = new Demande(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3), 7200, 45);
+        Tournee tournee = tourneeDansLOrdre(plan, LocalTime.of(8, 0), List.of(
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null),
+                new ArretPrevu(plan.obtenirNoeud(3), 60, TypeArret.COLLECTE,
+                        premiere),
+                new ArretPrevu(plan.obtenirNoeud(2), 7200, TypeArret.COLLECTE,
+                        longue),
+                new ArretPrevu(plan.obtenirNoeud(2), 120, TypeArret.LIVRAISON,
+                        premiere),
+                new ArretPrevu(plan.obtenirNoeud(3), 45, TypeArret.LIVRAISON,
+                        longue),
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null)));
+        Tournee apres = plan.calculerTourneeOrdreChange(tournee, 1, 1);
+        Tournee.Arret descendu = apres.arrets().get(2);
+        assertEquals(premiere, descendu.demande());
+        verifierMemePlage(tournee.arrets().get(1), descendu);
+        assertTrue(descendu.obtenirDecalageSecondes() > 7200);
+        assertTrue(descendu.estHorsPlage());
+        Tournee.Arret monte = apres.arrets().get(1);
+        verifierMemePlage(tournee.arrets().get(2), monte);
+        assertFalse(monte.estHorsPlage());
+    }
+
+    /**
+     * Déplacer un point ne change aucune plage annoncée, pas même celle du
+     * point déplacé : les arrêts qu'un ajout a retardés de plus d'une heure
+     * restent signalés hors plage.
+     */
+    @Test
+    public void deplacementGardeLesPlagesEtLesSignalements() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeRetardeeParUnAjout(plan);
+        int rangDeplace = 6; // livraison de la seconde demande, en 3
+        assertEquals(plan.obtenirNoeud(3),
+                avant.arrets().get(rangDeplace).noeud());
+        Tournee deplacee = plan.calculerTourneeAvecPointDeplace(avant,
+                rangDeplace, plan.obtenirNoeud(1));
+        assertEquals(plan.obtenirNoeud(1),
+                deplacee.arrets().get(rangDeplace).noeud());
+        for (int rang = 0; rang < avant.arrets().size(); rang++) {
+            verifierMemePlage(avant.arrets().get(rang),
+                    deplacee.arrets().get(rang));
+            assertEquals("rang " + rang, rang >= 3,
+                    deplacee.arrets().get(rang).estHorsPlage());
+        }
     }
 
     // --- Position de moindre coût et livreurs possibles ---
