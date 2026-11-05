@@ -23,3 +23,21 @@
 .accent-button:hover {
     -fx-background-color: #1558b0;
 }
+
+/* Consigne : ce que l'utilisateur doit faire maintenant, bien visible. */
+.consigne {
+    -fx-background-color: #e8f0fe;
+    -fx-border-color: #1a73e8 transparent #dadce0 transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 14 10 14;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #174ea6;
+    -fx-min-height: 44px;
+}
+
+/* Confirmation : ce qui vient d'être fait. */
+.confirmation {
+    -fx-font-size: 14px;
+    -fx-text-fill: #137333;
+}

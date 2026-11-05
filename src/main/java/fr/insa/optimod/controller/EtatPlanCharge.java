@@ -10,6 +10,16 @@ import fr.insa.optimod.controller.MapScreen.Action;
  * demandes de livraison, ou restaurer une tournée.
  */
 final class EtatPlanCharge implements Etat {
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE =
+            "Importez un programme de livraisons "
+            + "(bouton « Importer les demandes »).";
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
 
     @Override
     public void restaurer(MainController controleur) {

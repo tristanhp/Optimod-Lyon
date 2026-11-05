@@ -69,7 +69,15 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /** Bouton de calcul de la tournée. */
     private final Button boutonImporterDemandes =
             new Button("Importer les demandes");
+
+    /** Ce qui vient d'être fait, en bas de la fenêtre. */
     private final Label message = new Label();
+
+    /** Dernière confirmation de l'action, vide si aucune. */
+    private String texteConfirmation = "";
+
+    /** Avertissement sur les arrêts hors plage, vide si aucun. */
+    private String texteHorsPlage = "";
 
     private final Button boutonCalculer = new Button("Calculer");
     private final Button boutonSauvegarder = new Button("Sauvegarder");
@@ -85,7 +93,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     private final Button boutonAnnuler = new Button("Annuler");
     private final Button boutonRefaire = new Button("Rétablir");
 
-    /** Consigne pour l'utilisateur (ex. pendant l'ajout d'une demande). */
+    /** Ce que l'utilisateur doit faire maintenant, sous la barre d'outils. */
     private final Label consigne = new Label();
 
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
@@ -144,14 +152,18 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         indicateurAttente.setVisible(false);
         boutonImporterDemandes.getStyleClass().add("accent-button");
         message.setPadding(new Insets(12));
+        message.getStyleClass().add("confirmation");
+        message.setWrapText(true);
         setBottom(message);
-        boutonAnnuler.setTooltip(new Tooltip("Ctrl+Z"));
-        boutonRefaire.setTooltip(new Tooltip("Ctrl+Y"));
+        consigne.getStyleClass().add("consigne");
+        consigne.setWrapText(true);
+        consigne.setMaxWidth(Double.MAX_VALUE);
+        definirInfobulles();
         FlowPane barreOutils = new FlowPane(8, 8,
                 boutonImporterPlan, boutonImporterDemandes,
                 boutonCalculer, indicateurAttente, boutonAjouter,
                 boutonAnnuler, boutonRefaire, boutonSauvegarder,
-                boutonRestaurer, consigne);
+                boutonRestaurer);
         barreOutils.getStyleClass().add("tool-bar-box");
         listeTournee.setPrefWidth(LARGEUR_TOURNEE);
         listeTournee.setVisible(false);
@@ -203,8 +215,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonMonter.setMaxWidth(Double.MAX_VALUE);
         boutonDescendre.setMaxWidth(Double.MAX_VALUE);
         boutonDeplacer.setMaxWidth(Double.MAX_VALUE);
-        boutonDeplacer.setTooltip(new Tooltip("Sélectionnez un arrêt dans la "
-                + "liste, puis cliquez ici et sur sa nouvelle adresse."));
         HBox.setHgrow(boutonMonter, Priority.ALWAYS);
         HBox.setHgrow(boutonDescendre, Priority.ALWAYS);
         VBox.setVgrow(listeTournee, Priority.ALWAYS);
@@ -235,7 +245,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             }
         });
         setLeft(panneauDemandes);
-        setTop(barreOutils);
+        setTop(new VBox(barreOutils, consigne));
         setCenter(carte);
         setRight(panneauTournee);
     }
@@ -248,6 +258,43 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     @Override
     public void definirActionCalculer(Runnable action) {
         boutonCalculer.setOnAction(event -> action.run());
+    }
+
+    /**
+     * Ajoute une infobulle à chaque bouton : ce qu'il fait et ce qu'il faut
+     * avoir fait avant. Un bouton grisé n'affiche pas d'infobulle : la
+     * consigne dit alors ce qu'il faut faire d'abord.
+     */
+    private void definirInfobulles() {
+        boutonImporterPlan.setTooltip(new Tooltip("Choisissez le fichier XML "
+                + "du plan de la ville."));
+        boutonImporterDemandes.setTooltip(new Tooltip("Choisissez le fichier "
+                + "XML du programme de livraisons (les demandes de collecte "
+                + "et de livraison). Il faut d'abord importer un plan."));
+        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée du "
+                + "programme de livraisons chargé."));
+        boutonSauvegarder.setTooltip(new Tooltip("Enregistre les tournées "
+                + "calculées dans un fichier XML."));
+        boutonRestaurer.setTooltip(new Tooltip("Recharge un plan, un "
+                + "programme de livraisons et sa tournée depuis un fichier "
+                + "sauvegardé."));
+        boutonAjouter.setTooltip(new Tooltip("Cliquez ici, puis sur le point "
+                + "de collecte et sur le point de livraison de la carte. Un "
+                + "nouveau clic ici annule l'ajout."));
+        boutonSupprimer.setTooltip(new Tooltip("Sélectionnez une demande "
+                + "dans la liste, puis cliquez ici pour la supprimer."));
+        boutonMonter.setTooltip(new Tooltip("Sélectionnez un arrêt dans la "
+                + "liste de la tournée, puis cliquez ici pour le passer plus "
+                + "tôt."));
+        boutonDescendre.setTooltip(new Tooltip("Sélectionnez un arrêt dans la "
+                + "liste de la tournée, puis cliquez ici pour le passer plus "
+                + "tard."));
+        boutonDeplacer.setTooltip(new Tooltip("Sélectionnez un arrêt dans la "
+                + "liste, puis cliquez ici et sur sa nouvelle adresse."));
+        boutonAnnuler.setTooltip(new Tooltip("Annule la dernière "
+                + "modification (Ctrl+Z)."));
+        boutonRefaire.setTooltip(new Tooltip("Rétablit la modification "
+                + "annulée (Ctrl+Y)."));
     }
 
     @Override
@@ -453,8 +500,22 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
 
     @Override
     public void signalerArretsHorsPlage(List<Tournee.Arret> arrets) {
-        message.setText(arrets.isEmpty() ? "" : arrets.size()
-                + " arrêt(s) hors plage annoncée. Annuler reste possible.");
+        texteHorsPlage = arrets.isEmpty() ? "" : arrets.size()
+                + " arrêt(s) hors plage annoncée. Annuler reste possible.";
+        actualiserMessage();
+    }
+
+    @Override
+    public void afficherConfirmation(String confirmation) {
+        texteConfirmation = confirmation;
+        actualiserMessage();
+    }
+
+    /** Affiche la confirmation, suivie de l'avertissement hors plage. */
+    private void actualiserMessage() {
+        message.setText(texteConfirmation.isEmpty() ? texteHorsPlage
+                : texteHorsPlage.isEmpty() ? texteConfirmation
+                : texteConfirmation + " " + texteHorsPlage);
     }
 
     @Override
@@ -538,7 +599,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         effacerListeTournee();
         effacerDemandes();
         carte.afficherPlan(plan);
-        message.setText("");
+        texteConfirmation = "";
+        texteHorsPlage = "";
+        actualiserMessage();
     }
 
     @Override
@@ -599,7 +662,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         effacerListeTournee();
         effacerDemandes();
         carte.effacerCarte();
-        message.setText("");
+        texteConfirmation = "";
+        texteHorsPlage = "";
+        actualiserMessage();
     }
 
     @Override
@@ -659,8 +724,6 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             listeDemandes.getItems().add(
                     LibellesDemandes.decrire(rang++, demande));
         }
-        message.setText("Programme chargé : "
-                + programmeObserve.obtenirDemandes().size() + " demande(s)");
     }
 
     /**

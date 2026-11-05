@@ -15,6 +15,16 @@ import fr.insa.optimod.model.Tournee;
  * ({@link MainController#supprimerDemandeEnGardantLOrdre}).
  */
 final class EtatCalculEnCours implements Etat {
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE =
+            "Calcul en cours… la tournée s'affiche "
+            + "dès qu'elle est prête.";
+
+    @Override
+    public String consigne(MainController controleur) {
+        return CONSIGNE;
+    }
+
 
     @Override
     public void importerPlan(MainController controleur) {
@@ -37,6 +47,7 @@ final class EtatCalculEnCours implements Etat {
         if (tournees != null) {
             controleur.rangerTournees(tournees);
             controleur.changerEtat(new EtatTourneeCalculee());
+            controleur.confirmerCalcul(tournees);
         } else {
             controleur.changerEtat(new EtatProgrammeCharge());
             controleur.afficherErreurCalcul(erreur);

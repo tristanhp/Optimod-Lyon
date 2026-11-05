@@ -118,6 +118,14 @@ Ne pas lancer `MainApp` directement : JavaFX exige de passer par
 
 ### Utiliser
 
+**Guidage** : sous la barre d'outils, une bande bleue dit à chaque étape ce
+qu'il faut faire (importer un plan, importer les demandes, calculer, modifier
+la tournée…) ; elle change toute seule quand on passe à l'étape suivante.
+En bas de la fenêtre, une phrase en vert confirme ce qui vient d'être fait
+(« Demande ajoutée au livreur 2. », « Annulé : suppression d'une demande du
+livreur 1. »). Survoler un bouton affiche une infobulle ; un bouton grisé n'en
+affiche pas, c'est la consigne qui dit alors quoi faire d'abord.
+
 **Sauvegarde et restauration (modèle actuel : un livreur)** : après un calcul,
 cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
 dès l'ouverture et hors opération en cours, recharge le plan référencé et le

@@ -15,6 +15,22 @@ import fr.insa.optimod.controller.MapScreen.Action;
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
+    /** Consigne affichée en entrant dans cet état. */
+    static final String CONSIGNE = "Tournée prête. Vous pouvez modifier le "
+            + "programme (ajouter, supprimer, déplacer, réordonner, "
+            + "changer de livreur).";
+
+    /**
+     * Garde la consigne « ordre non optimisé » tant que les tournées affichées
+     * viennent d'une modification faite à la main, même après un refus,
+     * Annuler ou Rétablir.
+     */
+    @Override
+    public String consigne(MainController controleur) {
+        String ordreGarde = controleur.obtenirConsigneOrdreGarde();
+        return ordreGarde.isEmpty() ? CONSIGNE : ordreGarde;
+    }
+
     @Override
     public void sauvegarder(MainController controleur) {
         controleur.sauvegarderTournee();
