@@ -35,7 +35,7 @@ agents IA (et utiles à tous) sont dans [`AGENTS.md`](AGENTS.md).
 | Plusieurs livreurs : une tournée par livreur (modèle et calcul) | fait |
 | Changer l'ordre des arrêts d'une tournée (Monter / Descendre) | fait |
 | Saisir les durées et insérer une demande sans relancer le TSP | fait |
-| Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après ajout | fait |
+| Afficher les plages annoncées (± 1 h) et signaler leurs dépassements après une modification | fait |
 | Déplacer un point de collecte ou de livraison | fait |
 | Changer le livreur d'une demande (annulable) | fait |
 | Régler le nombre de livreurs (annulable) | fait |
@@ -273,8 +273,10 @@ minuit refusent l'ajout avec un message, sans proposer d'autre livreur.
 Annuler et Rétablir retrouvent l'avertissement : il se déduit des tournées
 affichées, pas d'un état retenu.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
-L'insertion conserve les plages des anciens arrêts ; la liste signale les
-dépassements en rouge et affiche le décalage en minutes et secondes.
+Les modifications (ajout, suppression, Monter / Descendre, déplacement d'un
+point) conservent la plage de chaque arrêt gardé, celle d'un point déplacé
+comprise ; seul un nouvel arrêt reçoit sa plage à l'ajout. La liste signale
+les dépassements en rouge et affiche le décalage en minutes et secondes.
 Annuler reste disponible. Une fois les tournées calculées, le bouton *Calculer*
 devient *Recalculer* : il n'est jamais lancé automatiquement et demande une
 confirmation, car les modifications manuelles et les plages annoncées seront
@@ -326,7 +328,7 @@ Termes principaux et leur traduction dans le code :
 | Tournée | Trajet d'un livreur : départ à 8 h, retour avant 13 h ; une par livreur | `Tournee`, `ProgrammeLivraisons.obtenirTournees()` |
 | Arrêt, heure de passage | Un point de la tournée (entrepôt, collecte ou livraison) et ses heures d'arrivée et de départ | `Tournee.Arret` |
 | Feuille de route | Page HTML imprimable d'un livreur : arrêts dans l'ordre, heures de passage et itinéraire rue par rue | `FeuilleDeRoute` |
-| Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée après insertion | `Arret.debutPlage()`, `Arret.finPlage()` |
+| Plage horaire annoncée | Heure d'arrivée ± 1 h, fixée au calcul et conservée par les modifications | `Arret.debutPlage()`, `Arret.finPlage()` |
 | Meilleure tournée | Celle qui revient à l'entrepôt le plus tôt | `Plan.calculerTournees` |
 | Tournée possible | Tournée dont le retour est au plus tard à 13 h ; sinon elle est affichée quand même, avec un avertissement | `Tournee.estPossible()` |
 | Contrainte d'ordre | Le colis est récupéré avant d'être livré | `GrapheDepandance` |
