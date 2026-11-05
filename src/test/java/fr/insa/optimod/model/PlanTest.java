@@ -1971,4 +1971,392 @@ public class PlanTest {
         assertFalse(plan.insererDemande(tournee, demande, pire)
                 .estPossible());
     }
+
+    // --- Fichiers de plan piégés ---
+
+    /** Mots qui trahissent un message technique en anglais. */
+    private static final List<String> MOTS_TECHNIQUES = List.of("For input",
+            "empty String", "is not allowed", "Premature", "DOCTYPE is",
+            "must", "Content", "No such file", "prolog", "markup",
+            "Exception", "null");
+
+    /** Message de l'erreur levée par la lecture du plan, ou null. */
+    private static String erreurDeLecture(String xml) {
+        return erreurDeLecture(xml.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String erreurDeLecture(byte[] octets) {
+        try {
+            new Plan(new ByteArrayInputStream(octets));
+        } catch (IOException | SAXException erreur) {
+            return erreur.getMessage();
+        }
+        return null;
+    }
+
+    /** Vérifie qu'une erreur est signalée, en français, sans jargon. */
+    private static void verifierMessageFrancais(String message) {
+        assertNotNull("le fichier aurait dû être refusé", message);
+        for (String mot : MOTS_TECHNIQUES) {
+            assertFalse("message technique : " + message,
+                    message.contains(mot));
+        }
+    }
+
+    /** Plan de deux nœuds reliés par un tronçon de cette longueur. */
+    private static String planAvecLongueur(String longueur) {
+        return "<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\""
+                + longueur + "\" nomRue=\"a\"/></reseau>";
+    }
+
+    /** Une longueur négative est refusée : A* ne finirait pas. */
+    @Test
+    public void longueurNegativeRefusee() {
+        String message = erreurDeLecture(planAvecLongueur("-10"));
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("longueur"));
+    }
+
+    /** Une longueur NaN est refusée. */
+    @Test
+    public void longueurNaNRefusee() {
+        verifierMessageFrancais(erreurDeLecture(planAvecLongueur("NaN")));
+    }
+
+    /** Une longueur infinie est refusée. */
+    @Test
+    public void longueurInfinieRefusee() {
+        verifierMessageFrancais(erreurDeLecture(planAvecLongueur(
+                "Infinity")));
+    }
+
+    /**
+     * Un cycle de longueurs négatives ne gèle plus le calcul : le plan est
+     * refusé dès la lecture.
+     */
+    @Test(timeout = 5000)
+    public void cycleNegatifRefuseALaLecture() {
+        verifierMessageFrancais(erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" "
+                + "longueur=\"-1000\" nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"1\" "
+                + "longueur=\"-1000\" nomRue=\"a\"/></reseau>"));
+    }
+
+    /** Une latitude hors de [-90, 90] est refusée. */
+    @Test
+    public void latitudeHorsBornesRefusee() {
+        String message = erreurDeLecture("<reseau><noeud id=\"1\" "
+                + "latitude=\"95\" longitude=\"4\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("latitude"));
+    }
+
+    /** Une longitude NaN est refusée. */
+    @Test
+    public void longitudeNaNRefusee() {
+        verifierMessageFrancais(erreurDeLecture("<reseau><noeud id=\"1\" "
+                + "latitude=\"45\" longitude=\"NaN\"/></reseau>"));
+    }
+
+    /** Deux nœuds de même identifiant sont refusés. */
+    @Test
+    public void identifiantEnDoubleRefuse() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"1\" latitude=\"46\" longitude=\"4\"/>"
+                + "</reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("même identifiant"));
+    }
+
+    /** Un fichier dont la balise principale n'est pas reseau est refusé. */
+    @Test
+    public void racineInattendueRefusee() {
+        String message = erreurDeLecture("<demandeDeLivraisons>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "</demandeDeLivraisons>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("pas un plan"));
+    }
+
+    /** Un tronçon vers un nœud absent est refusé en nommant le nœud. */
+    @Test
+    public void tronconVersNoeudAbsentMessageFrancais() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"7\" longueur=\"1\" "
+                + "nomRue=\"a\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("7"));
+    }
+
+    /** Un identifiant non numérique est cité dans un message français. */
+    @Test
+    public void identifiantNonNumeriqueMessageFrancais() {
+        String message = erreurDeLecture("<reseau><noeud id=\"abc\" "
+                + "latitude=\"45\" longitude=\"4\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("« id »"));
+        assertTrue(message, message.contains("« abc »"));
+    }
+
+    /** Un tronçon sans longueur est refusé en nommant l'attribut. */
+    @Test
+    public void tronconSansLongueurMessageFrancais() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"1\" nomRue=\"a\"/>"
+                + "</reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("« longueur »"));
+    }
+
+    /** Un fichier vide est refusé avec un message français. */
+    @Test
+    public void fichierVideMessageFrancais() {
+        String message = erreurDeLecture("");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("vide"));
+    }
+
+    /** Un XML incomplet donne un message français avec la ligne. */
+    @Test
+    public void xmlIncompletMessageFrancaisAvecLigne() {
+        String message = erreurDeLecture("<reseau>\n<noeud id=\"1\"");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("ligne 2"));
+    }
+
+    /** Même avec la JVM en français, le message reste lisible. */
+    @Test
+    public void xmlMalFormeMessageFrancaisAvecLocaleFrancaise() {
+        java.util.Locale avant = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(java.util.Locale.FRANCE);
+        try {
+            verifierMessageFrancais(erreurDeLecture("<reseau><noeud/>"));
+        } finally {
+            java.util.Locale.setDefault(avant);
+        }
+    }
+
+    /** Un DOCTYPE est refusé avec un message français. */
+    @Test
+    public void doctypeMessageFrancais() {
+        String message = erreurDeLecture("<?xml version=\"1.0\"?>"
+                + "<!DOCTYPE reseau [<!ENTITY x \"y\">]><reseau/>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("DOCTYPE"));
+    }
+
+    /** Une image renommée en .xml est refusée avec un message français. */
+    @Test
+    public void fichierBinaireMessageFrancais() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0,
+            0, 0, 13, 'I', 'H', 'D', 'R', (byte) 0xff, (byte) 0xfe};
+        verifierMessageFrancais(erreurDeLecture(png));
+    }
+
+    /** Un texte quelconque renommé en .xml est refusé en français. */
+    @Test
+    public void texteNonXmlMessageFrancais() {
+        verifierMessageFrancais(erreurDeLecture("bonjour, ceci n'est pas "
+                + "un plan"));
+    }
+
+    /** Un plan précédé d'une marque d'ordre des octets (BOM) est lu. */
+    @Test
+    public void planAvecBomLu() throws Exception {
+        byte[] xml = PETIT_PLAN.getBytes(StandardCharsets.UTF_8);
+        byte[] avecBom = new byte[xml.length + 3];
+        avecBom[0] = (byte) 0xEF;
+        avecBom[1] = (byte) 0xBB;
+        avecBom[2] = (byte) 0xBF;
+        System.arraycopy(xml, 0, avecBom, 3, xml.length);
+        assertEquals(3, new Plan(new ByteArrayInputStream(avecBom))
+                .obtenirNoeuds().size());
+    }
+
+    /** Un plan en ISO-8859-1 qui le déclare est lu avec ses accents. */
+    @Test
+    public void planEnIsoLatinLu() throws Exception {
+        String xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
+                + "<reseau><noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"1\" longueur=\"1\" "
+                + "nomRue=\"Rue de l'Hôtel\"/></reseau>";
+        Plan plan = new Plan(new ByteArrayInputStream(
+                xml.getBytes(StandardCharsets.ISO_8859_1)));
+        assertEquals("Rue de l'Hôtel", plan.obtenirTroncons().get(0)
+                .nomRue());
+    }
+
+    /** Un plan mal encodé (Latin-1 déclaré UTF-8) est refusé en français. */
+    @Test
+    public void mauvaisEncodageMessageFrancais() {
+        String xml = "<reseau><noeud id=\"1\" latitude=\"45\" longitude=\"4\""
+                + "/><troncon origine=\"1\" destination=\"1\" longueur=\"1\" "
+                + "nomRue=\"Hôtel\"/></reseau>";
+        verifierMessageFrancais(erreurDeLecture(xml.getBytes(
+                StandardCharsets.ISO_8859_1)));
+    }
+
+    /** Un XML imbriqué sur 100 000 niveaux est refusé vite, sans débordement. */
+    @Test(timeout = 10000)
+    public void imbricationProfondeRefusee() {
+        StringBuilder xml = new StringBuilder("<reseau>");
+        xml.append("<a>".repeat(100_000)).append("</a>".repeat(100_000));
+        xml.append("</reseau>");
+        verifierMessageFrancais(erreurDeLecture(xml.toString()));
+    }
+
+    /** Un fichier introuvable est signalé en français, par son nom. */
+    @Test
+    public void fichierIntrouvableMessageFrancais() {
+        IOException erreur = assertThrows(IOException.class,
+                () -> new Plan("/nexiste/pas/plan.xml"));
+        verifierMessageFrancais(erreur.getMessage());
+        assertTrue(erreur.getMessage().contains("plan.xml"));
+    }
+
+    /**
+     * Un plan de 60 000 nœuds et 120 000 tronçons (13 Mo) se lit en
+     * quelques secondes : la lecture n'est plus quasi quadratique.
+     */
+    @Test(timeout = 60000)
+    public void planEnormeLuRapidement() throws Exception {
+        int nombre = 60_000;
+        StringBuilder xml = new StringBuilder("<reseau>");
+        for (int i = 0; i < nombre; i++) {
+            xml.append("<noeud id=\"").append(i).append("\" latitude=\"")
+                    .append(45 + i * 1e-6).append("\" longitude=\"")
+                    .append(4 + (i % 300) * 1e-4).append("\"/>");
+        }
+        for (int i = 0; i < 2 * nombre; i++) {
+            xml.append("<troncon origine=\"").append(i % nombre)
+                    .append("\" destination=\"").append((i * 7 + 1) % nombre)
+                    .append("\" longueur=\"50.5\" nomRue=\"Rue ").append(i)
+                    .append("\"/>");
+        }
+        xml.append("</reseau>");
+        byte[] octets = xml.toString().getBytes(StandardCharsets.UTF_8);
+        long debut = System.nanoTime();
+        Plan plan = new Plan(new ByteArrayInputStream(octets));
+        long millisecondes = (System.nanoTime() - debut) / 1_000_000;
+        assertEquals(nombre, plan.obtenirNoeuds().size());
+        assertTrue("lecture en " + millisecondes + " ms",
+                millisecondes < 5000);
+    }
+
+    /**
+     * Des tronçons démesurés (mais finis) ne font pas déborder les coûts du
+     * voyageur de commerce : la tournée est refusée car elle dépasse minuit.
+     */
+    @Test
+    public void tronconsDemesuresSansDebordement() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"45.002\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"1e300\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"3\" longueur=\"1e300\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"3\" destination=\"1\" longueur=\"1e300\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        assertTrue(erreur.getMessage(), erreur.getMessage().contains(
+                "minuit"));
+    }
+
+    /**
+     * Des nœuds aux coordonnées identiques ne gênent ni la lecture ni le
+     * calcul.
+     */
+    @Test
+    public void noeudsAuxCoordonneesIdentiques() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"3\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"3\" destination=\"1\" longueur=\"10\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        assertEquals(4, plan.calculerTournees(programme).get(1).arrets()
+                .size());
+    }
+
+    /**
+     * Plan non connexe : une adresse inaccessible est refusée par une
+     * IllegalStateException au message français, sans gel.
+     */
+    @Test(timeout = 5000)
+    public void planNonConnexeRefuseProprement() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"46\" longitude=\"5\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"1\" longueur=\"10\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        verifierMessageFrancais(erreur.getMessage());
+    }
+
+    /**
+     * Une demande dont la collecte et la livraison sont à l'entrepôt donne
+     * une tournée sans trajet.
+     */
+    @Test
+    public void demandeEntierementALEntrepot() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(entrepot,
+                LocalTime.of(8, 0), List.of(new Demande(entrepot, entrepot,
+                        60, 60)));
+        Tournee tournee = plan.calculerTournees(programme).get(1);
+        assertEquals(LocalTime.of(8, 2), tournee.obtenirHeureRetour());
+    }
+
+    /**
+     * Des durées sur place énormes ne font pas déborder les heures : la
+     * tournée est refusée car elle dépasse minuit.
+     */
+    @Test
+    public void dureesEnormesRefuseesCarApresMinuit() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(1), Integer.MAX_VALUE,
+                                Integer.MAX_VALUE)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        assertTrue(erreur.getMessage().contains("minuit"));
+    }
 }
