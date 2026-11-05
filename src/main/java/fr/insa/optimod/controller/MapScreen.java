@@ -59,6 +59,15 @@ public interface MapScreen {
     Optional<SaisieDemande> saisirDemande();
 
     /**
+     * Fait confirmer un nouveau calcul complet des tournées déjà calculées :
+     * les modifications manuelles et les plages annoncées seront perdues.
+     *
+     * @return vrai si l'administrateur accepte, faux s'il refuse ou ferme la
+     *         fenêtre
+     */
+    boolean confirmerRecalcul();
+
+    /**
      * Affiche les points choisis avant validation de la demande.
      *
      * @param collecte  point de collecte, ou null pour effacer l'aperçu
@@ -100,6 +109,8 @@ public interface MapScreen {
         IMPORTER_PROGRAMME,
         /** Bouton « Calculer ». */
         CALCULER,
+        /** Le bouton de calcul se nomme « Recalculer » (tournées calculées). */
+        RECALCULER,
         /** Bouton « Ajouter une demande » (ou annuler l'ajout en cours). */
         AJOUTER_DEMANDE,
         /** Bouton « Supprimer la demande » (demande sélectionnée). */
@@ -110,6 +121,8 @@ public interface MapScreen {
         DEPLACER_POINT,
         /** Bouton « Changer de livreur » (demande sélectionnée). */
         CHANGER_LIVREUR,
+        /** Champ « Livreurs » (nombre de livreurs de la journée). */
+        CHANGER_NOMBRE_LIVREURS,
         /** Bouton « Annuler » (Ctrl+Z). */
         ANNULER,
         /** Bouton « Rétablir » (Ctrl+Y). */
@@ -265,6 +278,48 @@ public interface MapScreen {
      * @param detail explication du refus
      */
     void afficherRefusChangementLivreur(String detail);
+
+    /**
+     * Propose à l'administrateur les livreurs qui peuvent prendre une demande
+     * dont l'ajout est refusé chez son livreur (retour après 13 h). La liste
+     * peut contenir le livreur de la demande : une autre position chez lui
+     * peut suffire. Le livreur choisi, la position est ensuite demandée par
+     * {@link #choisirPositionInsertion}.
+     *
+     * @param livreurRefuse numéro du livreur chez qui l'ajout est refusé
+     * @param livreurs numéros des livreurs possibles, jamais vide
+     * @param detail explication du refus
+     * @return numéro du livreur choisi, ou vide après annulation de l'ajout
+     */
+    Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+            List<Integer> livreurs, String detail);
+
+    /**
+     * Explique à l'utilisateur pourquoi l'ajout d'une demande est refusé
+     * (aucun livreur ne peut la prendre, adresse inaccessible, position
+     * invalide) ; les demandes et les tournées n'ont pas changé.
+     *
+     * @param detail explication du refus
+     */
+    void afficherRefusAjout(String detail);
+
+    /**
+     * Définit l'action du champ « Livreurs » (régler le nombre de livreurs de
+     * la journée).
+     *
+     * @param action reçoit le nombre de livreurs demandé par l'utilisateur
+     */
+    void definirActionNombreLivreurs(IntConsumer action);
+
+    /**
+     * Remet le champ « Livreurs » à cette valeur, sans déclencher d'action.
+     * Le contrôleur s'en sert quand il refuse un réglage : le champ reprend le
+     * nombre de livreurs d'avant. Quand un réglage est accepté, l'écran suit
+     * le programme qu'il observe.
+     *
+     * @param nombre nombre de livreurs à afficher
+     */
+    void afficherNombreLivreurs(int nombre);
 
     /**
      * Définit l'action du bouton « Annuler » et de Ctrl+Z.

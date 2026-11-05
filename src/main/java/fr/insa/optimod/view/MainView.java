@@ -24,6 +24,7 @@ import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ComboBox;
@@ -32,6 +33,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.Spinner;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCombination;
@@ -96,8 +98,15 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     /** Ce que l'utilisateur doit faire maintenant, sous la barre d'outils. */
     private final Label consigne = new Label();
 
+    /** Nombre de livreurs de la journée, réglé par les flèches seulement. */
+    private final Spinner<Integer> champLivreurs =
+            new Spinner<>(1, ProgrammeLivraisons.MAXIMUM_LIVREURS, 1);
+
     /** Vrai si l'état du contrôleur permet de supprimer une demande. */
     private boolean suppressionPermise;
+
+    /** Action du champ « Livreurs » ; ne fait rien tant qu'elle est nulle. */
+    private IntConsumer actionNombreLivreurs;
 
     /** Vrai si l'état du contrôleur permet de changer le livreur. */
     private boolean changementLivreurPermis;
@@ -124,10 +133,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      *                    départ
      *                    de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
-     * @param horsPlage   vrai si l'arrivée sort de la plage annoncée
+     * @param style style de l'arrêt, rouge en cas d'alerte
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
-            boolean horsPlage) {
+            String style) {
     }
 
     /** Lignes de {@link #listeTournee}, dans le même ordre. */
@@ -160,9 +169,24 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         consigne.setWrapText(true);
         consigne.setMaxWidth(Double.MAX_VALUE);
         definirInfobulles();
+        champLivreurs.valueProperty().addListener(
+                (observable, ancienne, nouvelle) -> {
+                    if (actionNombreLivreurs != null && nouvelle != null
+                            && programmeObserve != null
+                            && nouvelle
+                            != programmeObserve.obtenirNombreLivreurs()) {
+                        actionNombreLivreurs.accept(nouvelle);
+                    }
+                });
+        champLivreurs.setEditable(false);
+        champLivreurs.setPrefWidth(70);
+        champLivreurs.setDisable(true);
+        Label etiquetteLivreurs = new Label("Livreurs");
+        etiquetteLivreurs.setLabelFor(champLivreurs);
         FlowPane barreOutils = new FlowPane(8, 8,
                 boutonImporterPlan, boutonImporterDemandes,
-                boutonCalculer, indicateurAttente, boutonAjouter,
+                boutonCalculer, indicateurAttente, etiquetteLivreurs,
+                champLivreurs, boutonAjouter,
                 boutonAnnuler, boutonRefaire, boutonSauvegarder,
                 boutonRestaurer);
         barreOutils.getStyleClass().add("tool-bar-box");
@@ -174,10 +198,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                boolean horsPlage = !vide && getIndex() >= 0
+                String style = !vide && getIndex() >= 0
                         && getIndex() < lignesTournee.size()
-                        && lignesTournee.get(getIndex()).horsPlage();
-                setStyle(horsPlage ? "-fx-text-fill: #c62828;" : "");
+                        ? lignesTournee.get(getIndex()).style() : "";
+                setStyle(style);
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -274,8 +298,13 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setTooltip(new Tooltip("Choisissez le fichier "
                 + "XML du programme de livraisons (les demandes de collecte "
                 + "et de livraison). Il faut d'abord importer un plan."));
-        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée du "
-                + "programme de livraisons chargé."));
+        boutonCalculer.setTooltip(new Tooltip("Calcule la tournée de chaque "
+                + "livreur. Une fois calculées, les tournées ne sont "
+                + "recalculées qu'après votre confirmation."));
+        champLivreurs.setTooltip(new Tooltip("Nombre de livreurs de la "
+                + "journée (1 par défaut). Les flèches ajoutent ou retirent "
+                + "un livreur ; on ne retire que le dernier, et seulement "
+                + "s'il n'a aucune demande."));
         boutonSauvegarder.setTooltip(new Tooltip("Enregistre les tournées "
                 + "calculées dans un fichier XML."));
         boutonRestaurer.setTooltip(new Tooltip("Recharge un plan, un "
@@ -308,7 +337,11 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         boutonImporterDemandes.setDisable(
                 !actions.contains(Action.IMPORTER_PROGRAMME));
         boutonCalculer.setDisable(!actions.contains(Action.CALCULER));
+        boutonCalculer.setText(actions.contains(Action.RECALCULER)
+                ? "Recalculer" : "Calculer");
         boutonAjouter.setDisable(!actions.contains(Action.AJOUTER_DEMANDE));
+        champLivreurs.setDisable(
+                !actions.contains(Action.CHANGER_NOMBRE_LIVREURS));
         boutonAnnuler.setDisable(!actions.contains(Action.ANNULER));
         boutonRefaire.setDisable(!actions.contains(Action.REFAIRE));
         suppressionPermise = actions.contains(Action.SUPPRIMER_DEMANDE);
@@ -385,6 +418,88 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         Alert alert = new Alert(Alert.AlertType.WARNING);
         alert.setTitle("Optimod'Lyon");
         alert.setHeaderText("Changement de livreur impossible");
+        alert.setContentText(detail);
+        alert.initOwner(getScene().getWindow());
+        alert.showAndWait();
+    }
+
+    /**
+     * Transmet le nombre de livreurs choisi aux flèches du champ. Une valeur
+     * qui est déjà celle du programme n'est pas transmise : quand le code
+     * remet lui-même le champ à jour, aucune action ne se déclenche.
+     */
+    @Override
+    public void definirActionNombreLivreurs(IntConsumer action) {
+        actionNombreLivreurs = action;
+    }
+
+    @Override
+    public void afficherNombreLivreurs(int nombre) {
+        champLivreurs.getValueFactory().setValue(nombre);
+    }
+
+    /** Le champ « Livreurs » reprend le nombre du programme observé. */
+    private void actualiserChampLivreurs() {
+        afficherNombreLivreurs(programmeObserve == null ? 1
+                : programmeObserve.obtenirNombreLivreurs());
+    }
+
+    @Override
+    public Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+            List<Integer> livreurs, String detail) {
+        ChoiceDialog<Integer> dialogue = new ChoiceDialog<>(livreurs.get(0),
+                livreurs);
+        dialogue.setTitle("Ajout impossible chez ce livreur");
+        dialogue.setHeaderText("Ajout refusé chez le livreur " + livreurRefuse
+                + ".\n" + detail + "\nLivreurs qui rentrent avant 13 h avec "
+                + "la position de moindre coût (la position choisie ensuite "
+                + "peut encore être refusée) :");
+        dialogue.setContentText("Affecter la demande au livreur :");
+        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.OK))
+                .setText("Affecter");
+        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.CANCEL))
+                .setText("Annuler");
+        dialogue.initOwner(getScene().getWindow());
+        return dialogue.showAndWait();
+    }
+
+    /** Bouton « Oui » de la confirmation du recalcul. */
+    static final ButtonType OUI = new ButtonType("Oui",
+            ButtonBar.ButtonData.YES);
+
+    /**
+     * Bouton « Non » de la confirmation du recalcul : c'est le bouton
+     * d'annulation, donc Échap et la croix valent un refus.
+     */
+    static final ButtonType NON = new ButtonType("Non",
+            ButtonBar.ButtonData.CANCEL_CLOSE);
+
+    /**
+     * Traduit la réponse de la fenêtre de confirmation.
+     *
+     * @param reponse bouton choisi, vide si la fenêtre est fermée
+     * @return vrai seulement si l'administrateur a cliqué sur « Oui »
+     */
+    static boolean recalculAccepte(Optional<ButtonType> reponse) {
+        return reponse.filter(OUI::equals).isPresent();
+    }
+
+    @Override
+    public boolean confirmerRecalcul() {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
+                "Les modifications manuelles et les plages horaires annoncées "
+                        + "seront perdues. Continuer ?", OUI, NON);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Recalculer les tournées");
+        alert.initOwner(getScene().getWindow());
+        return recalculAccepte(alert.showAndWait());
+    }
+
+    @Override
+    public void afficherRefusAjout(String detail) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText("Ajout impossible");
         alert.setContentText(detail);
         alert.initOwner(getScene().getWindow());
         alert.showAndWait();
@@ -715,6 +830,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      */
     @Override
     public void mettreAJour(Observable source) {
+        actualiserChampLivreurs();
         dessinerDemandes();
         dessinerTournees();
     }
@@ -732,6 +848,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         if (programme != null) {
             programme.ajouterObservateur(this);
         }
+        actualiserChampLivreurs();
         dessinerDemandes();
         dessinerTournees();
     }
@@ -772,15 +889,16 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
                 lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
-                        false));
+                        ""));
             }
             int rang = 0;
             for (Tournee.Arret arret : entree.getValue().arrets()) {
                 listeTournee.getItems().add(decrireArret(arret));
                 lignesTournee.add(new LigneTournee(livreur, rang++,
-                        dernierRang, arret.estHorsPlage()));
+                        dernierRang, LibellesArrets.style(arret)));
             }
         }
+        listeTournee.refresh();
         carte.afficherTournees(tournees);
         listeTournee.setVisible(true);
         listeTournee.setManaged(true);

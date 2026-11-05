@@ -353,6 +353,44 @@ public class PlanTest {
                 Plan.HEURE_LIMITE_RETOUR));
     }
 
+    /**
+     * Sur les jeux fournis le voyageur de commerce termine avant la limite :
+     * la tournée est prouvée optimale. Une tournée sans demande l'est aussi.
+     */
+    @Test
+    public void tourneeCalculeeSurLesJeuxFournisEstProuveeOptimale()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
+                plan);
+        assertTrue(premiereTournee(plan, programme).prouveeOptimale());
+        programme.definirNombreLivreurs(3);
+        plan.calculerTournees(programme).values().forEach(
+                tournee -> assertTrue(tournee.prouveeOptimale()));
+    }
+
+    /**
+     * Un ordre gardé après le calcul (suppression d'une demande) n'est plus
+     * prouvé optimal.
+     */
+    @Test
+    public void tourneeRecalculeeLocalementNEstPlusProuveeOptimale()
+            throws Exception {
+        Plan plan = new Plan(getClass().getResourceAsStream(
+                "/data/petitPlan.xml"));
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
+                plan);
+        Tournee tournee = premiereTournee(plan, programme);
+        assertTrue(tournee.prouveeOptimale());
+        Demande supprimee = programme.obtenirDemandes().get(0);
+        Tournee sansDemande = plan.calculerTourneeSansDemande(tournee,
+                supprimee);
+        assertFalse(sansDemande.prouveeOptimale());
+    }
+
     /** Une demande par livreur permet deux retours avant 13 h. */
     @Test
     public void demandeTropImportanteRepartissableEntreDeuxLivreurs()
@@ -769,6 +807,117 @@ public class PlanTest {
         assertEquals(memorises, plan.nombreOrdresMemorises());
     }
 
+    // --- Livreurs possibles pour une demande ---
+
+    /** Tournée vide d'un livreur, au départ de l'entrepôt à l'heure donnée. */
+    private static Tournee tourneeVideA(Plan plan, LocalTime heureDepart) {
+        return tourneeImposee(plan, heureDepart, List.of(plan.obtenirNoeud(1)),
+                List.of(0));
+    }
+
+    /** Demande du petit réseau (collecte en 3, livraison en 2) du livreur 1. */
+    private static Demande demandeDuPetitReseau(Plan plan) {
+        return new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60, 60);
+    }
+
+    /**
+     * Le livreur 1 partirait trop tard pour une demande de plus, le livreur 2
+     * a le temps : seul le livreur 2 est proposé.
+     */
+    @Test
+    public void livreursPossiblesContientUnAutreLivreur() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(12, 59)),
+                2, tourneeVideA(plan, LocalTime.of(8, 0)));
+        assertEquals(List.of(2), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /**
+     * Le livreur de la demande est proposé lui aussi s'il peut la prendre :
+     * l'administrateur peut choisir une autre position chez lui. La liste est
+     * dans l'ordre des numéros de livreur.
+     */
+    @Test
+    public void livreursPossiblesContientLeLivreurDeLaDemande()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                2, tourneeVideA(plan, LocalTime.of(8, 0)),
+                1, tourneeVideA(plan, LocalTime.of(9, 0)));
+        assertEquals(List.of(1, 2), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /**
+     * Une tournée qui rentre déjà après 13 h accepterait la demande
+     * ({@link Plan#insererDemande}), mais ne rentrerait pas avant 13 h : son
+     * livreur n'est pas proposé.
+     */
+    @Test
+    public void livreursPossiblesExclutUneTourneeDejaEnRetard()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Tournee enRetard = tourneeImposee(plan, LocalTime.of(12, 59),
+                List.of(entrepot, plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                        entrepot),
+                List.of(0, 60, 60, 0));
+        assertFalse(enRetard.estPossible());
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(8, 0)),
+                2, enRetard);
+        assertEquals(List.of(1), plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)));
+    }
+
+    /** Aucun livreur ne rentre avant 13 h : la liste est vide. */
+    @Test
+    public void livreursPossiblesVideSiPersonneNeRentreAvant13h()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(12, 59)),
+                2, tourneeVideA(plan, LocalTime.of(12, 59)));
+        assertTrue(plan.trouverLivreursPossibles(tournees,
+                demandeDuPetitReseau(plan)).isEmpty());
+    }
+
+    /**
+     * Une livraison inaccessible depuis la collecte l'est pour tous les
+     * livreurs : la liste est vide, sans exception.
+     */
+    @Test
+    public void livreursPossiblesVideSiAdresseInaccessible() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(8, 0)),
+                2, tourneeVideA(plan, LocalTime.of(8, 0)));
+        Demande inaccessible = new Demande(plan.obtenirNoeud(4),
+                plan.obtenirNoeud(2), 60, 60);
+        assertTrue(plan.trouverLivreursPossibles(tournees, inaccessible)
+                .isEmpty());
+    }
+
+    /** Chercher les livreurs possibles ne modifie aucune tournée. */
+    @Test
+    public void livreursPossiblesNeModifieAucuneTournee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee premiere = tourneeDeTroisNoeuds(plan);
+        Tournee seconde = tourneeVideA(plan, LocalTime.of(8, 0));
+        Map<Integer, Tournee> tournees = Map.of(1, premiere, 2, seconde);
+        int arretsAvant = premiere.arrets().size();
+        int memorises = plan.nombreOrdresMemorises();
+        plan.trouverLivreursPossibles(tournees, demandeDuPetitReseau(plan));
+        assertEquals(2, tournees.size());
+        assertSame(premiere, tournees.get(1));
+        assertSame(seconde, tournees.get(2));
+        assertEquals(arretsAvant, premiere.arrets().size());
+        assertEquals(1, seconde.arrets().size());
+        assertEquals(memorises, plan.nombreOrdresMemorises());
+    }
+
     // --- Mémoire de l'ordre de passage du voyageur de commerce ---
 
     /**
@@ -916,7 +1065,8 @@ public class PlanTest {
             arrets.add(new Tournee.Arret(prevu.noeud(), arrivee, heure,
                     prevu.type(), prevu.demande()));
         }
-        return new Tournee(arrets, chemins);
+        // Ordre imposé, pas trouvé par le voyageur de commerce : non prouvé.
+        return new Tournee(arrets, chemins, false);
     }
 
     /** Les arrêts d'une tournée, sauf ceux d'une demande. */
@@ -1078,7 +1228,7 @@ public class PlanTest {
         arrets.add(new Tournee.Arret(entrepot, heure, heure,
                 TypeArret.ENTREPOT, null));
         Tournee actuelle = new Tournee(arrets,
-                Collections.nCopies(5, Chemin.INACCESSIBLE));
+                Collections.nCopies(5, Chemin.INACCESSIBLE), true);
         IllegalStateException erreur = assertThrows(
                 IllegalStateException.class,
                 () -> plan.calculerTourneeSansDemande(actuelle, demande));
@@ -1125,8 +1275,11 @@ public class PlanTest {
         Tournee sans = plan.calculerTourneeSansDemande(
                 premiereTournee(plan, programme),
                 programme.obtenirDemandes().get(0));
-        assertEquals(premiereTournee(plan, new ProgrammeLivraisons(
-                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of())), sans);
+        Tournee attendue = premiereTournee(plan, new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of()));
+        assertEquals(attendue.arrets(), sans.arrets());
+        assertEquals(attendue.chemins(), sans.chemins());
+        assertFalse(sans.prouveeOptimale());
     }
 
     /** Une demande dont les arrêts ne sont pas dans la tournée est refusée. */
@@ -1313,8 +1466,12 @@ public class PlanTest {
             long nouveaux = descendue.chemins().stream()
                     .filter(chemin -> !anciens.contains(chemin)).count();
             assertEquals(3, nouveaux);
-            assertEquals(tournee, plan.calculerTourneeOrdreChange(descendue,
-                    rang + 1, -1));
+            Tournee remontee = plan.calculerTourneeOrdreChange(descendue,
+                    rang + 1, -1);
+            assertEquals(tournee.arrets(), remontee.arrets());
+            assertEquals(tournee.chemins(), remontee.chemins());
+            assertFalse("ordre changé : plus prouvé optimal",
+                    remontee.prouveeOptimale());
             acceptes++;
         }
         assertTrue(acceptes > 0);
@@ -1524,5 +1681,93 @@ public class PlanTest {
         Tournee deplacee = plan.calculerTourneeAvecPointDeplace(tournee, 1,
                 plan.obtenirNoeud(2));
         assertFalse(deplacee.estPossible());
+    }
+
+    // --- Position de moindre coût et livreurs possibles ---
+
+    /** Tournée 1, 3, 2, 1 partant à l'heure donnée. */
+    private static Tournee tourneeDeTroisArretsAu(Plan plan, LocalTime depart) {
+        Noeud entrepot = plan.obtenirNoeud(1);
+        return tourneeImposee(plan, depart,
+                List.of(entrepot, plan.obtenirNoeud(3), plan.obtenirNoeud(2),
+                        entrepot),
+                List.of(0, 60, 60, 0));
+    }
+
+    /**
+     * La position de moindre coût donne-t-elle toujours le retour
+     * le plus tôt ? On compare, pour chaque départ autour de la limite, la
+     * réponse de trouverLivreursPossibles à un essai de toutes les positions.
+     */
+    @Test
+    public void moindreCoutDonneLeRetourLePlusTot() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande demande = new Demande(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), 60, 60);
+        Tournee base = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0));
+        LocalTime meilleurRetour = null;
+        for (int position = 1; position < base.arrets().size(); position++) {
+            LocalTime retour = plan.insererDemande(base, demande, position)
+                    .obtenirHeureRetour();
+            if (meilleurRetour == null || retour.isBefore(meilleurRetour)) {
+                meilleurRetour = retour;
+            }
+        }
+        long ecart = LocalTime.of(8, 0).until(meilleurRetour,
+                ChronoUnit.SECONDS);
+        LocalTime departLimite = LocalTime.of(13, 0).minusSeconds(ecart);
+        for (int decalage = -10; decalage <= 10; decalage++) {
+            LocalTime depart = departLimite.plusSeconds(decalage);
+            Tournee tournee = tourneeDeTroisArretsAu(plan, depart);
+            boolean uneFaisable = false;
+            for (int position = 1; position < tournee.arrets().size();
+                    position++) {
+                try {
+                    uneFaisable |= plan.insererDemande(tournee, demande,
+                            position).estPossible();
+                } catch (IllegalStateException refus) {
+                    continue;
+                }
+            }
+            assertEquals("départ " + depart, uneFaisable,
+                    !plan.trouverLivreursPossibles(Map.of(1, tournee),
+                            demande).isEmpty());
+        }
+    }
+
+    /**
+     * Le livreur est proposé parce que la position de moindre coût
+     * rentre à 13 h, mais une autre position est refusée.
+     */
+    @Test
+    public void livreurPossibleMaisAutrePositionRefusee()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Demande demande = new Demande(plan.obtenirNoeud(1),
+                plan.obtenirNoeud(3), 60, 60);
+        Tournee base = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0));
+        int meilleure = plan.trouverPositionMoindreCout(base, demande);
+        LocalTime retourMeilleur = plan.insererDemande(base, demande,
+                meilleure).obtenirHeureRetour();
+        int pire = meilleure;
+        LocalTime retourPire = retourMeilleur;
+        for (int position = 1; position < base.arrets().size(); position++) {
+            LocalTime retour = plan.insererDemande(base, demande, position)
+                    .obtenirHeureRetour();
+            if (retour.isAfter(retourPire)) {
+                pire = position;
+                retourPire = retour;
+            }
+        }
+        assertTrue("positions de coûts différents", pire != meilleure);
+        long marge = retourMeilleur.until(LocalTime.of(13, 0),
+                ChronoUnit.SECONDS);
+        Tournee tournee = tourneeDeTroisArretsAu(plan, LocalTime.of(8, 0)
+                .plusSeconds(marge));
+        assertEquals(List.of(1), plan.trouverLivreursPossibles(
+                Map.of(1, tournee), demande));
+        int positionRefusee = pire;
+        assertThrows(IllegalStateException.class,
+                () -> plan.insererDemande(tournee, demande, positionRefusee));
     }
 }

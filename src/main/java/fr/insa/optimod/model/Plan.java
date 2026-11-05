@@ -298,7 +298,7 @@ public final class Plan {
             ordre = List.copyOf(trouve.sommets());
         }
         Tournee tournee = calculerHeuresDePassage(heureDepart, sommets,
-                chemins, ordre);
+                chemins, ordre, dejaMemorise || trouve.optimal());
         if (!dejaMemorise && trouve.optimal()) {
             // Gardé seulement une fois la tournée obtenue : le voyageur de
             // commerce renvoie aussi un ordre par une adresse inaccessible.
@@ -354,7 +354,8 @@ public final class Plan {
             chemins[rang][suivant] = plusCourtChemin(adresses.get(rang),
                     adresses.get(suivant));
         }
-        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre);
+        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre,
+                false);
     }
 
     /**
@@ -413,7 +414,7 @@ public final class Plan {
             chemins[rang][(rang + 1) % nombre] = trajets.get(rang);
         }
         Tournee candidate = calculerHeuresDePassage(anciens.get(0).depart(),
-                sommets, chemins, ordre);
+                sommets, chemins, ordre, false);
         List<Tournee.Arret> arrets = new ArrayList<>(candidate.arrets());
         for (int rang = 0; rang < anciens.size(); rang++) {
             if (tourneeVide && rang == 1) {
@@ -427,7 +428,7 @@ public final class Plan {
                     nouveau.demande(), ancien.debutPlage(),
                     ancien.finPlage()));
         }
-        Tournee apres = new Tournee(arrets, candidate.chemins());
+        Tournee apres = new Tournee(arrets, candidate.chemins(), false);
         if (!apres.estPossible() && tournee.estPossible()) {
             throw new IllegalStateException("Insertion refusée : le retour à "
                     + "l'entrepôt serait à " + apres.obtenirHeureRetour()
@@ -497,6 +498,57 @@ public final class Plan {
                     + "inaccessible depuis cette tournée.");
         }
         return meilleurePosition;
+    }
+
+    /**
+     * Cherche les livreurs qui peuvent prendre une demande de plus et rentrer
+     * à l'entrepôt avant {@link #HEURE_LIMITE_RETOUR}. C'est une aide à la
+     * décision, utilisée quand l'insertion chez le livreur choisi est refusée :
+     * rien n'est inséré, aucune tournée ne change, et l'administrateur choisit
+     * ensuite le livreur puis la position.
+     *
+     * <p>Pour chaque livreur, y compris celui de la demande, on essaie la
+     * position de {@link #trouverPositionMoindreCout}. Elle donne le retour le
+     * plus tôt parmi toutes les positions (les durées sur place sont les mêmes
+     * partout) : si elle ne rentre pas avant 13 h, aucune autre position ne le
+     * peut. Ce n'est donc qu'un test de faisabilité : la position réellement
+     * choisie par l'administrateur peut être une autre. Un livreur dont la
+     * tournée rentre déjà après 13 h n'est pas proposé, de même qu'un livreur
+     * pour lequel une adresse est inaccessible. Le voyageur de commerce n'est
+     * pas lancé.
+     *
+     * @param tournees tournées actuelles, par numéro de livreur, jamais
+     *        modifiées
+     * @param demande demande à ajouter ; son livreur est ignoré
+     * @return numéros des livreurs possibles, dans l'ordre croissant ; vide si
+     *         personne ne peut la prendre avant 13 h
+     */
+    public List<Integer> trouverLivreursPossibles(
+            Map<Integer, Tournee> tournees, Demande demande) {
+        List<Integer> possibles = new ArrayList<>();
+        for (Map.Entry<Integer, Tournee> entree
+                : new TreeMap<>(tournees).entrySet()) {
+            if (rentreAvantLimite(entree.getValue(),
+                    demande.avecLivreur(entree.getKey()))) {
+                possibles.add(entree.getKey());
+            }
+        }
+        return Collections.unmodifiableList(possibles);
+    }
+
+    /**
+     * Vrai si le livreur rentre avant la limite en prenant la demande à sa
+     * position de moindre coût. Retour après 13 h ou adresse inaccessible :
+     * faux.
+     */
+    private boolean rentreAvantLimite(Tournee tournee, Demande demande) {
+        try {
+            return insererDemande(tournee, demande,
+                    trouverPositionMoindreCout(tournee, demande))
+                    .estPossible();
+        } catch (IllegalStateException refus) {
+            return false;
+        }
     }
 
     /**
@@ -578,9 +630,14 @@ public final class Plan {
      * Heures de passage : l'arrivée sur un arrêt est le départ de l'arrêt
      * précédent plus le temps de trajet (arrondi à la seconde), le départ est
      * l'arrivée plus la durée sur place.
+     *
+     * @param prouveeOptimale vrai seulement si l'ordre vient du voyageur de
+     *                        commerce qui a prouvé son optimalité ; faux pour
+     *                        un ordre gardé ou changé, ou une limite de temps
      */
     private static Tournee calculerHeuresDePassage(LocalTime heureDepart,
-            List<Sommet> sommets, Chemin[][] chemins, List<Integer> ordre) {
+            List<Sommet> sommets, Chemin[][] chemins, List<Integer> ordre,
+            boolean prouveeOptimale) {
         List<Integer> parcours = new ArrayList<>(ordre);
         if (ordre.size() > 1) {
             parcours.add(0); // retour à l'entrepôt
@@ -616,7 +673,7 @@ public final class Plan {
             arrets.add(new Tournee.Arret(sommet.adresse(), arrivee, depart,
                     sommet.type(), sommet.demande()));
         }
-        return new Tournee(arrets, trajets);
+        return new Tournee(arrets, trajets, prouveeOptimale);
     }
 
     private static long secondesDeTrajet(double metres) {
@@ -732,7 +789,7 @@ public final class Plan {
         // Le premier arrêt est l'entrepôt : il est « atteint » à l'heure de
         // départ de la tournée.
         return calculerHeuresDePassage(arrets.get(0).arrivee(), sommets,
-                chemins, ordre);
+                chemins, ordre, false);
     }
 
     /**
@@ -874,7 +931,8 @@ public final class Plan {
             }
         }
         return recalculerDansLOrdre(
-                new Tournee(arretsDeplaces, tournee.chemins()), rangs, rang);
+                new Tournee(arretsDeplaces, tournee.chemins(), false), rangs,
+                rang);
     }
 
     /**

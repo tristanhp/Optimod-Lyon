@@ -16,6 +16,7 @@ package "model" {
     +recalculerTournee(heureDepart, adresses, durees, types, demandes) : Tournee
     +insererDemande(tournee, demande, position) : Tournee
     +trouverPositionMoindreCout(tournee, demande) : int
+    +trouverLivreursPossibles(tournees, demande) : List<Integer>
     +calculerTourneeSansDemande(tournee : Tournee, demande : Demande) : Tournee
     +calculerTourneeOrdreChange(tournee : Tournee, rang : int, decalage : int) : Tournee
     +calculerTourneeAvecPointDeplace(tournee : Tournee, rang : int, nouveau : Noeud) : Tournee
@@ -68,7 +69,9 @@ package "model" {
     +remplacerDemande(position : int, demande : Demande)
     +remplacerDemandeEtTournees(position : int, demande : Demande, tournees : Map<Integer, Tournee>)
     +obtenirNombreLivreurs() : int
+    +verifierNombreLivreurs(nombre : int)
     +definirNombreLivreurs(nombre : int)
+    +definirNombreLivreursEtTournees(nombre : int, tournees : Map<Integer, Tournee>)
     +obtenirTournees() : Map<Integer, Tournee>
     +definirTournees(tournees : Map<Integer, Tournee>)
     +definirTournee(livreur : int, tournee : Tournee)
@@ -89,6 +92,7 @@ package "model" {
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
+    prouveeOptimale : boolean
     +obtenirHeureRetour() : LocalTime
     +estPossible() : boolean
   }
@@ -128,6 +132,7 @@ package "controller" {
     ~supprimerDemandeEnGardantLOrdre(position : int)
     ~changerOrdreTournee(livreur : int, rang : int, decalage : int)
     ~changerLivreurDemande(position : int)
+    ~changerNombreLivreurs(nombre : int)
     ~choisirPointADeplacer(livreur : int, rang : int)
     ~deplacerPoint(livreur : int, rang : int, idNoeud : long)
   }
@@ -135,11 +140,16 @@ package "controller" {
     +afficherConsigne(consigne : String)
     +afficherConfirmation(confirmation : String)
     +saisirDemande() : Optional<SaisieDemande>
+    +confirmerRecalcul() : boolean
     +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
     +{static} POSITION_MOINDRE_COUT : int = 0
     +choisirPositionInsertion(tournee) : Optional<Integer>
     +choisirLivreur(livreurActuel, nombreDeLivreurs) : Optional<Integer>
     +afficherRefusChangementLivreur(detail)
+    +choisirLivreurPossible(livreurRefuse, livreurs, detail) : Optional<Integer>
+    +afficherRefusAjout(detail)
+    +definirActionNombreLivreurs(action)
+    +afficherNombreLivreurs(nombre : int)
     +signalerArretsHorsPlage(arrets)
   }
   class "MapScreen.SaisieDemande" as SaisieDemande <<record>> {
@@ -175,12 +185,19 @@ package "controller" {
   class CommandeChangerOrdre
   class CommandeDeplacerPoint
   class CommandeChangerLivreur
+  class CommandeChangerNombreLivreurs
 }
 
 package "view" {
   class MainView
   class MapCanvas
-  class LibellesArrets
+  class LibellesArrets {
+    {static} style(arret) : String
+  }
+  note right of LibellesArrets
+    Liste et popup : rouge hors plage
+    ou si l'arrivée dépasse 13 h.
+  end note
   class MapProjection
 }
 
@@ -228,6 +245,7 @@ CommandeSupprimerDemande ..|> Commande
 CommandeChangerOrdre ..|> Commande
 CommandeDeplacerPoint ..|> Commande
 CommandeChangerLivreur ..|> Commande
+CommandeChangerNombreLivreurs ..|> Commande
 
 MainView ..|> MapScreen
 MainView ..|> Observateur

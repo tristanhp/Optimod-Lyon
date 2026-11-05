@@ -7,18 +7,20 @@ import fr.insa.optimod.controller.MapScreen.Action;
 /**
  * Les tournées des demandes actuelles sont calculées et rangées dans le
  * programme. Les actions sont celles de {@link EtatProgrammeCharge} :
- * recalculer, importer, modifier les demandes, annuler ou rétablir. Ajouter
- * une demande retire les tournées ; en supprimer une met à jour celle de son
- * livreur (recalcul local). On peut en plus changer l'ordre des arrêts d'un
- * livreur (« Monter », « Descendre »), déplacer un point de collecte ou de
- * livraison (« Déplacer ») et sauvegarder les tournées.
+ * recalculer (après confirmation), importer, modifier les demandes, régler
+ * le nombre de livreurs (un livreur ajouté a une tournée vide), annuler ou
+ * rétablir. Ajouter une demande retire les tournées ; en supprimer une met à
+ * jour celle de son livreur (recalcul local). On peut en plus changer
+ * l'ordre des arrêts d'un livreur (« Monter », « Descendre »), déplacer un
+ * point de collecte ou de livraison (« Déplacer ») et sauvegarder les
+ * tournées.
  */
 final class EtatTourneeCalculee extends EtatProgrammeCharge {
 
     /** Consigne affichée en entrant dans cet état. */
     static final String CONSIGNE = "Tournée prête. Vous pouvez modifier le "
             + "programme (ajouter, supprimer, déplacer, réordonner, "
-            + "changer de livreur).";
+            + "changer de livreur) ou régler le nombre de livreurs.";
 
     /**
      * Garde la consigne « ordre non optimisé » tant que les tournées affichées
@@ -29,6 +31,18 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
     public String consigne(MainController controleur) {
         String ordreGarde = controleur.obtenirConsigneOrdreGarde();
         return ordreGarde.isEmpty() ? CONSIGNE : ordreGarde;
+    }
+
+    /**
+     * « Recalculer » : relance le voyageur de commerce pour chaque livreur,
+     * seulement si l'administrateur accepte de perdre les modifications
+     * manuelles et les plages annoncées. Sinon rien ne change.
+     */
+    @Override
+    public void calculer(MainController controleur) {
+        if (controleur.confirmerRecalcul()) {
+            super.calculer(controleur);
+        }
     }
 
     @Override
@@ -94,6 +108,7 @@ final class EtatTourneeCalculee extends EtatProgrammeCharge {
         // EtatProgrammeCharge renvoie déjà un ensemble neuf et modifiable : pas
         // besoin de le copier.
         Set<Action> actions = super.actionsPermises(controleur);
+        actions.add(Action.RECALCULER);
         actions.add(Action.CHANGER_ORDRE);
         actions.add(Action.DEPLACER_POINT);
         actions.add(Action.SAUVEGARDER);

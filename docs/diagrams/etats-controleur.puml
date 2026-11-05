@@ -7,9 +7,9 @@ EtatInitial : boutons : Plan, Restaurer
 EtatPlanCharge : boutons : Plan, Demandes, Restaurer
 EtatProgrammeCharge : boutons : Plan, Demandes, Calculer,
 EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
-EtatProgrammeCharge : Restaurer
+EtatProgrammeCharge : Restaurer, champ Livreurs
 EtatCalculEnCours : boutons : aucun
-EtatTourneeCalculee : boutons : comme EtatProgrammeCharge
+EtatTourneeCalculee : boutons : comme EtatProgrammeCharge (RECALCULER : Calculer affiche Recalculer)
 EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
 EtatTourneeCalculee : + Changer de livreur [plusieurs livreurs]
 EtatRestauration : boutons : aucun
@@ -24,14 +24,19 @@ EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
 EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
 EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
-EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
-EtatTourneeCalculee --> EtatCalculEnCours : calculer
+EtatCalculEnCours --> choix : finirCalcul [erreur]
+EtatTourneeCalculee --> EtatCalculEnCours : calculer [confirmerRecalcul]
+EtatTourneeCalculee --> EtatTourneeCalculee : calculer [refusé] / rien ne change
 EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
 EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
 state "Choix de l'état selon les tournées du programme" as choix <<choice>>
 EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
 EtatTourneeCalculee --> choix : annuler / refaire
+EtatProgrammeCharge --> choix : changerNombreLivreurs [réglage permis] / CommandeChangerNombreLivreurs
+EtatTourneeCalculee --> choix : changerNombreLivreurs [réglage permis] / CommandeChangerNombreLivreurs
+EtatProgrammeCharge --> EtatProgrammeCharge : changerNombreLivreurs [refusé] / consigne
+EtatTourneeCalculee --> EtatTourneeCalculee : changerNombreLivreurs [refusé] / consigne
 EtatTourneeCalculee --> EtatCalculEnCours : supprimerDemande (recalcul local du livreur)
 EtatCalculEnCours --> choix : fin du recalcul local / CommandeSupprimerDemande
 EtatTourneeCalculee --> EtatCalculEnCours : changerOrdre (livreur, rang)
