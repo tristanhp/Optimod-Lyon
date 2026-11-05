@@ -40,8 +40,10 @@ stateDiagram-v2
     EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [valide]
     EtatProgrammeCharge --> EtatCalculEnCours : calculer
     EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
-    EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur]
-    EtatTourneeCalculee --> EtatCalculEnCours : calculer
+    EtatCalculEnCours --> EtatProgrammeCharge : finirCalcul [erreur, sans tournées]
+    EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [erreur d'un recalcul]
+    EtatTourneeCalculee --> EtatCalculEnCours : calculer [confirmerRecalcul]
+    EtatTourneeCalculee --> EtatTourneeCalculee : calculer [refusé]
     EtatProgrammeCharge --> EtatAjoutCollecte : ajouterDemande
     EtatAjoutCollecte --> EtatAjoutLivraison : clic valide / aperçu collecte
     EtatAjoutLivraison --> EtatAjoutLivraison : second clic / aperçu livraison

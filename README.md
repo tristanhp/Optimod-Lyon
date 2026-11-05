@@ -157,9 +157,11 @@ heures sur place imposent un retour après 20 h.
    (tronçons en gris, nœuds en points sombres). Molette pour zoomer,
    glisser pour se déplacer, double-clic pour revenir à la vue d'ensemble.
 2. **Importer les demandes** : choisir un fichier de demandes. L'entrepôt
-   (losange), les points de collecte (carrés) et de livraison (ronds)
+   (losange orange), les points de collecte (carrés) et de livraison (ronds)
    apparaissent, une couleur par demande, et la liste des demandes s'affiche
-   à gauche. Survoler un point met sa demande en évidence.
+   à gauche. Survoler un point met sa demande en évidence, au-dessus de
+   l'entrepôt. Une légende, dans une bande sous la carte, explique les
+   symboles.
 3. **Calculer** : l'application calcule la meilleure tournée de chaque
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
@@ -167,7 +169,11 @@ heures sur place imposent un retour après 20 h.
    sa tournée est affichée quand même, sans message d'erreur. Les arrêts dont
    l'arrivée dépasse 13 h sont rouges dans la liste et le popup, avec la
    mention « Après 13 h » sur sa propre ligne, même s'ils respectent leur
-   plage annoncée ; sur la carte, leur numéro est sur fond rouge.
+   plage annoncée ; sur la carte, leur numéro est sur fond rouge. Si la
+   limite de calcul de 10 s est atteinte, la meilleure tournée trouvée est
+   affichée avec la consigne « Solution non prouvée optimale » (elle nomme
+   les livreurs concernés s'il y en a plusieurs) ; la consigne revient après
+   *Annuler* et *Rétablir*.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
@@ -243,14 +249,24 @@ déjà après 13 h accepte une demande de plus, sans proposition.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
 dépassements en rouge et affiche le décalage en minutes et secondes.
-Annuler reste disponible. Le bouton Calculer fixe de
-nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
-calcul volontaire. Le support multi-livreurs reste à intégrer.
+Annuler reste disponible. Une fois les tournées calculées, le bouton *Calculer*
+devient *Recalculer* : il n'est jamais lancé automatiquement et demande une
+confirmation, car les modifications manuelles et les plages annoncées seront
+perdues. *Oui* relance le TSP pour chaque livreur et fixe de nouvelles plages ;
+*Non* ne change rien. Annuler n'annule pas ce recalcul : il défait la dernière
+modification du programme. La suppression retire encore la tournée jusqu'au
+prochain calcul volontaire.
 
 Une fois la tournée calculée, elle est tracée sur la carte : le trait est clair
 au départ de l'entrepôt et foncé au retour, une flèche blanche au milieu de
 chaque tronçon indique le sens, et les arrêts sont numérotés 1, 2, 3… dans
-l'ordre de passage. Cliquer sur un arrêt (ou le choisir dans la liste de
+l'ordre de passage. Un tronçon que la tournée parcourt plusieurs fois, dans un
+sens ou dans l'autre, est tracé en traits parallèles, un par passage, et porte
+« ×2 », « ×3 »… (la légende le
+rappelle). Un arrêt dont l'arrivée sort de la plage annoncée ou dépasse 13 h
+a son numéro sur fond rouge, comme dans la liste de droite, et un retour tardif
+à l'entrepôt en rougit le contour ; la légende l'indique.
+Cliquer sur un arrêt (ou le choisir dans la liste de
 droite, les deux sont synchronisés) ouvre un popup avec son type (entrepôt,
 point de collecte, point de livraison), son adresse (noms des rues), ses heures
 d'arrivée et de départ et sa plage annoncée. Si le dessin échoue (plan sans
@@ -295,6 +311,7 @@ Termes principaux et leur traduction dans le code :
 | Séparation et évaluation, borne | Recherche complète qui abandonne les pistes sans espoir | `TemplateTSP` |
 | Patron de méthode | Une méthode fixe les étapes, les sous-classes les détails | `TemplateTSP` |
 | Limite de temps | Durée maximale du calcul ; on garde le meilleur trouvé | 10 s dans `Plan` |
+| Solution prouvée optimale | Le voyageur de commerce a fini avant la limite de temps ; sinon la consigne « Solution non prouvée optimale » s'affiche après *Calculer* | `Tournee.prouveeOptimale()` |
 | Fichier de plan / de demandes | Les fichiers XML d'entrée | `src/main/resources/data/` |
 | Heure de départ | Écrite `8:0:0` ou `08:00` dans le fichier de demandes | `obtenirHeureDepart()` |
 

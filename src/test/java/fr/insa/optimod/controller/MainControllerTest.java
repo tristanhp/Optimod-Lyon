@@ -109,6 +109,15 @@ public class MainControllerTest {
         private Noeud livraisonProvisoire;
         private Runnable pendantSaisie = () -> {
         };
+        /** Réponse de l'administrateur à la confirmation de « Recalculer ». */
+        private boolean recalculConfirme = true;
+        private int nombreDeConfirmationsDeRecalcul;
+
+        @Override
+        public boolean confirmerRecalcul() {
+            nombreDeConfirmationsDeRecalcul++;
+            return recalculConfirme;
+        }
 
         @Override
         public void afficherPointsProvisoires(Noeud collecte, Noeud livraison) {
@@ -379,7 +388,7 @@ public class MainControllerTest {
                         LocalTime.of(8, 0), TypeArret.ENTREPOT, null),
                 new Tournee.Arret(ENTREPOT, retour, retour,
                         TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
     }
 
     private static final Tournee TOURNEE = tourneeRevenantA(
@@ -404,7 +413,7 @@ public class MainControllerTest {
             Action.AJOUTER_DEMANDE, Action.SUPPRIMER_DEMANDE,
             Action.CHANGER_ORDRE, Action.DEPLACER_POINT, Action.RESTAURER,
             Action.SAUVEGARDER, Action.GENERER_FEUILLES_ROUTE,
-            Action.CHANGER_NOMBRE_LIVREURS);
+            Action.CHANGER_NOMBRE_LIVREURS, Action.RECALCULER);
 
     /**
      * Actions permises juste après une suppression avec tournée affichée : on
@@ -417,7 +426,7 @@ public class MainControllerTest {
                     Action.DEPLACER_POINT, Action.RESTAURER,
                     Action.SAUVEGARDER, Action.ANNULER,
                     Action.GENERER_FEUILLES_ROUTE,
-                    Action.CHANGER_NOMBRE_LIVREURS);
+                    Action.CHANGER_NOMBRE_LIVREURS, Action.RECALCULER);
 
     private EcranFactice ecran;
     private MainController controleur;
@@ -817,7 +826,8 @@ public class MainControllerTest {
     }
 
     /**
-     * Calculer de nouveau après une tournée relance un calcul en arrière-plan.
+     * Recalculer, une fois la confirmation acceptée, relance un calcul en
+     * arrière-plan.
      */
     @Test
     public void recalculerApresUneTournee() throws Exception {
@@ -825,8 +835,190 @@ public class MainControllerTest {
         ecran.actionCalculer.run();
         executerArrierePlan();
         ecran.actionCalculer.run();
+        assertEquals(1, ecran.nombreDeConfirmationsDeRecalcul);
         assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
         assertEquals(1, arrierePlan.size());
+    }
+
+    /**
+     * Le bouton se nomme « Recalculer » seulement quand les tournées sont
+     * calculées : c'est l'état du contrôleur qui le dit, pas la vue.
+     */
+    @Test
+    public void boutonRecalculerSeulementAvecDesTournees() throws Exception {
+        chargerPlanEtLivraison();
+        assertFalse(ecran.actions.contains(Action.RECALCULER));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertTrue(ecran.actions.contains(Action.RECALCULER));
+        ecran.actionSupprimer.accept(0);
+        executerArrierePlan();
+        assertEquals(controleur.obtenirEtat() instanceof EtatTourneeCalculee,
+                ecran.actions.contains(Action.RECALCULER));
+    }
+
+    /** Le premier calcul ne perd rien : il ne demande pas de confirmation. */
+    @Test
+    public void premierCalculSansConfirmation() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(0, ecran.nombreDeConfirmationsDeRecalcul);
+        assertEquals(TOURNEES, tournees());
+    }
+
+    /**
+     * Confirmation acceptée : le voyageur de commerce est relancé, l'ordre
+     * changé à la main est perdu et la consigne « ordre non optimisé »
+     * disparaît.
+     */
+    @Test
+    public void recalculConfirmeRemplaceLesTournees() throws Exception {
+        Tournee calculee = afficherUneTourneeDeDeuxDemandes();
+        descendreUnArretPermis(calculee);
+        assertNotEquals(calculee, tournees().get(1));
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        int calculsAvant = nombreDeCalculs;
+
+        ecran.actionCalculer.run();
+
+        assertEquals(1, ecran.nombreDeConfirmationsDeRecalcul);
+        assertEquals(calculsAvant + 1, nombreDeCalculs);
+        assertEquals(calculee, tournees().get(1));
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Confirmation refusée : rien ne change, ni les tournées, ni l'historique,
+     * ni la consigne, et aucun calcul n'est lancé.
+     */
+    @Test
+    public void recalculRefuseNeChangeRien() throws Exception {
+        Tournee calculee = afficherUneTourneeDeDeuxDemandes();
+        descendreUnArretPermis(calculee);
+        Map<Integer, Tournee> avant = tournees();
+        int calculsAvant = nombreDeCalculs;
+        String confirmationAvant = ecran.confirmation;
+        ecran.recalculConfirme = false;
+
+        ecran.actionCalculer.run();
+
+        assertEquals(1, ecran.nombreDeConfirmationsDeRecalcul);
+        assertEquals(calculsAvant, nombreDeCalculs);
+        assertSame(avant.get(1), tournees().get(1));
+        assertTrue(controleur.peutAnnuler());
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+        assertEquals(confirmationAvant, ecran.confirmation);
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /**
+     * Aucune modification ne relance le voyageur de commerce ni ne demande de
+     * confirmation : ajout, changement d'ordre, déplacement, changement de
+     * livreur, suppression, nombre de livreurs, puis annuler et rétablir
+     * chacune.
+     */
+    @Test
+    public void aucuneModificationNeRelanceLeCalcul() throws Exception {
+        calculerAvecDeuxLivreurs(1);
+        ajouterUneDemandeAuLivreur(1, "5", "5");
+        descendreUnArretPermis(tournees().get(1));
+        ecran.actionDeplacer.accept(1, 1);
+        ecran.actionClicNoeud.accept(NOEUD_AILLEURS);
+        ecran.actionChangerLivreur.accept(0);
+        ecran.actionSupprimer.accept(0);
+        ecran.actionNombreLivreurs.accept(3);
+
+        int modifications = 0;
+        while (controleur.peutAnnuler()) {
+            ecran.actionAnnuler.run();
+            modifications++;
+        }
+        while (controleur.peutRefaire()) {
+            ecran.actionRefaire.run();
+        }
+
+        assertEquals(6, modifications);
+        assertEquals(1, nombreDeCalculs);
+        assertEquals(0, ecran.nombreDeConfirmationsDeRecalcul);
+    }
+
+    /**
+     * Recalculer n'est pas annulable en soi : l'historique reste. Annuler
+     * remonte à l'état d'avant la dernière modification, et rétablir remet les
+     * tournées recalculées, sans nouveau calcul.
+     */
+    @Test
+    public void annulerApresUnRecalculRemonteAvantLaDerniereModification()
+            throws Exception {
+        Tournee calculee = afficherUneTourneeDeDeuxDemandes();
+        ecran.actionSupprimer.accept(0);
+        ecran.actionCalculer.run();
+        Tournee recalculee = tournees().get(1);
+        int calculsAvant = nombreDeCalculs;
+
+        ecran.actionAnnuler.run();
+
+        assertEquals(2, demandes().size());
+        assertSame(calculee, tournees().get(1));
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+
+        ecran.actionRefaire.run();
+
+        assertEquals(1, demandes().size());
+        assertSame(recalculee, tournees().get(1));
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+        assertEquals(calculsAvant, nombreDeCalculs);
+    }
+
+    /**
+     * Un recalcul en échec garde les tournées affichées et reste dans
+     * {@link EtatTourneeCalculee} : le clic suivant redemande la confirmation.
+     */
+    @Test
+    public void recalculEnEchecGardeLesTourneesEtLaConfirmation()
+            throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        erreurDeCalcul = new IllegalStateException("Tournée impossible");
+
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+
+        assertEquals("Tournée impossible", ecran.erreurCalcul);
+        assertSame(TOURNEE, tournees().get(1));
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(MODIFIABLE_AVEC_TOURNEE, ecran.actions);
+
+        ecran.actionCalculer.run();
+
+        assertEquals(2, ecran.nombreDeConfirmationsDeRecalcul);
+    }
+
+    /** Plusieurs livreurs : une seule confirmation, une tournée par livreur. */
+    @Test
+    public void recalculDePlusieursLivreursUneSeuleConfirmation()
+            throws Exception {
+        calculerAvecDeuxLivreurs(2);
+        ecran.actionCalculer.run();
+        assertEquals(1, ecran.nombreDeConfirmationsDeRecalcul);
+        assertEquals(2, nombreDeCalculs);
+        assertEquals(2, tournees().size());
+    }
+
+    /** Un nouveau programme n'a pas de tournée : pas de confirmation. */
+    @Test
+    public void nouveauProgrammeCalculeSansConfirmation() throws Exception {
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        importerProgramme(ressource("/data/demandePetit2.xml"));
+        ecran.actionCalculer.run();
+        assertEquals(0, ecran.nombreDeConfirmationsDeRecalcul);
+        assertTrue(controleur.obtenirEtat() instanceof EtatCalculEnCours);
     }
 
     /** Contrôleur par defaut calcule la tournée avec le plan. */
@@ -923,6 +1115,77 @@ public class MainControllerTest {
         assertEquals(TOURNEES, tournees());
         assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
         assertTrue("pas de nouveau calcul", arrierePlan.isEmpty());
+    }
+
+    /** Tournée du faux calcul dont le voyageur de commerce a été coupé. */
+    private static Tournee nonProuvee(Tournee tournee) {
+        return new Tournee(tournee.arrets(), tournee.chemins(), false);
+    }
+
+    /**
+     * Un calcul complet dont la limite de temps a été atteinte affiche
+     * « Solution non prouvée optimale » ; prouvé optimal, il n'affiche que la
+     * consigne de l'état.
+     */
+    @Test
+    public void calculNonProuveOptimalAfficheLaConsigne() throws Exception {
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(EtatTourneeCalculee.CONSIGNE, ecran.consigne);
+
+        tourneesCalculees = Map.of(1, nonProuvee(TOURNEE));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+        assertTrue(ecran.consigne.contains("10 s"));
+    }
+
+    /** Avec plusieurs livreurs, la consigne nomme ceux non prouvés. */
+    @Test
+    public void calculNonProuveOptimalNommeLesLivreurs() throws Exception {
+        chargerDeuxDemandes();
+        controleur.obtenirProgramme().definirNombreLivreurs(3);
+        tourneesCalculees = Map.of(1, TOURNEE, 2, nonProuvee(TOURNEE),
+                3, nonProuvee(TOURNEE));
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE_LIVREURS
+                .formatted("2, 3"), ecran.consigne);
+    }
+
+    /**
+     * La consigne « non prouvée optimale » est retrouvée après Annuler et
+     * Rétablir d'une modification, et remplacée par « ordre non optimisé »
+     * tant que la modification est appliquée.
+     */
+    @Test
+    public void consigneNonProuveeRetrouveeApresAnnulerEtRetablir()
+            throws Exception {
+        controleur = new MainController(ecran, (plan, programme) -> {
+            Map<Integer, Tournee> tournees = new java.util.TreeMap<>();
+            plan.calculerTournees(programme).forEach(
+                    (livreur, tournee) -> tournees.put(livreur,
+                            nonProuvee(tournee)));
+            return tournees;
+        }, Runnable::run, Runnable::run);
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(ressource("/data/demandePetit2.xml"));
+        ecran.actionCalculer.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+
+        ecran.actionSupprimer.accept(0);
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
+
+        ecran.actionRefaire.run();
+        assertEquals(MainController.CONSIGNE_ORDRE_GARDE, ecran.consigne);
+
+        ecran.actionAnnuler.run();
+        assertEquals(MainController.CONSIGNE_NON_PROUVEE, ecran.consigne);
     }
 
     /** Rétablir retrouve la tournée recalculée. */
@@ -1607,7 +1870,7 @@ public class MainControllerTest {
                 LocalTime.of(11, 0), LocalTime.of(11, 5), TypeArret.ENTREPOT,
                 null, LocalTime.of(8, 0), LocalTime.of(10, 0));
         controleur.obtenirProgramme().definirTournees(
-                Map.of(1, new Tournee(List.of(arret), List.of())));
+                Map.of(1, new Tournee(List.of(arret), List.of(), true)));
         controleur.retrouverEtatProgramme();
         assertEquals(List.of(arret), ecran.horsPlage);
         controleur.obtenirProgramme().definirTournees(TOURNEES);
@@ -1672,7 +1935,8 @@ public class MainControllerTest {
         assertTrue(fichier.length() > 0);
         ecran.actionSupprimer.accept(0);
         ecran.actionRestaurer.run();
-        assertEquals(avant, tournees().get(1));
+        assertEquals(avant.arrets(), tournees().get(1).arrets());
+        assertEquals(avant.chemins(), tournees().get(1).chemins());
         assertEquals(1, demandes().size());
         assertFalse(controleur.peutAnnuler());
         assertFalse(controleur.peutRefaire());
@@ -2095,7 +2359,8 @@ public class MainControllerTest {
         Tournee avant = afficherUneTourneeDeDeuxDemandes();
         int rang = descendreUnArretPermis(avant);
         ecran.actionMonter.accept(1, rang + 1);
-        assertEquals(avant, tournees().get(1));
+        assertEquals(avant.arrets(), tournees().get(1).arrets());
+        assertEquals(avant.chemins(), tournees().get(1).chemins());
     }
 
     /**

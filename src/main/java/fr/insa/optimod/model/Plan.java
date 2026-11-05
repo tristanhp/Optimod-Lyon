@@ -298,7 +298,7 @@ public final class Plan {
             ordre = List.copyOf(trouve.sommets());
         }
         Tournee tournee = calculerHeuresDePassage(heureDepart, sommets,
-                chemins, ordre);
+                chemins, ordre, dejaMemorise || trouve.optimal());
         if (!dejaMemorise && trouve.optimal()) {
             // Gardé seulement une fois la tournée obtenue : le voyageur de
             // commerce renvoie aussi un ordre par une adresse inaccessible.
@@ -354,7 +354,8 @@ public final class Plan {
             chemins[rang][suivant] = plusCourtChemin(adresses.get(rang),
                     adresses.get(suivant));
         }
-        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre);
+        return calculerHeuresDePassage(heureDepart, sommets, chemins, ordre,
+                false);
     }
 
     /**
@@ -413,7 +414,7 @@ public final class Plan {
             chemins[rang][(rang + 1) % nombre] = trajets.get(rang);
         }
         Tournee candidate = calculerHeuresDePassage(anciens.get(0).depart(),
-                sommets, chemins, ordre);
+                sommets, chemins, ordre, false);
         List<Tournee.Arret> arrets = new ArrayList<>(candidate.arrets());
         for (int rang = 0; rang < anciens.size(); rang++) {
             if (tourneeVide && rang == 1) {
@@ -427,7 +428,7 @@ public final class Plan {
                     nouveau.demande(), ancien.debutPlage(),
                     ancien.finPlage()));
         }
-        Tournee apres = new Tournee(arrets, candidate.chemins());
+        Tournee apres = new Tournee(arrets, candidate.chemins(), false);
         if (!apres.estPossible() && tournee.estPossible()) {
             throw new IllegalStateException("Insertion refusée : le retour à "
                     + "l'entrepôt serait à " + apres.obtenirHeureRetour()
@@ -629,9 +630,14 @@ public final class Plan {
      * Heures de passage : l'arrivée sur un arrêt est le départ de l'arrêt
      * précédent plus le temps de trajet (arrondi à la seconde), le départ est
      * l'arrivée plus la durée sur place.
+     *
+     * @param prouveeOptimale vrai seulement si l'ordre vient du voyageur de
+     *                        commerce qui a prouvé son optimalité ; faux pour
+     *                        un ordre gardé ou changé, ou une limite de temps
      */
     private static Tournee calculerHeuresDePassage(LocalTime heureDepart,
-            List<Sommet> sommets, Chemin[][] chemins, List<Integer> ordre) {
+            List<Sommet> sommets, Chemin[][] chemins, List<Integer> ordre,
+            boolean prouveeOptimale) {
         List<Integer> parcours = new ArrayList<>(ordre);
         if (ordre.size() > 1) {
             parcours.add(0); // retour à l'entrepôt
@@ -667,7 +673,7 @@ public final class Plan {
             arrets.add(new Tournee.Arret(sommet.adresse(), arrivee, depart,
                     sommet.type(), sommet.demande()));
         }
-        return new Tournee(arrets, trajets);
+        return new Tournee(arrets, trajets, prouveeOptimale);
     }
 
     private static long secondesDeTrajet(double metres) {
@@ -783,7 +789,7 @@ public final class Plan {
         // Le premier arrêt est l'entrepôt : il est « atteint » à l'heure de
         // départ de la tournée.
         return calculerHeuresDePassage(arrets.get(0).arrivee(), sommets,
-                chemins, ordre);
+                chemins, ordre, false);
     }
 
     /**
@@ -925,7 +931,8 @@ public final class Plan {
             }
         }
         return recalculerDansLOrdre(
-                new Tournee(arretsDeplaces, tournee.chemins()), rangs, rang);
+                new Tournee(arretsDeplaces, tournee.chemins(), false), rangs,
+                rang);
     }
 
     /**

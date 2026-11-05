@@ -92,8 +92,10 @@ package "model" {
   class Tournee <<record>> {
     arrets : List<Arret>
     chemins : List<Chemin>
+    prouveeOptimale : boolean
     +obtenirHeureRetour() : LocalTime
     +estPossible() : boolean
+    +compterPassagesParTroncon() : Map<Set<Noeud>, Integer>
   }
   class "Tournee.Arret" as Arret <<record>> {
     noeud : Noeud
@@ -139,6 +141,7 @@ package "controller" {
     +afficherConsigne(consigne : String)
     +afficherConfirmation(confirmation : String)
     +saisirDemande() : Optional<SaisieDemande>
+    +confirmerRecalcul() : boolean
     +afficherPointsProvisoires(collecte : Noeud, livraison : Noeud)
     +{static} POSITION_MOINDRE_COUT : int = 0
     +choisirPositionInsertion(tournee) : Optional<Integer>

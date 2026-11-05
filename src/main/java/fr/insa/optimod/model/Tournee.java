@@ -2,7 +2,10 @@ package fr.insa.optimod.model;
 
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
@@ -15,8 +18,13 @@ import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
  *
  * @param arrets  arrêts dans l'ordre de passage
  * @param chemins chemin entre l'arrêt {@code i} et l'arrêt {@code i + 1}
+ * @param prouveeOptimale vrai si l'ordre de passage vient du voyageur de
+ *                        commerce, qui a prouvé qu'il est le plus court ; faux
+ *                        si la limite de temps a coupé la recherche, ou si
+ *                        l'ordre a été gardé ou changé après le calcul
  */
-public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
+public record Tournee(List<Arret> arrets, List<Chemin> chemins,
+        boolean prouveeOptimale) {
 
     /** Ce que le livreur fait à un arrêt. */
     public enum TypeArret {
@@ -142,7 +150,7 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      */
     static Tournee vide(Noeud entrepot, LocalTime heureDepart) {
         return new Tournee(List.of(new Arret(entrepot, heureDepart,
-                heureDepart, TypeArret.ENTREPOT, null)), List.of());
+                heureDepart, TypeArret.ENTREPOT, null)), List.of(), true);
     }
 
     /** @return heure de retour à l'entrepôt (arrivée au dernier arrêt) */
@@ -158,5 +166,24 @@ public record Tournee(List<Arret> arrets, List<Chemin> chemins) {
      */
     public boolean estPossible() {
         return !arrets.get(arrets.size() - 1).estApresHeureLimite();
+    }
+
+    /**
+     * Compte combien de fois la tournée parcourt chaque tronçon, sans tenir
+     * compte du sens : un aller et son retour sur la même rue font deux
+     * passages. Un tronçon est désigné par l'ensemble de ses deux extrémités.
+     *
+     * @return nombre de passages par tronçon parcouru, non modifiable
+     */
+    public Map<Set<Noeud>, Integer> compterPassagesParTroncon() {
+        Map<Set<Noeud>, Integer> passages = new HashMap<>();
+        for (Chemin chemin : chemins) {
+            for (Troncon troncon : chemin.troncons()) {
+                passages.merge(
+                        Set.of(troncon.origine(), troncon.destination()), 1,
+                        Integer::sum);
+            }
+        }
+        return Map.copyOf(passages);
     }
 }

@@ -49,7 +49,7 @@ public class FeuilleDeRouteTest {
                 new Chemin(150, List.of(
                         new Troncon(n1, n2, 100, "Rue A & B"),
                         new Troncon(n2, n3, 50, "Rue A & B"))),
-                new Chemin(70, List.of(new Troncon(n3, n1, 70, "")))));
+                new Chemin(70, List.of(new Troncon(n3, n1, 70, "")))), true);
     }
 
     /** Le nom du fichier suit le numéro du livreur. */
@@ -130,7 +130,7 @@ public class FeuilleDeRouteTest {
         LocalTime huit = LocalTime.of(8, 0);
         Tournee seule = new Tournee(List.of(
                 new Arret(n1, huit, huit, TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
         assertTrue(FeuilleDeRoute.generer(plan, 1, seule)
                 .contains("45.750000, 4.850000"));
     }
@@ -138,7 +138,7 @@ public class FeuilleDeRouteTest {
     /** Une tournée sans arrêt est refusée. */
     @Test(expected = IllegalArgumentException.class)
     public void tourneeVideRefusee() throws Exception {
-        FeuilleDeRoute.generer(plan(), 1, new Tournee(List.of(), List.of()));
+        FeuilleDeRoute.generer(plan(), 1, new Tournee(List.of(), List.of(), true));
     }
 
     /** Sur une vraie tournée calculée, chaque arrêt et trajet est écrit. */
@@ -146,7 +146,7 @@ public class FeuilleDeRouteTest {
     public void tourneeCalculeeSurLePetitPlan() throws Exception {
         Plan petit = PlansPourTests.petitPlan();
         ProgrammeLivraisons programme = new ProgrammeLivraisons(
-                getClass().getResource("/data/demandePetit2.xml").getPath(),
+                getClass().getResourceAsStream("/data/demandePetit2.xml"),
                 petit);
         Tournee tournee = petit.calculerTournees(programme).get(1);
         String html = FeuilleDeRoute.generer(petit, 1, tournee);
@@ -166,7 +166,7 @@ public class FeuilleDeRouteTest {
         Tournee tournee = new Tournee(List.of(
                 new Arret(n1, huit, huit, TypeArret.ENTREPOT, null),
                 new Arret(n1, retour, retour, TypeArret.ENTREPOT, null)),
-                List.of());
+                List.of(), true);
         String html = FeuilleDeRoute.generer(plan, 1, tournee);
         assertTrue(html, html.contains("retour prévue à l'entrepôt : 08:49<"));
         assertFalse(html, html.contains("08:49:32"));

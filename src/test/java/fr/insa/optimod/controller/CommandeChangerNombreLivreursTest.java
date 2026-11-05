@@ -37,7 +37,7 @@ public class CommandeChangerNombreLivreursTest {
     /** Tournée d'un livreur sans demande : le seul départ de l'entrepôt. */
     private static Tournee tourneeVide() {
         return new Tournee(List.of(new Tournee.Arret(noeud(0), DEPART, DEPART,
-                TypeArret.ENTREPOT, null)), List.of());
+                TypeArret.ENTREPOT, null)), List.of(), true);
     }
 
     /** Une tournée par livreur, de 1 à ce nombre, toutes vides. */
