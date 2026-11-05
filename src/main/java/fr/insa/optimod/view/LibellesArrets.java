@@ -79,6 +79,7 @@ final class LibellesArrets {
                 + HEURE.format(arret.finPlage())
                 + "\nDécalage : " + signe + secondes / 60 + " min "
                 + secondes % 60 + " s"
-                + (arret.estHorsPlage() ? " — Hors plage" : "");
+                + (arret.estHorsPlage() ? " — Hors plage" : "")
+                + (arret.estApresHeureLimite() ? " — Après 13 h" : "");
     }
 }

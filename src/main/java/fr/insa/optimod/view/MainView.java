@@ -126,9 +126,10 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      *                    de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
      * @param horsPlage   vrai si l'arrivée sort de la plage annoncée
+     * @param apres13h    vrai si l'arrivée dépasse 13 h
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
-            boolean horsPlage) {
+            boolean horsPlage, boolean apres13h) {
     }
 
     /** Lignes de {@link #listeTournee}, dans le même ordre. */
@@ -175,10 +176,16 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                boolean horsPlage = !vide && getIndex() >= 0
+                LigneTournee ligne = !vide && getIndex() >= 0
                         && getIndex() < lignesTournee.size()
-                        && lignesTournee.get(getIndex()).horsPlage();
-                setStyle(horsPlage ? "-fx-text-fill: #c62828;" : "");
+                        ? lignesTournee.get(getIndex()) : null;
+                if (ligne != null && ligne.apres13h()) {
+                    setStyle("-fx-text-fill: #c62828; -fx-font-weight: bold;");
+                } else if (ligne != null && ligne.horsPlage()) {
+                    setStyle("-fx-text-fill: #e37400;");
+                } else {
+                    setStyle("");
+                }
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -801,13 +808,14 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
                 lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
-                        false));
+                        false, false));
             }
             int rang = 0;
             for (Tournee.Arret arret : entree.getValue().arrets()) {
                 listeTournee.getItems().add(decrireArret(arret));
                 lignesTournee.add(new LigneTournee(livreur, rang++,
-                        dernierRang, arret.estHorsPlage()));
+                        dernierRang, arret.estHorsPlage(),
+                        arret.estApresHeureLimite()));
             }
         }
         carte.afficherTournees(tournees);

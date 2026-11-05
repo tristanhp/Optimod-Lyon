@@ -158,8 +158,9 @@ de même taille.
    livreur et affiche à droite les arrêts avec leurs heures d'arrivée et de
    départ (un titre par livreur s'il y en a plusieurs). Si une adresse est
    inaccessible, un message l'explique ; si un livreur revient après 13 h,
-   sa tournée est affichée quand même, sans message d'erreur (les arrêts en
-   retard seront mis en rouge : TIG-71).
+   sa tournée est affichée quand même, sans message d'erreur : les arrêts
+   dont l'arrivée dépasse 13 h sont en rouge dans la liste (en gras, avec
+   « Après 13 h ») et sur la carte (numéro sur fond rouge).
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
@@ -224,7 +225,7 @@ refusé avec un message et le programme n'est pas modifié. Une tournée qui ren
 déjà après 13 h accepte une demande de plus, sans proposition.
 Le calcul global fixe une plage annoncée de ± 1 heure autour de l'arrivée.
 L'insertion conserve les plages des anciens arrêts ; la liste signale les
-dépassements en rouge et affiche le décalage en minutes et secondes.
+dépassements de plage en orange et affiche le décalage en minutes et secondes.
 Annuler reste disponible. Le bouton Calculer fixe de
 nouvelles plages. La suppression retire encore la tournée jusqu'au prochain
 calcul volontaire. Le support multi-livreurs reste à intégrer.

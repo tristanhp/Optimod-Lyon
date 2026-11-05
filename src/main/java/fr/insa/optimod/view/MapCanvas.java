@@ -86,6 +86,13 @@ final class MapCanvas extends Pane {
     /** Couleur de la tournée au retour à l'entrepôt (foncé). */
     private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
 
+    /** Fond du numéro d'un arrêt dont l'arrivée dépasse 13 h (rouge). */
+    private static final Color COULEUR_APRES_13H = Color.web("#d93025");
+
+    /** Contour du numéro d'un arrêt dont l'arrivée dépasse 13 h. */
+    private static final Color COULEUR_APRES_13H_CONTOUR =
+            Color.web("#8c1c13");
+
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
 
@@ -605,13 +612,16 @@ final class MapCanvas extends Pane {
                 boolean selectionne = entree.getKey() == livreurSelectionne
                         && rang == rangSelectionne;
                 double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
+                boolean apres13h = arrets.get(rang).estApresHeureLimite();
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
-                        : Color.WHITE);
-                contexte.setStroke(COULEUR_FIN_TOURNEE);
+                        : apres13h ? COULEUR_APRES_13H : Color.WHITE);
+                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR
+                        : COULEUR_FIN_TOURNEE);
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
-                contexte.setFill(Color.BLACK);
+                contexte.setFill(apres13h && !selectionne ? Color.WHITE
+                        : Color.BLACK);
                 contexte.fillText(String.valueOf(rang), x, y);
             }
         }
