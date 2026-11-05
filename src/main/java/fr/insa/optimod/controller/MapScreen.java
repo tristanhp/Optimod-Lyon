@@ -31,7 +31,7 @@ public interface MapScreen {
             int livreur) {
 
         /**
-         * Convertit une durée strictement positive en secondes entières.
+         * Convertit une durée positive ou nulle en secondes entières.
          *
          * @param texte minutes saisies
          * @return secondes
@@ -40,13 +40,13 @@ public interface MapScreen {
         public static int convertirDuree(String texte) {
             try {
                 int minutes = Integer.parseInt(texte.trim());
-                if (minutes <= 0) {
+                if (minutes < 0) {
                     throw new NumberFormatException();
                 }
                 return Math.multiplyExact(minutes, 60);
             } catch (NumberFormatException | ArithmeticException erreur) {
                 throw new IllegalArgumentException("Saisir une durée entière "
-                        + "strictement positive en minutes.", erreur);
+                        + "positive ou nulle en minutes.", erreur);
             }
         }
     }

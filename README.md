@@ -138,11 +138,13 @@ cliquer sur *Sauvegarder* et choisir un fichier XML. *Restaurer*, disponible
 dès l'ouverture et hors opération en cours, recharge le plan référencé et le
 programme, puis recalcule les trajets et les heures sans changer l'ordre des
 arrêts et sans relancer le TSP. La restauration réussie vide Annuler/Rétablir.
-Un fichier invalide laisse le travail courant intact. Garder le fichier du
+Un fichier invalide, ou toute autre erreur pendant la restauration, laisse le
+travail courant intact et affiche un message. Garder le fichier du
 plan à son emplacement ; il n'est pas inclus dans la sauvegarde.
 Le [format XML](docs/sauvegarde-tournee.md) décrit les limites de cette version.
-Avec plusieurs livreurs (champ *Livreurs*), *Sauvegarder* affiche un message et
-n'écrit rien : seule la tournée d'un livreur est gérée pour l'instant.
+Avec plusieurs livreurs (champ *Livreurs*), *Sauvegarder* n'ouvre pas le choix
+du fichier et n'écrit rien : la consigne avertit que la sauvegarde ne gère
+qu'un livreur pour l'instant.
 
 Les fichiers fournis sont dans `src/main/resources/data/` : trois plans
 (`petitPlan.xml`, `moyenPlan.xml`, `grandPlan.xml`) et des fichiers de
@@ -182,7 +184,7 @@ arrêts arrivent après 13 h.
 4. **Modifier le programme** :
    - *Ajouter une demande* : cliquer sur le bouton, puis sur le point de
      collecte, puis sur le point de livraison ; saisir les deux durées
-     entières strictement positives en minutes (5 par défaut) et choisir le
+     entières positives ou nulles en minutes (5 par défaut) et choisir le
      livreur ;
      le carré de collecte apparaît dès le premier clic, puis le rond de
      livraison au second, avant validation du dialogue. Recliquer sur le

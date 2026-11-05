@@ -124,9 +124,25 @@ public final class MainController {
             + "liste de la tournée, le point de collecte ou de livraison à "
             + "déplacer.";
 
-    /** Début de consigne quand la nouvelle adresse est déjà celle du couple. */
+    /**
+     * Début de consigne quand la nouvelle adresse est celle de l'autre point
+     * de la demande.
+     */
     static final String CONSIGNE_MEME_ADRESSE = "La collecte et la livraison "
             + "d'une demande doivent être à des adresses différentes. ";
+
+    /** Début de consigne quand la nouvelle adresse est celle du point. */
+    static final String CONSIGNE_DEJA_A_CETTE_ADRESSE = "Ce point est déjà à "
+            + "cette adresse. ";
+
+    /** Refus de sauvegarder des tournées de plusieurs livreurs. */
+    static final String CONSIGNE_SAUVEGARDE_UN_LIVREUR = "La sauvegarde ne "
+            + "gère qu'un livreur pour l'instant : revenez à 1 livreur pour "
+            + "sauvegarder.";
+
+    /** Message d'une erreur inattendue pendant la restauration. */
+    static final String ERREUR_RESTAURATION = "La sauvegarde n'a pas pu être "
+            + "restaurée.";
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
@@ -766,8 +782,17 @@ public final class MainController {
                 .filter(Tournee.Arret::estHorsPlage).toList());
     }
 
-    /** Sauvegarde les tournées calculées dans le fichier choisi. */
+    /**
+     * Sauvegarde les tournées calculées dans le fichier choisi. Le format ne
+     * gère qu'un livreur : avec plusieurs livreurs, la sauvegarde est
+     * refusée par une consigne, avant de choisir un fichier.
+     */
     void sauvegarderTournee() {
+        if (programme.obtenirNombreLivreurs() != 1) {
+            ecran.afficherConfirmation("");
+            ecran.afficherConsigne(CONSIGNE_SAUVEGARDE_UN_LIVREUR);
+            return;
+        }
         ecran.choisirFichierSauvegarde().ifPresent(fichier -> {
             try {
                 SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
@@ -780,7 +805,11 @@ public final class MainController {
         });
     }
 
-    /** Restaure intégralement avant de remplacer l'état courant. */
+    /**
+     * Restaure intégralement avant de remplacer l'état courant. Si la
+     * restauration échoue, fichier invalide ou erreur inattendue,
+     * l'application revient à l'état d'avant et affiche l'erreur.
+     */
     void restaurerSauvegarde() {
         ecran.choisirFichierRestauration().ifPresent(fichier -> {
             Etat ancienEtat = etat;
@@ -801,11 +830,16 @@ public final class MainController {
                         retrouverEtatProgramme();
                         ecran.afficherConfirmation("Tournée restaurée.");
                     });
-                } catch (SAXException erreur) {
+                } catch (SAXException | RuntimeException erreur) {
+                    // Une erreur inattendue ne doit pas laisser l'application
+                    // bloquée sur « Restauration en cours ».
+                    String detail = erreur instanceof SAXException
+                            ? erreur.getMessage()
+                            : ERREUR_RESTAURATION;
                     interfaceUtilisateur.execute(() -> {
                         ecran.afficherAttente(false);
                         changerEtat(ancienEtat);
-                        ecran.afficherErreurXml(erreur.getMessage());
+                        ecran.afficherErreurXml(detail);
                     });
                 }
             });
@@ -1108,7 +1142,13 @@ public final class MainController {
         if (nouveau == null || actuelle == null) {
             return; // clic hors du plan : ignoré
         }
-        Demande demande = actuelle.arrets().get(rang).demande();
+        Tournee.Arret arret = actuelle.arrets().get(rang);
+        Demande demande = arret.demande();
+        if (nouveau.equals(arret.noeud())) {
+            ecran.afficherConsigne(CONSIGNE_DEJA_A_CETTE_ADRESSE
+                    + EtatDeplacementPoint.CONSIGNE);
+            return;
+        }
         if (nouveau.equals(demande.collecte())
                 || nouveau.equals(demande.livraison())) {
             ecran.afficherConsigne(CONSIGNE_MEME_ADRESSE
