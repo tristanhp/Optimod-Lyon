@@ -168,6 +168,7 @@ package "controller" {
   class EtatTourneeCalculee
   class EtatCalculEnCours
   class EtatRestauration
+  class EtatLectureFichier
   class EtatAjoutCollecte
   class EtatAjoutLivraison
   class EtatDeplacementPoint
@@ -201,6 +202,13 @@ package "view" {
     ou si l'arrivée dépasse 13 h.
   end note
   class MapProjection
+  class GestionnaireErreursInattendues
+  note right of GestionnaireErreursInattendues
+    Filet de sécurité : toute exception
+    non attrapée est journalisée et
+    signalée par une alerte, sans
+    fermer l'application.
+  end note
 }
 
 Plan *--> "*" Noeud
@@ -234,6 +242,7 @@ EtatProgrammeCharge ..|> Etat
 EtatTourneeCalculee --|> EtatProgrammeCharge
 EtatCalculEnCours ..|> Etat
 EtatRestauration ..|> Etat
+EtatLectureFichier ..|> Etat
 MainController ..> SauvegardeTournee
 SauvegardeTournee ..> Plan : lecture et recalcul sans TSP
 MainController ..> FeuilleDeRoute

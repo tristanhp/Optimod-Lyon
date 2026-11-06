@@ -65,4 +65,21 @@ public class TSP5Test {
         }
         assertEquals(NB_SOMMETS, vus.size());
     }
+
+    /**
+     * La durée annoncée est mesurée par une horloge monotone, en
+     * millisecondes : elle atteint la limite et ne dépasse pas la durée
+     * réellement écoulée.
+     */
+    @Test
+    public void dureeDeCalculMesureeParHorlogeMonotone() {
+        TSP5 tsp = new TSP5();
+        long debut = System.nanoTime();
+        tsp.chercherSolution(LIMITE_MS, graphe());
+        long ecoule = (System.nanoTime() - debut) / 1_000_000;
+        long annonce = tsp.obtenirDureeCalcul();
+        assertTrue("durée annoncée " + annonce + " ms", annonce >= LIMITE_MS);
+        assertTrue("durée annoncée " + annonce + " ms > " + ecoule + " ms",
+                annonce <= ecoule);
+    }
 }

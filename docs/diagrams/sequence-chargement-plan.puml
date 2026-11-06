@@ -4,6 +4,7 @@ autonumber
 actor Utilisateur as U
 boundary "vue : MainView" as V
 control "controleur : MainController" as C
+participant "arrière-plan : Executor" as A
 entity "plan : Plan" as P
 participant "carte : MapCanvas" as M
 participant "projection : MapProjection" as R
@@ -18,19 +19,27 @@ V --> C : Optional<File>
 alt Annulation
   note over V,C : État précédent conservé
 else Fichier sélectionné
-  C -> P : new Plan(cheminFichierXml)
-  P -> P : creerLecteurXml().parse(fichier)
-  P -> P : Plan(documentXml)
-  loop Balises noeud
-    P -> P : new Noeud(identifiant, longitude, latitude)
+  C -> C : changerEtat(new EtatLectureFichier())
+  C -> V : activerActions(aucune), afficherConsigne(« Lecture du fichier en cours… »)
+  C -> V : afficherAttente(true)
+  C -> A : enArrierePlan(lecture) : hors du thread JavaFX
+  A -> P : new Plan(cheminFichierXml)
+  P -> P : lireXml(fichier) : erreurs du lecteur traduites en français
+  P -> P : Plan(documentXml) : balise principale « reseau »
+  loop Éléments noeud (parcours linéaire)
+    P -> P : lire id, longitude, latitude (nombres valides, dans les bornes)
+    P -> P : new Noeud(identifiant, longitude, latitude) [identifiant unique]
   end
-  loop Balises troncon
+  loop Éléments troncon
     P -> P : trouverNoeud(origine), trouverNoeud(destination)
+    P -> P : lire longueur [nombre fini, positif]
     P -> P : new Troncon(origine, destination, longueur, nomRue)
   end
-  alt Lecture réussie
-    P --> C : Plan construit
-    note right of C : plan = résultat ; programme = null
+  alt Lecture réussie (au moins un nœud)
+    P --> A : Plan construit
+    A -> C : finirLecturePlan(plan, fichier) [thread JavaFX]
+    C -> V : afficherAttente(false)
+    note right of C : plan = résultat ; programme = null ; historique vidé
     C -> V : afficherPlan(plan)
     V -> M : afficherPlan(plan)
     M -> M : dessinerCarte()
@@ -43,17 +52,19 @@ else Fichier sélectionné
       R --> M : Coordonnées en pixels
     end
     M --> U : Carte dessinée
-    note right of V : Effacer le message
-    note right of C : etat = EtatPlanCharge
-  else Erreur de lecture
-    P --> C : IOException / SAXException
-    C -> V : afficherErreurXml(erreur.getMessage())
+    C -> C : changerEtat(new EtatPlanCharge())
+  else Fichier invalide ou introuvable
+    P --> A : IOException / SAXException (message en français)
+    A -> C : refuserFichier(message) [thread JavaFX]
+    C -> V : afficherAttente(false)
+    C -> C : retrouverEtatStable()
+    note right of C : plan, programme, tournées et historique gardés ;\nretour à l'état d'avant la lecture
+    C -> V : afficherErreurXml(message)
     V --> U : Alerte « Fichier XML invalide »
-    note right of C : plan = null ; programme = null
-    C -> V : reinitialiser()
-    V -> M : effacerCarte()
-    note right of V : Effacer le message
-    note right of C : etat = EtatInitial
+  else Erreur inattendue
+    A -> C : signalerErreurInattendue(erreur) [thread JavaFX]
+    C -> V : afficherAttente(false), afficherErreurInattendue(détail)
+    note right of C : retrouverEtatStable() : rien n'est perdu
   end
 end
 @enduml

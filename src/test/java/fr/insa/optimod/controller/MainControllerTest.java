@@ -1,5 +1,6 @@
 package fr.insa.optimod.controller;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -64,6 +65,10 @@ public class MainControllerTest {
         private LongConsumer actionClicNoeud;
         private Consumer<String> actionErreurDessin;
         private String erreurCarte;
+        private String erreurXml;
+        private String erreurEcriture;
+        private String refusSauvegarde;
+        private String erreurInattendue;
         private String consigne = "";
         private String confirmation = "";
         private File fichierChoisi;
@@ -255,7 +260,26 @@ public class MainControllerTest {
 
         @Override
         public void afficherErreurXml(String detail) {
+            erreurXml = detail;
             evenements.add("invalide");
+        }
+
+        @Override
+        public void afficherErreurEcriture(String detail) {
+            erreurEcriture = detail;
+            evenements.add("ecriture impossible");
+        }
+
+        @Override
+        public void afficherRefusSauvegarde(String detail) {
+            refusSauvegarde = detail;
+            evenements.add("refus sauvegarde");
+        }
+
+        @Override
+        public void afficherErreurInattendue(String detail) {
+            erreurInattendue = detail;
+            evenements.add("erreur inattendue");
         }
 
         @Override
@@ -466,14 +490,21 @@ public class MainControllerTest {
         return new File(getClass().getResource(nom).toURI());
     }
 
+    /**
+     * Importe un plan et le laisse lire : la lecture se fait en arrière-plan,
+     * comme le calcul.
+     */
     private void importerPlan(File fichier) {
         ecran.fichierChoisi = fichier;
         ecran.actionImportPlan.run();
+        executerArrierePlan();
     }
 
+    /** Importe un fichier de demandes et le laisse lire. */
     private void importerProgramme(File fichier) {
         ecran.fichierChoisi = fichier;
         ecran.actionImportLivraison.run();
+        executerArrierePlan();
     }
 
     /** Charge petitPlan.xml puis demandePetit1.xml, et vide les événements. */
@@ -497,6 +528,13 @@ public class MainControllerTest {
     /** Tournées rangées dans le programme chargé. */
     private Map<Integer, Tournee> tournees() {
         return controleur.obtenirProgramme().obtenirTournees();
+    }
+
+    /** Événements de l'écran, sans l'attente montrée pendant les lectures. */
+    private List<String> evenementsSansAttente() {
+        return ecran.evenements.stream()
+                .filter(evenement -> !evenement.startsWith("attente:"))
+                .toList();
     }
 
     private void executerArrierePlan() {
@@ -592,7 +630,8 @@ public class MainControllerTest {
     @Test
     public void afficheLePlanImporte() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
-        assertEquals(List.of("plan"), ecran.evenements);
+        assertEquals(List.of("attente:true", "attente:false", "plan"),
+                ecran.evenements);
         assertEquals(1, ecran.planAffiche.obtenirNoeuds().size());
         assertSame(ecran.planAffiche, controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
@@ -600,16 +639,39 @@ public class MainControllerTest {
                 Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
-    /** Plan invalide ouvre la fenêtre et vide la page. */
+    /**
+     * Plan invalide : la fenêtre d'erreur s'ouvre et le plan affiché est
+     * gardé.
+     */
     @Test
-    public void planInvalideOuvreLaFenetreEtVideLaPage() throws Exception {
+    public void planInvalideOuvreLaFenetreEtGardeLePlan() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
+        Plan plan = controleur.obtenirPlan();
         importerPlan(ecrire("<reseau>"));
-        assertEquals(List.of("plan", "invalide", "reinitialiser"),
-                ecran.evenements);
-        assertNull(ecran.planAffiche);
+        assertEquals(List.of("plan", "invalide"), evenementsSansAttente());
+        assertSame(plan, ecran.planAffiche);
+        assertSame(plan, controleur.obtenirPlan());
+        assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
+        assertFalse(ecran.attente);
+    }
+
+    /** Pendant la lecture du plan, l'attente est affichée et tout bloqué. */
+    @Test
+    public void lectureDuPlanEnArrierePlanBloqueLesActions()
+            throws Exception {
+        ecran.fichierChoisi = ecrire(PLAN_MINUSCULE);
+        ecran.actionImportPlan.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatLectureFichier);
+        assertEquals(EtatLectureFichier.CONSIGNE, ecran.consigne);
+        assertTrue(ecran.actions.isEmpty());
+        assertTrue(ecran.attente);
         assertNull(controleur.obtenirPlan());
-        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+        ecran.actionImportPlan.run();
+        ecran.actionImportLivraison.run();
+        assertEquals(1, arrierePlan.size());
+        executerArrierePlan();
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
     }
 
     /** Annuler l'import du plan ne change rien. */
@@ -617,7 +679,7 @@ public class MainControllerTest {
     public void annulerLImportDuPlanNeChangeRien() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
         importerPlan(null);
-        assertEquals(List.of("plan"), ecran.evenements);
+        assertEquals(List.of("plan"), evenementsSansAttente());
         assertNotNull(controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
     }
@@ -633,24 +695,38 @@ public class MainControllerTest {
                 Action.IMPORTER_PROGRAMME, Action.RESTAURER), ecran.actions);
     }
 
-    /** Plan invalide oublie la livraison. */
+    /**
+     * Un plan invalide choisi par erreur garde tout le travail : plan,
+     * programme, tournées et historique.
+     */
     @Test
-    public void planInvalideOublieLaLivraison() throws Exception {
-        chargerPlanEtLivraison();
-        importerPlan(ecrire("<reseau>"));
-        assertNull(controleur.obtenirProgramme());
-        assertNull(controleur.obtenirPlan());
-        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+    public void planInvalideGardeLeTravailEnCours() throws Exception {
+        utiliserLeVraiCalcul();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        ecran.actionSupprimer.accept(0);
+        Plan plan = controleur.obtenirPlan();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        Map<Integer, Tournee> avant = tournees();
+        importerPlan(ressource("/data/demandePetit1.xml"));
+        assertTrue(ecran.evenements.contains("invalide"));
+        assertSame(plan, controleur.obtenirPlan());
+        assertSame(programme, controleur.obtenirProgramme());
+        assertEquals(avant, tournees());
+        assertTrue(controleur.peutAnnuler());
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertTrue(ecran.actions.contains(Action.ANNULER));
     }
 
-    /** Plan sans nœud ni tronçon : message, page vidée, état initial. */
+    /** Plan sans nœud ni tronçon : message, rien n'est chargé. */
     @Test
-    public void planSansNoeudNiTronconOuvreLaFenetreEtVideLaPage()
-            throws Exception {
+    public void planSansNoeudNiTronconOuvreLaFenetre() throws Exception {
         importerPlan(ecrire("<reseau></reseau>"));
-        assertEquals(List.of("invalide", "reinitialiser"), ecran.evenements);
+        assertEquals(List.of("invalide"), evenementsSansAttente());
         assertNull(controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+        assertEquals(EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER),
+                ecran.actions);
     }
 
     // --- Erreur pendant le dessin de la carte (cas 7) ---
@@ -662,8 +738,8 @@ public class MainControllerTest {
         chargerPlanEtLivraison();
         ecran.actionErreurDessin.accept("dessin impossible");
         assertEquals("dessin impossible", ecran.erreurCarte);
-        assertEquals(List.of("reinitialiser", "erreur carte"),
-                ecran.evenements);
+        assertEquals(List.of("attente:false", "reinitialiser",
+                "erreur carte"), ecran.evenements);
         assertNull(controleur.obtenirPlan());
         assertNull(controleur.obtenirProgramme());
         assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
@@ -698,7 +774,7 @@ public class MainControllerTest {
     public void importeLesDemandesEtActiveLeCalcul() throws Exception {
         importerPlan(ressource("/data/petitPlan.xml"));
         importerProgramme(ressource("/data/demandePetit1.xml"));
-        assertEquals(List.of("plan", "programme"), ecran.evenements);
+        assertEquals(List.of("plan", "programme"), evenementsSansAttente());
         assertEquals(1, controleur.obtenirProgramme().obtenirDemandes().size());
         assertEquals(LocalTime.of(8, 0),
                 controleur.obtenirProgramme().obtenirHeureDepart());
@@ -712,7 +788,7 @@ public class MainControllerTest {
     public void programmeHorsPlanRefuse() throws Exception {
         importerPlan(ecrire(PLAN_MINUSCULE));
         importerProgramme(ressource("/data/demandePetit1.xml"));
-        assertEquals(List.of("plan", "invalide"), ecran.evenements);
+        assertEquals(List.of("plan", "invalide"), evenementsSansAttente());
         assertNull(controleur.obtenirProgramme());
         assertNull(ecran.programmeAffiche);
         assertTrue(controleur.obtenirEtat() instanceof EtatPlanCharge);
@@ -724,7 +800,7 @@ public class MainControllerTest {
         chargerPlanEtLivraison();
         ProgrammeLivraisons precedente = controleur.obtenirProgramme();
         importerProgramme(ecrire(PLAN_MINUSCULE));
-        assertEquals(List.of("invalide"), ecran.evenements);
+        assertEquals(List.of("invalide"), evenementsSansAttente());
         assertSame(precedente, controleur.obtenirProgramme());
         assertNotNull(controleur.obtenirPlan());
         assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
@@ -748,7 +824,7 @@ public class MainControllerTest {
         importerPlan(ecrire(PLAN_MINUSCULE));
         ecran.actionCalculer.run();
         assertTrue(arrierePlan.isEmpty());
-        assertEquals(List.of("plan"), ecran.evenements);
+        assertEquals(List.of("plan"), evenementsSansAttente());
     }
 
     /** Calcul bloque toutes les actions. */
@@ -793,8 +869,11 @@ public class MainControllerTest {
         Plan plan = controleur.obtenirPlan();
         ProgrammeLivraisons programme = controleur.obtenirProgramme();
         ecran.actionCalculer.run();
-        importerPlan(ecrire(PLAN_MINUSCULE));
-        importerProgramme(ressource("/data/demandePetit1.xml"));
+        ecran.fichierChoisi = ecrire(PLAN_MINUSCULE);
+        ecran.actionImportPlan.run();
+        ecran.fichierChoisi = ressource("/data/demandePetit1.xml");
+        ecran.actionImportLivraison.run();
+        assertEquals(1, arrierePlan.size());
         assertSame(plan, controleur.obtenirPlan());
         assertSame(programme, controleur.obtenirProgramme());
         executerArrierePlan();
@@ -2238,7 +2317,8 @@ public class MainControllerTest {
         ecran.actionImportPlan.run();
         ecran.actionRestaurer.run();
         executerArrierePlan();
-        assertSame(avant, controleur.obtenirEtat());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertEquals(avant.actionsPermises(controleur), ecran.actions);
         assertSame(programme, controleur.obtenirProgramme());
         assertTrue(controleur.peutAnnuler());
         assertFalse(ecran.attente);
@@ -3603,13 +3683,13 @@ public class MainControllerTest {
         assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
     }
 
-    /** Un plan invalide ramène à la première étape, avec sa consigne. */
+    /** Un plan invalide laisse la consigne de l'étape courante. */
     @Test
-    public void planInvalideRamenePremiereConsigne() throws Exception {
+    public void planInvalideGardeLaConsigne() throws Exception {
         chargerPlanEtLivraison();
         importerPlan(ecrire("ceci n'est pas du XML"));
-        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
-        assertEquals(EtatInitial.CONSIGNE, ecran.consigne);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
     }
 
     /** Des demandes invalides laissent la consigne de l'étape courante. */
@@ -4204,7 +4284,9 @@ public class MainControllerTest {
         calculerUneTournee();
         ecran.dossierChoisi = new File(dossier.getRoot(), "absent");
         ecran.actionGenererFeuillesDeRoute.run();
-        assertTrue(ecran.evenements.contains("invalide"));
+        assertTrue(ecran.evenements.contains("ecriture impossible"));
+        assertTrue(ecran.erreurEcriture, ecran.erreurEcriture.startsWith(
+                "Dossier introuvable"));
     }
 
     /**
@@ -4416,7 +4498,9 @@ public class MainControllerTest {
     @Test
     public void sauvegarderAvecDeuxLivreursSignaleSansEcrire() throws Exception {
         calculerAvecUnLivreur();
+        assertTrue(ecran.actions.contains(Action.SAUVEGARDER));
         ecran.actionNombreLivreurs.accept(2);
+        assertFalse(ecran.actions.contains(Action.SAUVEGARDER));
         File fichier = dossier.newFile("deux.xml");
         ecran.fichierChoisi = fichier;
         ecran.evenements.clear();
@@ -4478,9 +4562,9 @@ public class MainControllerTest {
 
     /**
      * Une erreur inattendue pendant la restauration (ici un nom de fichier
-     * qu'aucun chemin ne peut représenter) ramène à l'état d'avant avec un
-     * message, comme un fichier invalide : l'application ne reste pas
-     * bloquée sur « Restauration en cours » (TIG-107).
+     * qu'aucun chemin ne peut représenter) ramène à un état équivalent à
+     * celui d'avant, programme intact, avec un message : l'application ne
+     * reste pas bloquée sur « Restauration en cours » (TIG-107).
      */
     @Test
     public void restaurationErreurInattendueRevientALEtatDAvant()
@@ -4492,9 +4576,235 @@ public class MainControllerTest {
         ecran.actionRestaurer.run();
         assertTrue(controleur.obtenirEtat() instanceof EtatRestauration);
         executerArrierePlan();
-        assertSame(avant, controleur.obtenirEtat());
+        assertEquals(avant.getClass(), controleur.obtenirEtat().getClass());
         assertSame(programme, controleur.obtenirProgramme());
         assertFalse(ecran.attente);
+        assertTrue(ecran.evenements.contains("erreur inattendue"));
+    }
+
+    // --- Robustesse : fichiers piégés, erreurs imprévues, écriture ---
+
+    /**
+     * Cliquer sur l'adresse actuelle du point à déplacer ne change rien et
+     * le dit, au lieu d'une consigne fausse sur les adresses différentes.
+     */
+    @Test
+    public void deplacerUnPointSurSaPropreAdresse() throws Exception {
+        Tournee avant = afficherUneTourneeDeDeuxDemandes();
+        ecran.actionDeplacer.accept(1, 1);
+        ecran.actionClicNoeud.accept(avant.arrets().get(1).noeud()
+                .identifiant());
+        assertTrue(ecran.consigne, ecran.consigne.startsWith(
+                MainController.CONSIGNE_DEJA_A_CETTE_ADRESSE));
+        assertFalse(ecran.consigne.contains("adresses différentes"));
+        assertTrue(controleur.obtenirEtat() instanceof EtatDeplacementPoint);
+        assertSame(avant, tournees().get(1));
+    }
+
+    /**
+     * Une erreur de dessin pendant un recalcul local vide la page ; la fin
+     * du recalcul est alors abandonnée, sans NullPointerException.
+     */
+    @Test
+    public void erreurDeDessinPendantUnRecalculLocal() throws Exception {
+        utiliserLeVraiCalculEnArrierePlan();
+        chargerDeuxDemandes();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        ecran.actionSupprimer.accept(0);
+        assertTrue(ecran.attente);
+        ecran.actionErreurDessin.accept("dessin impossible");
+        executerArrierePlan();
+        assertTrue(controleur.obtenirEtat() instanceof EtatInitial);
+        assertNull(controleur.obtenirProgramme());
+        assertFalse(ecran.attente);
+        assertEquals(EnumSet.of(Action.IMPORTER_PLAN, Action.RESTAURER),
+                ecran.actions);
+    }
+
+    /**
+     * Une erreur imprévue (pas une exception) pendant le calcul n'arrête
+     * pas l'application : l'attente s'éteint, l'erreur est signalée et l'état
+     * revient au programme chargé.
+     */
+    @Test
+    public void erreurImprevueDuCalculNeBloquePas() throws Exception {
+        controleur = new MainController(ecran, (plan, programme) -> {
+            throw new StackOverflowError();
+        }, arrierePlan::add, Runnable::run);
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertFalse(ecran.attente);
+        assertEquals("StackOverflowError", ecran.erreurInattendue);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertEquals(EtatProgrammeCharge.CONSIGNE, ecran.consigne);
+        assertEquals(MODIFIABLE, ecran.actions);
+    }
+
+    /**
+     * Une exception imprévue pendant la fin d'un calcul, sur le thread de
+     * l'interface, ne laisse pas l'application en attente.
+     */
+    @Test
+    public void exceptionALaFinDuCalculNeBloquePas() throws Exception {
+        tourneesCalculees = Collections.singletonMap(1, null);
+        chargerPlanEtLivraison();
+        ecran.actionCalculer.run();
+        executerArrierePlan();
+        assertFalse(ecran.attente);
+        assertNotNull(ecran.erreurInattendue);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertFalse(ecran.actions.isEmpty());
+    }
+
+    /**
+     * Une erreur imprévue pendant une restauration ramène à l'état d'avant,
+     * sans rester sur « Restauration en cours ».
+     */
+    @Test
+    public void erreurImprevuePendantLaRestaurationNeBloquePas()
+            throws Exception {
+        chargerDeuxDemandes();
+        ProgrammeLivraisons programme = controleur.obtenirProgramme();
+        // Un dossier à la place d'une sauvegarde : la lecture échoue.
+        ecran.fichierChoisi = dossier.newFolder("pas-une-sauvegarde");
+        ecran.actionRestaurer.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatRestauration);
+        executerArrierePlan();
+        assertFalse(ecran.attente);
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+        assertSame(programme, controleur.obtenirProgramme());
         assertTrue(ecran.evenements.contains("invalide"));
+    }
+
+    /** Un fichier supprimé entre le choix et la lecture est signalé. */
+    @Test
+    public void fichierSupprimeAvantLaLectureSignale() throws Exception {
+        chargerPlanEtLivraison();
+        Plan plan = controleur.obtenirPlan();
+        File fichier = ecrire(PLAN_MINUSCULE);
+        ecran.fichierChoisi = fichier;
+        ecran.actionImportPlan.run();
+        Files.delete(fichier.toPath());
+        executerArrierePlan();
+        assertTrue(ecran.erreurXml, ecran.erreurXml.startsWith(
+                "Fichier introuvable"));
+        assertSame(plan, controleur.obtenirPlan());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+    }
+
+    /** Pendant la lecture d'un programme, l'attente est affichée. */
+    @Test
+    public void lectureDuProgrammeEnArrierePlan() throws Exception {
+        importerPlan(ressource("/data/petitPlan.xml"));
+        ecran.fichierChoisi = ressource("/data/demandePetit1.xml");
+        ecran.actionImportLivraison.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatLectureFichier);
+        assertTrue(ecran.attente);
+        assertNull(controleur.obtenirProgramme());
+        executerArrierePlan();
+        assertFalse(ecran.attente);
+        assertNotNull(controleur.obtenirProgramme());
+        assertTrue(controleur.obtenirEtat() instanceof EtatProgrammeCharge);
+    }
+
+    /** Copie un fichier fourni dans le dossier temporaire du test. */
+    private File copier(String nom) throws Exception {
+        File copie = new File(dossier.getRoot(), nom);
+        Files.copy(ressource("/data/" + nom).toPath(), copie.toPath());
+        return copie;
+    }
+
+    /** Sauvegarder par-dessus le fichier du plan est refusé : il est gardé. */
+    @Test
+    public void sauvegarderSurLeFichierDuPlanRefuse() throws Exception {
+        utiliserLeVraiCalcul();
+        File plan = copier("petitPlan.xml");
+        importerPlan(plan);
+        importerProgramme(copier("demandePetit2.xml"));
+        ecran.actionCalculer.run();
+        byte[] contenu = Files.readAllBytes(plan.toPath());
+        ecran.fichierChoisi = plan;
+        ecran.actionSauvegarder.run();
+        assertTrue(ecran.evenements.contains("refus sauvegarde"));
+        assertTrue(ecran.refusSauvegarde.contains("petitPlan.xml"));
+        assertArrayEquals(contenu, Files.readAllBytes(plan.toPath()));
+    }
+
+    /** Sauvegarder par-dessus le fichier des demandes est refusé aussi. */
+    @Test
+    public void sauvegarderSurLeFichierDesDemandesRefuse() throws Exception {
+        utiliserLeVraiCalcul();
+        importerPlan(copier("petitPlan.xml"));
+        File demandes = copier("demandePetit2.xml");
+        importerProgramme(demandes);
+        ecran.actionCalculer.run();
+        byte[] contenu = Files.readAllBytes(demandes.toPath());
+        ecran.fichierChoisi = new File(demandes.getParentFile(),
+                "./demandePetit2.xml");
+        ecran.actionSauvegarder.run();
+        assertTrue(ecran.evenements.contains("refus sauvegarde"));
+        assertArrayEquals(contenu, Files.readAllBytes(demandes.toPath()));
+    }
+
+    /** Sauvegarder dans un dossier protégé : « Accès refusé ». */
+    @Test
+    public void sauvegarderDansUnDossierProtegeSignale() throws Exception {
+        calculerAvecUnLivreur();
+        File protege = dossier.newFolder("protege");
+        org.junit.Assume.assumeTrue(protege.setWritable(false));
+        org.junit.Assume.assumeFalse(protege.canWrite()); // administrateur
+        try {
+            ecran.fichierChoisi = new File(protege, "tournee.xml");
+            ecran.actionSauvegarder.run();
+            assertTrue(ecran.evenements.contains("ecriture impossible"));
+            assertTrue(ecran.erreurEcriture, ecran.erreurEcriture.startsWith(
+                    "Accès refusé"));
+        } finally {
+            protege.setWritable(true);
+        }
+    }
+
+    /** Feuilles de route dans un dossier protégé : « Accès refusé ». */
+    @Test
+    public void feuillesDeRouteDansUnDossierProtegeSignale() throws Exception {
+        calculerUneTournee();
+        File protege = dossier.newFolder("feuilles-protegees");
+        org.junit.Assume.assumeTrue(protege.setWritable(false));
+        org.junit.Assume.assumeFalse(protege.canWrite());
+        try {
+            ecran.dossierChoisi = protege;
+            ecran.actionGenererFeuillesDeRoute.run();
+            assertTrue(ecran.erreurEcriture, ecran.erreurEcriture.startsWith(
+                    "Accès refusé"));
+            assertFalse(ecran.evenements.contains("invalide"));
+        } finally {
+            protege.setWritable(true);
+        }
+    }
+
+    /** La sauvegarde fournie avec l'application se restaure. */
+    @Test
+    public void sauvegardeFournieRestauree() throws Exception {
+        controleur = new MainController(ecran);
+        ecran.fichierChoisi = ressource(
+                "/data/demande_sauvegardee_grand.xml");
+        ecran.actionRestaurer.run();
+        assertEquals("Tournée restaurée.", ecran.confirmation);
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+    }
+
+    /** Un programme sans demande se calcule : une tournée vide. */
+    @Test
+    public void programmeSansDemandeCalcule() throws Exception {
+        utiliserLeVraiCalcul();
+        importerPlan(ressource("/data/petitPlan.xml"));
+        importerProgramme(ecrire("<demandeDeLivraisons>"
+                + "<entrepot adresse=\"342873658\" heureDepart=\"8:0:0\"/>"
+                + "</demandeDeLivraisons>"));
+        ecran.actionCalculer.run();
+        assertTrue(controleur.obtenirEtat() instanceof EtatTourneeCalculee);
+        assertEquals(1, tournees().get(1).arrets().size());
     }
 }

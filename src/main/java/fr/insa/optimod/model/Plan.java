@@ -25,8 +25,9 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
+import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import fr.insa.optimod.algo.tsp.GrapheDepandance;
@@ -64,6 +65,13 @@ public final class Plan {
      * partagée entre les livreurs qui ont des demandes.
      */
     private static final int LIMITE_TEMPS_TSP_MS = 10_000;
+
+    /**
+     * Imbrication maximale d'un fichier XML lu : un plan, un programme ou une
+     * sauvegarde n'ont que deux niveaux ; un fichier bien plus profond est
+     * piégé.
+     */
+    private static final String PROFONDEUR_MAXIMALE_XML = "100";
 
     /** Secondes dans une journée, au-delà desquelles une heure repart de 0. */
     private static final int SECONDES_PAR_JOUR = 24 * 3600;
@@ -123,11 +131,13 @@ public final class Plan {
      * Lit un plan depuis un fichier XML.
      *
      * @param cheminFichierXml chemin du fichier XML
-     * @throws IOException  si le fichier est illisible
-     * @throws SAXException si le XML est invalide
+     * @throws IOException  si le fichier est introuvable ou illisible (message
+     *                      en français)
+     * @throws SAXException si le XML ou ses données sont invalides (message
+     *                      en français)
      */
     public Plan(String cheminFichierXml) throws IOException, SAXException {
-        this(creerLecteurXml().parse(new File(cheminFichierXml)));
+        this(lireXml(new File(cheminFichierXml)));
     }
 
     /**
@@ -135,45 +145,58 @@ public final class Plan {
      *
      * @param fluxXml contenu XML du plan
      * @throws IOException  si le flux est illisible
-     * @throws SAXException si le XML est invalide
+     * @throws SAXException si le XML ou ses données sont invalides (message
+     *                      en français)
      */
     public Plan(InputStream fluxXml) throws IOException, SAXException {
-        this(creerLecteurXml().parse(fluxXml));
+        this(lireXml(fluxXml));
     }
 
     private Plan(Document documentXml) throws SAXException {
-        documentXml.getDocumentElement().normalize();
-        try {
-            NodeList elementsNoeuds = documentXml.getElementsByTagName("noeud");
-            for (int indice = 0; indice < elementsNoeuds.getLength(); indice++) {
-                Element element = (Element) elementsNoeuds.item(indice);
-                Noeud noeud = new Noeud(
-                        Long.parseLong(element.getAttribute("id")),
-                        Double.parseDouble(element.getAttribute("longitude")),
-                        Double.parseDouble(element.getAttribute("latitude")));
-                noeuds.put(noeud.identifiant(), noeud);
-                tronconsSortants.put(noeud, new ArrayList<>());
+        Element racine = documentXml.getDocumentElement();
+        if (!"reseau".equals(racine.getTagName())) {
+            throw new SAXException("Ce fichier n'est pas un plan : sa balise "
+                    + "principale doit être « reseau », pas « "
+                    + racine.getTagName() + " ».");
+        }
+        List<Element> elementsNoeuds = elementsFils(racine, "noeud");
+        for (int indice = 0; indice < elementsNoeuds.size(); indice++) {
+            Element element = elementsNoeuds.get(indice);
+            String quoi = "nœud n° " + (indice + 1);
+            Noeud noeud = new Noeud(lireLong(element, "id", quoi),
+                    lireCoordonnee(element, "longitude", quoi, 180),
+                    lireCoordonnee(element, "latitude", quoi, 90));
+            if (noeuds.putIfAbsent(noeud.identifiant(), noeud) != null) {
+                throw new SAXException("Deux nœuds ont le même identifiant : "
+                        + noeud.identifiant() + ".");
             }
-            NodeList elementsTroncons = documentXml.getElementsByTagName("troncon");
-            for (int indice = 0; indice < elementsTroncons.getLength(); indice++) {
-                Element element = (Element) elementsTroncons.item(indice);
-                Noeud origine = trouverNoeud(element.getAttribute("origine"));
-                Troncon troncon = new Troncon(origine,
-                        trouverNoeud(element.getAttribute("destination")),
-                        Double.parseDouble(element.getAttribute("longueur")),
-                        element.getAttribute("nomRue"));
-                troncons.add(troncon);
-                tronconsSortants.get(origine).add(troncon);
+            tronconsSortants.put(noeud, new ArrayList<>());
+        }
+        List<Element> elementsTroncons = elementsFils(racine, "troncon");
+        for (int indice = 0; indice < elementsTroncons.size(); indice++) {
+            Element element = elementsTroncons.get(indice);
+            String quoi = "tronçon n° " + (indice + 1);
+            Noeud origine = trouverNoeud(element, "origine", quoi);
+            Noeud destination = trouverNoeud(element, "destination", quoi);
+            double longueur = lireReel(element, "longueur", quoi);
+            // !(longueur >= 0) refuse aussi NaN. Avec une longueur négative,
+            // il n'y a plus de plus court chemin et A* ne finirait pas.
+            if (!(longueur >= 0) || Double.isInfinite(longueur)) {
+                throw new SAXException("Valeur invalide pour l'attribut "
+                        + "« longueur » (" + quoi + ") : « "
+                        + element.getAttribute("longueur") + " ». Une "
+                        + "longueur est un nombre de mètres positif.");
             }
-        } catch (NumberFormatException erreur) {
-            throw new SAXException("Nombre invalide dans le plan : "
-                    + erreur.getMessage(), erreur);
+            Troncon troncon = new Troncon(origine, destination, longueur,
+                    element.getAttribute("nomRue"));
+            troncons.add(troncon);
+            tronconsSortants.get(origine).add(troncon);
         }
     }
 
     /**
-     * Crée un lecteur XML sécurisé (pas de DOCTYPE, pas d'entité externe),
-     * partagé avec {@link ProgrammeLivraisons}.
+     * Crée un lecteur XML sécurisé (pas de DOCTYPE, pas d'entité externe,
+     * imbrication limitée), partagé avec {@link ProgrammeLivraisons}.
      *
      * @return le lecteur
      */
@@ -183,19 +206,215 @@ public final class Plan {
             fabrique.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             fabrique.setFeature(
                     "http://apache.org/xml/features/disallow-doctype-decl", true);
+            fabrique.setAttribute("jdk.xml.maxElementDepth",
+                    PROFONDEUR_MAXIMALE_XML);
             DocumentBuilder lecteur = fabrique.newDocumentBuilder();
             lecteur.setErrorHandler(new DefaultHandler()); // pas de trace
             return lecteur;
-        } catch (ParserConfigurationException erreur) {
+        } catch (ParserConfigurationException
+                | IllegalArgumentException erreur) {
             throw new IllegalStateException(erreur);
         }
     }
 
-    private Noeud trouverNoeud(String identifiant) throws SAXException {
-        Noeud noeud = noeuds.get(Long.parseLong(identifiant));
+    /**
+     * Lit un fichier XML avec {@link #creerLecteurXml()}, en traduisant les
+     * erreurs en messages français lisibles par l'utilisateur.
+     *
+     * @param fichier fichier à lire
+     * @return le document
+     * @throws IOException  si le fichier est introuvable ou illisible
+     * @throws SAXException si le fichier n'est pas un XML bien formé
+     */
+    static Document lireXml(File fichier) throws IOException, SAXException {
+        if (!fichier.isFile()) {
+            throw new IOException("Fichier introuvable : " + fichier.getName()
+                    + ". Il a peut-être été déplacé ou supprimé.");
+        }
+        if (!fichier.canRead()) {
+            throw new IOException("Lecture refusée pour le fichier "
+                    + fichier.getName() + ".");
+        }
+        try {
+            return creerLecteurXml().parse(fichier);
+        } catch (SAXParseException erreur) {
+            throw traduire(erreur);
+        } catch (IOException erreur) {
+            throw new IOException("Lecture impossible du fichier "
+                    + fichier.getName() + ".", erreur);
+        }
+    }
+
+    /**
+     * Lit un flux XML avec {@link #creerLecteurXml()}, en traduisant les
+     * erreurs en messages français lisibles par l'utilisateur.
+     *
+     * @param flux contenu XML
+     * @return le document
+     * @throws IOException  si le flux est illisible
+     * @throws SAXException si le contenu n'est pas un XML bien formé
+     */
+    static Document lireXml(InputStream flux) throws IOException,
+            SAXException {
+        try {
+            return creerLecteurXml().parse(flux);
+        } catch (SAXParseException erreur) {
+            throw traduire(erreur);
+        }
+    }
+
+    /**
+     * Traduit une erreur du lecteur XML (en anglais, quelle que soit la
+     * langue de la JVM) en message français, avec la ligne quand elle est
+     * connue.
+     */
+    private static SAXException traduire(SAXParseException erreur) {
+        String original = String.valueOf(erreur.getMessage());
+        String ligne = erreur.getLineNumber() > 0
+                ? " (ligne " + erreur.getLineNumber() + ")" : "";
+        String message;
+        if (original.contains("DOCTYPE")) {
+            message = "Ce fichier contient une déclaration de type de "
+                    + "document, interdite pour des raisons de sécurité.";
+        } else if (original.contains("Premature end of file")
+                && erreur.getLineNumber() <= 1
+                && erreur.getColumnNumber() <= 1) {
+            message = "Le fichier est vide.";
+        } else if (original.contains("Premature end of file")
+                || original.contains("same entity")) {
+            message = "Le fichier XML est incomplet : il s'arrête avant la "
+                    + "fin" + ligne + ".";
+        } else if (original.contains("maxElementDepth")) {
+            message = "Le fichier XML est trop profondément imbriqué"
+                    + ligne + ".";
+        } else if (original.contains("prolog") || original.contains("byte")
+                || original.contains("character")) {
+            message = "Ce fichier n'est pas un fichier XML lisible : contenu "
+                    + "ou encodage inattendu" + ligne + ".";
+        } else {
+            message = "Le fichier XML est mal formé" + ligne + ".";
+        }
+        return new SAXException(message, erreur);
+    }
+
+    /**
+     * Éléments enfants directs d'un élément qui portent ce nom, dans l'ordre
+     * du fichier ; sert aussi à la lecture des demandes et des sauvegardes.
+     * Le parcours est linéaire : {@code getElementsByTagName} recompte la
+     * liste à chaque accès et rendait la lecture d'un plan de 60 000 nœuds
+     * longue de 30 s.
+     *
+     * @param parent élément dont on lit les enfants
+     * @param nom    nom des éléments cherchés
+     * @return les éléments trouvés (modifiable)
+     */
+    static List<Element> elementsFils(Element parent, String nom) {
+        List<Element> elements = new ArrayList<>();
+        for (Node fils = parent.getFirstChild(); fils != null;
+                fils = fils.getNextSibling()) {
+            if (fils instanceof Element element
+                    && nom.equals(element.getTagName())) {
+                elements.add(element);
+            }
+        }
+        return elements;
+    }
+
+    /**
+     * Valeur d'un attribut obligatoire ; sert aussi à la lecture des
+     * demandes et des sauvegardes.
+     *
+     * @param element élément lu
+     * @param nom     nom de l'attribut
+     * @param quoi    élément désigné pour l'utilisateur (ex. « tronçon n° 3 »)
+     * @return la valeur, sans espaces autour, jamais vide
+     * @throws SAXException si l'attribut est absent ou vide
+     */
+    static String lireAttribut(Element element, String nom, String quoi)
+            throws SAXException {
+        String valeur = element.getAttribute(nom);
+        if (valeur.isBlank()) {
+            throw new SAXException("Attribut « " + nom + " » absent ou vide ("
+                    + quoi + ").");
+        }
+        return valeur.trim();
+    }
+
+    /**
+     * Entier d'un attribut obligatoire.
+     *
+     * @param element élément lu
+     * @param nom     nom de l'attribut
+     * @param quoi    élément désigné pour l'utilisateur
+     * @return la valeur
+     * @throws SAXException si l'attribut est absent ou n'est pas un entier
+     */
+    static int lireEntier(Element element, String nom, String quoi)
+            throws SAXException {
+        String valeur = lireAttribut(element, nom, quoi);
+        try {
+            return Integer.parseInt(valeur);
+        } catch (NumberFormatException erreur) {
+            throw valeurInvalide(nom, quoi, valeur, erreur);
+        }
+    }
+
+    /**
+     * Identifiant (grand entier) d'un attribut obligatoire.
+     *
+     * @param element élément lu
+     * @param nom     nom de l'attribut
+     * @param quoi    élément désigné pour l'utilisateur
+     * @return la valeur
+     * @throws SAXException si l'attribut est absent ou n'est pas un entier
+     */
+    static long lireLong(Element element, String nom, String quoi)
+            throws SAXException {
+        String valeur = lireAttribut(element, nom, quoi);
+        try {
+            return Long.parseLong(valeur);
+        } catch (NumberFormatException erreur) {
+            throw valeurInvalide(nom, quoi, valeur, erreur);
+        }
+    }
+
+    private static double lireReel(Element element, String nom, String quoi)
+            throws SAXException {
+        String valeur = lireAttribut(element, nom, quoi);
+        try {
+            return Double.parseDouble(valeur);
+        } catch (NumberFormatException erreur) {
+            throw valeurInvalide(nom, quoi, valeur, erreur);
+        }
+    }
+
+    /** Latitude ou longitude : un nombre entre -limite et limite. */
+    private static double lireCoordonnee(Element element, String nom,
+            String quoi, int limite) throws SAXException {
+        double valeur = lireReel(element, nom, quoi);
+        // !(… && …) refuse aussi NaN.
+        if (!(valeur >= -limite && valeur <= limite)) {
+            throw new SAXException("Valeur invalide pour l'attribut « " + nom
+                    + " » (" + quoi + ") : « " + element.getAttribute(nom)
+                    + " ». Elle doit être comprise entre -" + limite + " et "
+                    + limite + ".");
+        }
+        return valeur;
+    }
+
+    private static SAXException valeurInvalide(String nom, String quoi,
+            String valeur, NumberFormatException erreur) {
+        return new SAXException("Valeur invalide pour l'attribut « " + nom
+                + " » (" + quoi + ") : « " + valeur + " ».", erreur);
+    }
+
+    private Noeud trouverNoeud(Element element, String nom, String quoi)
+            throws SAXException {
+        long identifiant = lireLong(element, nom, quoi);
+        Noeud noeud = noeuds.get(identifiant);
         if (noeud == null) {
-            throw new SAXException("Tronçon vers un nœud inconnu : "
-                    + identifiant);
+            throw new SAXException("Le " + quoi + " mène à un nœud absent du "
+                    + "plan : " + identifiant + ".");
         }
         return noeud;
     }
@@ -583,8 +802,12 @@ public final class Plan {
         int[][] couts = new int[nombre][nombre];
         for (int i = 0; i < nombre; i++) {
             for (int j = 0; j < nombre; j++) {
+                // Un chemin très long (plan piégé) est plafonné juste sous le
+                // coût d'un arc inaccessible, pour que la somme ne déborde
+                // pas.
                 couts[i][j] = chemins[i][j].estAccessible()
-                        ? (int) Math.round(chemins[i][j].longueur())
+                        ? (int) Math.min(Math.round(chemins[i][j].longueur()),
+                                coutInaccessible - 1L)
                         : coutInaccessible;
             }
         }
@@ -672,9 +895,15 @@ public final class Plan {
         return new Tournee(arrets, trajets, prouveeOptimale);
     }
 
+    /**
+     * Durée d'un trajet en secondes, plafonnée à une journée : un trajet
+     * démesuré (plan piégé) ne doit pas faire déborder la somme des durées,
+     * qui repasserait alors avant minuit.
+     */
     private static long secondesDeTrajet(double metres) {
         double metresParSeconde = VITESSE_KMH * 1000 / 3600;
-        return Math.round(metres / metresParSeconde);
+        return Math.min(Math.round(metres / metresParSeconde),
+                SECONDES_PAR_JOUR);
     }
 
     // --- Recalcul local d'une tournée (sans relancer le voyageur de commerce)

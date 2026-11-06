@@ -22,9 +22,13 @@ Un fichier annonçant plusieurs livreurs est refusé, sans perte silencieuse.
 ```
 
 Les durées sont en secondes. L'ordre des demandes et celui des arrêts sont
-indépendants, chacun est conservé. Le plan est référencé par chemin absolu
-lors de l'écriture ; un chemin relatif est aussi accepté en lecture et se
-résout par rapport au dossier de la sauvegarde. Le plan n'est pas recopié.
+indépendants, chacun est conservé. Le plan est référencé par un chemin
+relatif au dossier de la sauvegarde, écrit avec des « / » (chemin absolu
+seulement s'il est sur un autre disque). En lecture, ce chemin (relatif, ou
+absolu dans les anciennes sauvegardes) est essayé d'abord ; s'il n'existe pas,
+le plan est cherché par son nom (après le dernier « / » ou « \ ») dans le
+dossier de la sauvegarde. Une sauvegarde déplacée avec son plan, ou écrite
+sous Windows, se restaure donc encore. Le plan n'est pas recopié.
 Une tournée sans demande contient seulement l'arrêt de départ de l'entrepôt.
 
 Les attributs `debutPlage` et `finPlage` conservent les engagements annoncés,

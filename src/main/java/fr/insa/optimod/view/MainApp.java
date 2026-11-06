@@ -35,6 +35,14 @@ public final class MainApp extends Application {
     @Override
     public void start(Stage stage) {
         MainView vue = new MainView();
+        // Filet de sécurité : une exception non attrapée, sur le thread de
+        // l'interface ou ailleurs, est journalisée et signalée par une
+        // alerte, sans fermer l'application.
+        GestionnaireErreursInattendues gestionnaire =
+                new GestionnaireErreursInattendues(Platform::runLater,
+                        vue::afficherErreurInattendue);
+        Thread.setDefaultUncaughtExceptionHandler(gestionnaire);
+        Thread.currentThread().setUncaughtExceptionHandler(gestionnaire);
         calcul = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "calcul-tournee");
             t.setDaemon(true);
