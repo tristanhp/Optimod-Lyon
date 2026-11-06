@@ -165,17 +165,21 @@ public class ListeDeCommandesTest {
 
     /**
      * Des tournées calculées après coup sont retenues par la dernière
-     * commande appliquée (pour Rétablir) et par la prochaine à rétablir
-     * (pour Annuler).
+     * commande appliquée (pour Rétablir), et le calcul oublie les commandes
+     * annulées : Rétablir ne peut plus remettre des tournées calculées avant
+     * lui (TIG-107).
      */
     @Test
-    public void tourneesCalculeesTransmisesAuxCommandesVoisines() {
+    public void calculRetenuParLaDerniereCommandeEtOublieLesAnnulees() {
         historique.memoriserTournees(Map.of());
         historique.executer(commande("a"));
         historique.executer(commande("b"));
         historique.annuler();
         journal.clear();
         historique.memoriserTournees(Map.of());
-        assertEquals(List.of("apres:a", "avant:b"), journal);
+        assertEquals(List.of("apres:a"), journal);
+        assertFalse(historique.peutRefaire());
+        assertNull(historique.refaire());
+        assertTrue(historique.peutAnnuler());
     }
 }

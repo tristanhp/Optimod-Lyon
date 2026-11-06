@@ -14,7 +14,6 @@ import java.util.TreeMap;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 /**
@@ -35,6 +34,14 @@ public final class ProgrammeLivraisons extends Observable {
 
     /** Plus grand nombre de livreurs de la journée. */
     public static final int MAXIMUM_LIVREURS = 20;
+
+    /**
+     * Plus grand nombre de demandes d'un fichier de demandes. Le calcul
+     * complet cherche un plus court chemin entre chaque couple d'adresses :
+     * avec 100 demandes sur le grand plan, il dure déjà une vingtaine de
+     * secondes ; avec des milliers, il ne finirait pas dans la journée.
+     */
+    public static final int MAXIMUM_DEMANDES = 100;
 
     /**
      * Demande de livraison : un colis à récupérer au point de collecte puis à
@@ -139,7 +146,7 @@ public final class ProgrammeLivraisons extends Observable {
      */
     public ProgrammeLivraisons(String cheminFichierXml, Plan plan)
             throws IOException, SAXException {
-        this(Plan.creerLecteurXml().parse(new File(cheminFichierXml)), plan);
+        this(Plan.lireXml(new File(cheminFichierXml)), plan);
     }
 
     /**
@@ -153,63 +160,67 @@ public final class ProgrammeLivraisons extends Observable {
      */
     public ProgrammeLivraisons(InputStream fluxXml, Plan plan)
             throws IOException, SAXException {
-        this(Plan.creerLecteurXml().parse(fluxXml), plan);
+        this(Plan.lireXml(fluxXml), plan);
     }
 
     private ProgrammeLivraisons(Document documentXml, Plan plan)
             throws SAXException {
         Element racine = documentXml.getDocumentElement();
-        racine.normalize();
         if (!"demandeDeLivraisons".equals(racine.getTagName())) {
-            throw new SAXException("Racine attendue : demandeDeLivraisons");
+            throw new SAXException("Ce fichier n'est pas un programme de "
+                    + "livraisons : sa balise principale doit être "
+                    + "« demandeDeLivraisons », pas « " + racine.getTagName()
+                    + " ».");
         }
-        NodeList entrepots = racine.getElementsByTagName("entrepot");
-        if (entrepots.getLength() != 1) {
-            throw new SAXException("Un unique entrepôt est requis");
+        List<Element> entrepots = Plan.elementsFils(racine, "entrepot");
+        if (entrepots.size() != 1) {
+            throw new SAXException("Le programme doit avoir un seul "
+                    + "entrepôt ; il en a " + entrepots.size() + ".");
         }
-        Element depot = (Element) entrepots.item(0);
-        heureDepart = lireHeure(lireAttribut(depot, "heureDepart"));
-        entrepot = lireAdresse(depot, "adresse", plan);
+        Element depot = entrepots.get(0);
+        heureDepart = lireHeure(Plan.lireAttribut(depot, "heureDepart",
+                "entrepôt"));
+        entrepot = lireAdresse(depot, "adresse", "entrepôt", plan);
         demandes = new ArrayList<>();
-        NodeList livraisons = racine.getElementsByTagName("livraison");
-        for (int indice = 0; indice < livraisons.getLength(); indice++) {
-            Element element = (Element) livraisons.item(indice);
-            try {
-                demandes.add(new Demande(
-                        lireAdresse(element, "adresseEnlevement", plan),
-                        lireAdresse(element, "adresseLivraison", plan),
-                        Integer.parseInt(lireAttribut(element,
-                                "dureeEnlevement")),
-                        Integer.parseInt(lireAttribut(element,
-                                "dureeLivraison"))));
-            } catch (IllegalArgumentException erreur) {
-                throw new SAXException("Durée sur place invalide : "
-                        + erreur.getMessage(), erreur);
-            }
+        List<Element> livraisons = Plan.elementsFils(racine, "livraison");
+        if (livraisons.size() > MAXIMUM_DEMANDES) {
+            throw new SAXException("Le programme contient "
+                    + livraisons.size() + " demandes : l'application en "
+                    + "accepte au plus " + MAXIMUM_DEMANDES + ".");
+        }
+        for (int indice = 0; indice < livraisons.size(); indice++) {
+            Element element = livraisons.get(indice);
+            String quoi = "demande n° " + (indice + 1);
+            Noeud collecte = lireAdresse(element, "adresseEnlevement", quoi,
+                    plan);
+            Noeud livraison = lireAdresse(element, "adresseLivraison", quoi,
+                    plan);
+            int dureeCollecte = lireDuree(element, "dureeEnlevement", quoi);
+            int dureeLivraison = lireDuree(element, "dureeLivraison", quoi);
+            demandes.add(new Demande(collecte, livraison, dureeCollecte,
+                    dureeLivraison));
         }
     }
 
-    private static String lireAttribut(Element element, String nom)
+    /** Durée sur place en secondes : un entier positif ou nul. */
+    private static int lireDuree(Element element, String nom, String quoi)
             throws SAXException {
-        String valeur = element.getAttribute(nom);
-        if (valeur.isBlank()) {
-            throw new SAXException("Attribut requis : " + nom);
+        int duree = Plan.lireEntier(element, nom, quoi);
+        if (duree < 0) {
+            throw new SAXException("Durée sur place invalide (" + quoi
+                    + ") : « " + duree + " ». Elle ne peut pas être "
+                    + "négative.");
         }
-        return valeur;
+        return duree;
     }
 
-    private static Noeud lireAdresse(Element element, String nom, Plan plan)
-            throws SAXException {
-        String valeur = lireAttribut(element, nom);
-        Noeud noeud;
-        try {
-            noeud = plan.obtenirNoeud(Long.parseLong(valeur));
-        } catch (NumberFormatException erreur) {
-            throw new SAXException("Adresse invalide : " + valeur, erreur);
-        }
+    private static Noeud lireAdresse(Element element, String nom, String quoi,
+            Plan plan) throws SAXException {
+        long identifiant = Plan.lireLong(element, nom, quoi);
+        Noeud noeud = plan.obtenirNoeud(identifiant);
         if (noeud == null) {
-            throw new SAXException("Adresse " + valeur
-                    + " absente du plan chargé");
+            throw new SAXException("Adresse " + identifiant + " (" + quoi
+                    + ") absente du plan chargé.");
         }
         return noeud;
     }
@@ -228,8 +239,9 @@ public final class ProgrammeLivraisons extends Observable {
                     Integer.parseInt(parties[1]),
                     parties.length == 3 ? Integer.parseInt(parties[2]) : 0);
         } catch (RuntimeException erreur) {
-            throw new SAXException("Heure de départ invalide : " + texte,
-                    erreur);
+            throw new SAXException("Heure de départ invalide : « " + texte
+                    + " ». Format attendu : heures:minutes, par exemple "
+                    + "8:0:0 ou 08:00, entre 0:00 et 23:59.", erreur);
         }
     }
 

@@ -490,4 +490,138 @@ public class ProgrammeLivraisonsTest {
                 () -> programme.ajouterDemande(1, new Demande(A, B, 0, 0)));
         assertEquals(List.of(), appels);
     }
+
+    // --- Fichiers de demandes piégés ---
+
+    /** Entrepôt du petit plan, à 8 h. */
+    private static final String ENTREPOT_PETIT =
+            "<entrepot adresse='342873658' heureDepart='8:0:0'/>";
+
+    /** Message de l'erreur levée par la lecture, en vérifiant le français. */
+    private static String refus(String xml) {
+        SAXException erreur = assertThrows(SAXException.class,
+                () -> lire(xml, petitPlan));
+        String message = erreur.getMessage();
+        for (String mot : List.of("For input", "empty String", "Exception",
+                "null", "Racine attendue")) {
+            assertTrue("message technique : " + message,
+                    !message.contains(mot));
+        }
+        return message;
+    }
+
+    /** Demande unique avec ces durées sur place. */
+    private static String demandeAvecDurees(String collecte,
+            String livraison) {
+        return "<demandeDeLivraisons>" + ENTREPOT_PETIT
+                + "<livraison adresseEnlevement='208769039'"
+                + " adresseLivraison='25173820' dureeEnlevement='" + collecte
+                + "' dureeLivraison='" + livraison + "'/>"
+                + "</demandeDeLivraisons>";
+    }
+
+    /** Une durée non numérique est citée avec le nom de l'attribut. */
+    @Test
+    public void dureeNonNumeriqueMessageFrancais() {
+        String message = refus(demandeAvecDurees("abc", "60"));
+        assertTrue(message, message.contains("« dureeEnlevement »"));
+        assertTrue(message, message.contains("« abc »"));
+    }
+
+    /** Une durée qui dépasse un entier est refusée, en français. */
+    @Test
+    public void dureeTropGrandeMessageFrancais() {
+        String message = refus(demandeAvecDurees("60", "99999999999"));
+        assertTrue(message, message.contains("« dureeLivraison »"));
+    }
+
+    /** Une durée négative est refusée, en français. */
+    @Test
+    public void dureeNegativeMessageFrancais() {
+        String message = refus(demandeAvecDurees("-5", "60"));
+        assertTrue(message, message.contains("négative"));
+    }
+
+    /** Une heure de départ 25:00 est refusée en rappelant le format. */
+    @Test
+    public void heure25hRefusee() {
+        String message = refus("<demandeDeLivraisons><entrepot "
+                + "adresse='342873658' heureDepart='25:00'/>"
+                + "</demandeDeLivraisons>");
+        assertTrue(message, message.contains("25:00"));
+    }
+
+    /** Une heure de départ « 8h » est refusée en rappelant le format. */
+    @Test
+    public void heure8hRefusee() {
+        String message = refus("<demandeDeLivraisons><entrepot "
+                + "adresse='342873658' heureDepart='8h'/>"
+                + "</demandeDeLivraisons>");
+        assertTrue(message, message.contains("Format attendu"));
+    }
+
+    /** Un fichier dont la balise principale est inattendue est refusé. */
+    @Test
+    public void racineInattendueMessageFrancais() {
+        String message = refus("<reseau><noeud id='1' latitude='45' "
+                + "longitude='4'/></reseau>");
+        assertTrue(message, message.contains("pas un programme"));
+    }
+
+    /** Un entrepôt absent du plan est refusé en citant son adresse. */
+    @Test
+    public void entrepotAbsentDuPlanRefuse() {
+        String message = refus("<demandeDeLivraisons><entrepot "
+                + "adresse='123' heureDepart='8:0:0'/>"
+                + "</demandeDeLivraisons>");
+        assertTrue(message, message.contains("123"));
+        assertTrue(message, message.contains("entrepôt"));
+    }
+
+    /** Deux entrepôts sont refusés. */
+    @Test
+    public void deuxEntrepotsRefuses() {
+        refus("<demandeDeLivraisons>" + ENTREPOT_PETIT + ENTREPOT_PETIT
+                + "</demandeDeLivraisons>");
+    }
+
+    /**
+     * Des milliers de demandes sont refusées dès la lecture : le calcul ne
+     * finirait pas.
+     */
+    @Test
+    public void tropDeDemandesRefusees() {
+        StringBuilder xml = new StringBuilder("<demandeDeLivraisons>")
+                .append(ENTREPOT_PETIT);
+        for (int i = 0; i < 2000; i++) {
+            xml.append("<livraison adresseEnlevement='208769039'"
+                    + " adresseLivraison='25173820' dureeEnlevement='60'"
+                    + " dureeLivraison='60'/>");
+        }
+        xml.append("</demandeDeLivraisons>");
+        String message = refus(xml.toString());
+        assertTrue(message, message.contains(String.valueOf(
+                ProgrammeLivraisons.MAXIMUM_DEMANDES)));
+    }
+
+    /** Le nombre maximal de demandes est accepté. */
+    @Test
+    public void maximumDeDemandesAccepte() throws Exception {
+        StringBuilder xml = new StringBuilder("<demandeDeLivraisons>")
+                .append(ENTREPOT_PETIT);
+        for (int i = 0; i < ProgrammeLivraisons.MAXIMUM_DEMANDES; i++) {
+            xml.append("<livraison adresseEnlevement='208769039'"
+                    + " adresseLivraison='25173820' dureeEnlevement='60'"
+                    + " dureeLivraison='60'/>");
+        }
+        xml.append("</demandeDeLivraisons>");
+        assertEquals(ProgrammeLivraisons.MAXIMUM_DEMANDES,
+                lire(xml.toString(), petitPlan).obtenirDemandes().size());
+    }
+
+    /** Un fichier vide est refusé en français. */
+    @Test
+    public void fichierVideMessageFrancais() {
+        assertTrue(refus("").contains("vide"));
+    }
 }

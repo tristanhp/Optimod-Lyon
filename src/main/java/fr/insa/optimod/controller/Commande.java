@@ -43,8 +43,8 @@ interface Commande {
     String description();
 
     /**
-     * Retient les tournées calculées après coup (« Calculer ») pour l'état
-     * d'avant la commande : {@link #annuler()} les remettra.
+     * Retient les tournées de l'état d'avant la commande :
+     * {@link #annuler()} les remettra.
      *
      * @param tournees tournées par numéro de livreur, éventuellement vide
      */

@@ -39,7 +39,7 @@ dire ce qui échoue.
 | `model` | `Plan` (lecture du plan **et** calcul des tournées), `ProgrammeLivraisons` (+ `Demande`, tournées des livreurs), `Tournee` (+ `Arret`, `TypeArret`), `Noeud`, `Troncon`, `Chemin`, `Observable`, `Observateur` | `algo.tsp`, JDK |
 | `algo.tsp` | Voyageur de commerce : `TemplateTSP`, `TSP3`, `GrapheDepandance` | JDK |
 | `controller` | `MainController`, `MapScreen`, états `Etat*`, commandes `Commande*`, `ListeDeCommandes` | `model` |
-| `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher` | `controller`, `model`, JavaFX |
+| `view` | `MainView`, `MapCanvas`, `MapProjection`, `LibellesDemandes`, `MainApp`, `AppLauncher`, `GestionnaireErreursInattendues` | `controller`, `model`, JavaFX |
 
 Règles :
 
@@ -103,8 +103,11 @@ Pour brancher une nouvelle modification :
    bouger) : lever `IllegalArgumentException` (demande refusée) ou
    `IllegalStateException` (adresse inaccessible) avec un message lisible par
    l'utilisateur. Un retour après 13 h n'est **pas** une exception : la méthode
-   renvoie la tournée, `Tournee.estPossible()` est faux ; c'est au contrôleur de
-   refuser, si la règle du ticket le demande.
+   renvoie la tournée, `Tournee.estPossible()` est faux, et le contrôleur ne
+   refuse pas : l'avertissement vient de la consigne
+   (`MainController.obtenirAvertissementRetour`) et, à l'ajout, de
+   `MapScreen.choisirLivreurPossible` (ADR 0006). Seul un dépassement de minuit
+   est une `IllegalStateException`.
 3. **Une commande** (`Commande`) : elle garde les tournées d'avant et d'après
    (`Map<Integer, Tournee>`, une par livreur) et les range dans
    `ProgrammeLivraisons` avec `definirTournees`, que la vue observe. Si elle
@@ -113,7 +116,8 @@ Pour brancher une nouvelle modification :
    **avant** la commande, et les tournées des autres livreurs sont reprises
    telles quelles ; annuler et rétablir ne recalculent rien. Elle implémente
    `memoriserTourneesAvant` et `memoriserTourneesApres`, pour qu'un « Calculer »
-   fait après coup ne soit pas écrasé.
+   fait après coup ne soit pas écrasé. Un « Calculer » oublie les commandes
+   annulées, comme une nouvelle commande : plus rien à rétablir.
 4. **Une action dans `Etat`** (méthode par défaut qui ignore l'action,
    redéfinie dans l'état qui la permet) et ses boutons dans `MapScreen`
    (implémentés dans `MainView` et dans le faux écran des tests). Une action
@@ -123,7 +127,8 @@ Pour brancher une nouvelle modification :
 6. **Un calcul long** tourne hors du thread JavaFX (voir *Architecture*).
 7. **La consigne** « ordre non optimisé » s'affiche après une modification qui
    garde un ordre (suppression, changement d'ordre) ; elle nomme le livreur
-   s'il y en a plusieurs.
+   s'il y en a plusieurs. L'avertissement « retour après 13 h » s'y ajoute
+   tout seul, déduit des tournées affichées : ne pas le poser à la main.
 8. Tests d'abord ; README et diagrammes dans la même PR.
 
 Les tournées sont une donnée du modèle (une par livreur) ; il n'y a plus de
@@ -175,8 +180,8 @@ correspondance dans le code. Règles :
 - Lecture XML : passer par `Plan.creerLecteurXml()` (DOCTYPE interdit). Une
   erreur de fichier devient une `SAXException` au message lisible par
   l'utilisateur ; une adresse inaccessible ou un calcul sans solution, une
-  `IllegalStateException` ; un retour après 13 h, une tournée renvoyée avec
-  `Tournee.estPossible()` faux.
+  `IllegalStateException`, de même qu'une tournée qui dépasse minuit ; un
+  retour après 13 h, une tournée renvoyée avec `Tournee.estPossible()` faux.
 - `docs/code-fourni/` est en lecture seule. `algo/tsp` ne sera nettoyé (garder
   seulement `TSP3`) qu'à la fin du projet : ne pas le faire sans demande.
 

@@ -1,10 +1,12 @@
 package fr.insa.optimod.view;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
 
 import fr.insa.optimod.model.Chemin;
@@ -24,6 +26,9 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineCap;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
 /**
@@ -41,13 +46,59 @@ final class MapCanvas extends Pane {
     /** Demi-côté d'un marqueur de collecte ou de livraison, en pixels. */
     private static final double TAILLE_MARQUEUR = 5;
 
-    private static final Color COULEUR_ENTREPOT = Color.web("#202124");
+    /** Orange vif, absent des couleurs des demandes et du fond. */
+    private static final Color COULEUR_ENTREPOT = Color.web("#ff6d00");
+
+    private static final Color COULEUR_CONTOUR_ENTREPOT = Color.WHITE;
+
+    private static final Color COULEUR_TEXTE = Color.web("#202124");
 
     /** Demi-diagonale du losange de l'entrepôt, en pixels. */
-    private static final double TAILLE_ENTREPOT = 9;
+    private static final double TAILLE_ENTREPOT = 11;
+
+    /** Marge, hauteur de ligne et taille des symboles de la légende. */
+    private static final double MARGE_LEGENDE = 10;
+    private static final double HAUTEUR_LIGNE_LEGENDE = 20;
+    private static final double TAILLE_SYMBOLE_LEGENDE = 5;
+
+    /** Largeur du symbole d'une entrée de la légende, et écart entre deux. */
+    private static final double LARGEUR_SYMBOLE_LEGENDE = 26;
+    private static final double ECART_ENTREES_LEGENDE = 18;
+
+    /** Texte de chaque entrée de la légende, dans l'ordre de ses symboles. */
+    private static final String[] LIBELLES_LEGENDE = {"Entrepôt",
+        "Point de collecte", "Point de livraison", "Tournée (clair → foncé)",
+        "Tronçon repassé (×N)", "Arrêt hors plage ou après 13 h"};
 
     /** Agrandissement d'un marqueur mis en évidence. */
     private static final double TAILLE_EN_EVIDENCE = 1.6;
+
+    /** Nombre de teintes réservées aux livreurs (le rouge d'alerte exclu). */
+    private static final double PLAGE_TEINTES = 310;
+
+    /** Première teinte des livreurs, en degrés : loin du rouge d'alerte. */
+    private static final double TEINTE_MINIMALE = 25;
+
+    /** Pas de teinte entre deux livreurs voisins (angle d'or, en degrés). */
+    private static final double PAS_TEINTE = 137.508;
+
+    /** Part de blanc mêlée à la couleur d'un livreur au départ (0 à 1). */
+    private static final double PART_BLANC_DEBUT = 0.6;
+
+    /**
+     * Renvoie la couleur attribuée à un livreur. Les teintes se suivent
+     * par l'angle d'or, donc deux livreurs voisins se distinguent, et
+     * aucune n'approche le rouge des arrêts après 13 h.
+     *
+     * @param index numéro du livreur, à partir de 0
+     * @return couleur de la tournée
+     */
+    static Color couleurLivreur(int index) {
+        double teinte = TEINTE_MINIMALE
+                + Math.floorMod((long) Math.round(index * PAS_TEINTE * 1000),
+                        (long) (PLAGE_TEINTES * 1000)) / 1000.0;
+        return Color.hsb(teinte, 0.75, 0.75);
+    }
 
     private static final Color COULEUR_CONTOUR_EVIDENCE = Color.BLACK;
 
@@ -80,10 +131,10 @@ final class MapCanvas extends Pane {
         return COULEURS_DEMANDES[indice % COULEURS_DEMANDES.length];
     }
 
-    /** Couleur de la tournée au départ de l'entrepôt (clair). */
+    /** Couleur de la légende au départ de l'entrepôt (clair). */
     private static final Color COULEUR_DEBUT_TOURNEE = Color.web("#8ab4f8");
 
-    /** Couleur de la tournée au retour à l'entrepôt (foncé). */
+    /** Couleur de la légende au retour à l'entrepôt (foncé). */
     private static final Color COULEUR_FIN_TOURNEE = Color.web("#0b2a6b");
 
     /** Fond du numéro d'un arrêt dont l'arrivée dépasse 13 h (rouge). */
@@ -95,6 +146,18 @@ final class MapCanvas extends Pane {
 
     /** Largeur du trait de la tournée, en pixels. */
     private static final double LARGEUR_TOURNEE = 5;
+
+    /** Largeur du trait d'un tronçon parcouru plusieurs fois, en pixels. */
+    private static final double LARGEUR_TOURNEE_REPETEE = 3;
+
+    /** Écart entre deux passages sur un même tronçon, en pixels. */
+    private static final double ECART_PASSAGES = 3.5;
+
+    /**
+     * Longueur d'écran en dessous de laquelle « ×N » n'est écrit que sur le
+     * plus long tronçon repassé.
+     */
+    private static final double LONGUEUR_MINIMALE_NOMBRE = 40;
 
     /** Demi-longueur d'une flèche de sens, en pixels. */
     private static final double TAILLE_FLECHE = 5;
@@ -160,15 +223,17 @@ final class MapCanvas extends Pane {
     private double dernierX;
     private double dernierY;
 
+    /** Largeur de chaque texte de la légende, mesurée au premier besoin. */
+    private double[] largeursLibelles;
+
     /** Projection du dernier dessin, utilisée pour repérer le survol. */
     private MapProjection projection;
 
     /** Indice de la demande mise en évidence, ou -1. */
     private int demandeEnEvidence = -1;
 
-    /** Prévenu de l'indice de la demande survolée (-1 hors d'un point). */
-    private IntConsumer surSurvol = indice -> {
-    };
+    /** Indice de la demande choisie dans la liste, ou -1. */
+    private int demandeSelectionnee = -1;
 
     /** Prévenu de l'identifiant de l'intersection cliquée. */
     private LongConsumer surClicNoeud = idNoeud -> {
@@ -225,9 +290,11 @@ final class MapCanvas extends Pane {
                         evenement.getScreenY());
             }
         });
-        setOnMouseMoved(evenement -> signalerSurvol(
-                trouverDemande(evenement.getX(), evenement.getY())));
-        setOnMouseExited(evenement -> signalerSurvol(-1));
+        setOnMouseMoved(evenement -> mettreEnEvidence(
+                demandeAMettreEnEvidence(
+                        trouverDemande(evenement.getX(), evenement.getY()),
+                        demandeSelectionnee)));
+        setOnMouseExited(evenement -> mettreEnEvidence(demandeSelectionnee));
     }
 
     /**
@@ -317,15 +384,6 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Définit l'action déclenchée quand la souris passe sur une demande.
-     *
-     * @param action reçoit l'indice de la demande, ou -1 en dehors
-     */
-    void definirSurSurvol(IntConsumer action) {
-        surSurvol = action;
-    }
-
-    /**
      * Définit l'action déclenchée par un clic sur une intersection.
      *
      * @param action reçoit l'identifiant du noeud le plus proche du clic
@@ -335,20 +393,36 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Met en évidence la collecte et la livraison d'une demande.
+     * Retient la demande choisie dans la liste et la met en évidence. Le
+     * survol d'une autre demande la remplace à l'écran le temps du survol,
+     * sans changer ce choix.
      *
      * @param indice indice de la demande, ou -1 pour aucune
      */
-    void mettreEnEvidence(int indice) {
+    void selectionnerDemande(int indice) {
+        demandeSelectionnee = indice;
+        mettreEnEvidence(indice);
+    }
+
+    /**
+     * Demande à mettre en évidence : celle que la souris survole, sinon celle
+     * choisie dans la liste. Le survol ne remplace jamais le choix fait par
+     * un clic (TIG-107).
+     *
+     * @param survolee     indice de la demande survolée, ou -1
+     * @param selectionnee indice de la demande choisie, ou -1
+     * @return indice de la demande à mettre en évidence, ou -1
+     */
+    static int demandeAMettreEnEvidence(int survolee, int selectionnee) {
+        return survolee >= 0 ? survolee : selectionnee;
+    }
+
+    /** Met en évidence la collecte et la livraison d'une demande, ou -1. */
+    private void mettreEnEvidence(int indice) {
         if (indice != demandeEnEvidence) {
             demandeEnEvidence = indice;
             dessinerCarte();
         }
-    }
-
-    private void signalerSurvol(int indice) {
-        mettreEnEvidence(indice);
-        surSurvol.accept(indice);
     }
 
     /** Revient à la vue d'ensemble du plan. */
@@ -374,7 +448,8 @@ final class MapCanvas extends Pane {
     /** Empêche de faire glisser le plan hors de la zone visible. */
     private void contenirDansLaCarte() {
         decalageX = Math.min(0, Math.max(decalageX, getWidth() * (1 - zoom)));
-        decalageY = Math.min(0, Math.max(decalageY, getHeight() * (1 - zoom)));
+        decalageY = Math.min(0,
+                Math.max(decalageY, hauteurCarte() * (1 - zoom)));
     }
 
     private double ecranX(double longitude) {
@@ -387,7 +462,8 @@ final class MapCanvas extends Pane {
 
     /** Indice de la demande dont un point est sous la souris, ou -1. */
     private int trouverDemande(double x, double y) {
-        if (plan == null || programme == null || projection == null) {
+        if (plan == null || programme == null || projection == null
+                || y >= hauteurCarte()) {
             return -1;
         }
         double portee = TAILLE_MARQUEUR + TOLERANCE_SURVOL;
@@ -406,7 +482,7 @@ final class MapCanvas extends Pane {
      * Intersection la plus proche d'un point de l'écran, ou null si trop loin.
      */
     private Noeud trouverNoeud(double x, double y) {
-        if (plan == null || projection == null) {
+        if (plan == null || projection == null || y >= hauteurCarte()) {
             return null;
         }
         Noeud plusProche = null;
@@ -442,6 +518,7 @@ final class MapCanvas extends Pane {
         tournees = Map.of();
         messageErreur.setVisible(false);
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         zoom = 1;
         decalageX = 0;
         decalageY = 0;
@@ -457,6 +534,7 @@ final class MapCanvas extends Pane {
     void afficherProgramme(ProgrammeLivraisons nouveauProgramme) {
         programme = nouveauProgramme;
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         dessinerCarte();
     }
 
@@ -470,6 +548,7 @@ final class MapCanvas extends Pane {
         messageErreur.setVisible(false);
         detailsArret.hide();
         demandeEnEvidence = -1;
+        demandeSelectionnee = -1;
         zoom = 1;
         decalageX = 0;
         decalageY = 0;
@@ -508,7 +587,21 @@ final class MapCanvas extends Pane {
             return;
         }
         projection = new MapProjection(plan.obtenirNoeuds(),
-                canevas.getWidth(), canevas.getHeight(), MARGE_INTERIEURE);
+                canevas.getWidth(), hauteurCarte(), MARGE_INTERIEURE);
+        contexteGraphique.save();
+        try {
+            contexteGraphique.beginPath();
+            contexteGraphique.rect(0, 0, canevas.getWidth(), hauteurCarte());
+            contexteGraphique.clip();
+            dessinerPlanEtTournees(contexteGraphique);
+        } finally {
+            contexteGraphique.restore();
+        }
+        dessinerLegende(contexteGraphique);
+    }
+
+    /** Dessine le plan, les tournées et les points dans la zone de carte. */
+    private void dessinerPlanEtTournees(GraphicsContext contexteGraphique) {
         contexteGraphique.setStroke(COULEUR_RUE);
         contexteGraphique.setLineWidth(1);
         contexteGraphique.beginPath();
@@ -535,28 +628,43 @@ final class MapCanvas extends Pane {
     }
 
     /**
-     * Trace les tronçons de chaque chemin d'un trait épais, du plus clair (au
-     * départ) au plus foncé (au retour), avec une flèche au milieu de chaque
-     * tronçon pour montrer le sens de parcours.
+     * Trace les tronçons de chaque chemin d'un trait épais, dans la couleur
+     * du livreur, du plus clair (au départ) au plus foncé (au retour), avec
+     * une flèche au milieu de chaque tronçon pour montrer le sens de
+     * parcours. Un tronçon parcouru plusieurs fois est tracé en traits
+     * parallèles et porte « ×N ».
      */
     private void dessinerTournees(GraphicsContext contexte) {
         contexte.setLineCap(StrokeLineCap.ROUND);
-        for (Tournee tournee : tournees.values()) {
+        for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
+            int numeroLivreur = entree.getKey();
+            Tournee tournee = entree.getValue();
+            Color couleur = couleurLivreur(numeroLivreur - 1);
+            Color debut = couleur.interpolate(Color.WHITE, PART_BLANC_DEBUT);
+            Color fin = couleur.darker();
             int total = tournee.chemins().stream()
                     .mapToInt(chemin -> chemin.troncons().size()).sum();
             int fait = 0;
+            Map<Set<Noeud>, Integer> passages =
+                    tournee.compterPassagesParTroncon();
+            Map<Set<Noeud>, Integer> dejaVus = new HashMap<>();
             for (Chemin chemin : tournee.chemins()) {
                 for (Troncon troncon : chemin.troncons()) {
                     verifierDansLePlan(troncon.origine());
                     verifierDansLePlan(troncon.destination());
                     double avancement = total <= 1 ? 0
                             : (double) fait / (total - 1);
+                    Set<Noeud> extremites = Set.of(troncon.origine(),
+                            troncon.destination());
+                    int nombre = passages.get(extremites);
+                    int rang = dejaVus.merge(extremites, 1, Integer::sum) - 1;
                     dessinerTroncon(contexte, troncon,
-                            COULEUR_DEBUT_TOURNEE.interpolate(
-                                    COULEUR_FIN_TOURNEE, avancement));
+                            debut.interpolate(fin, avancement),
+                            nombre, rang);
                     fait++;
                 }
             }
+            dessinerNombresPassages(contexte, passages);
         }
         contexte.setLineCap(StrokeLineCap.BUTT);
     }
@@ -569,31 +677,107 @@ final class MapCanvas extends Pane {
         }
     }
 
+    /**
+     * Trace un passage sur un tronçon ; quand le tronçon est parcouru
+     * plusieurs fois, chaque passage est décalé sur le côté du précédent.
+     *
+     * @param nombre nombre de passages de la tournée sur ce tronçon
+     * @param rang rang de ce passage parmi eux, à partir de 0
+     */
     private void dessinerTroncon(GraphicsContext contexte, Troncon troncon,
-            Color couleur) {
+            Color couleur, int nombre, int rang) {
         double x1 = ecranX(troncon.origine().longitude());
         double y1 = ecranY(troncon.origine().latitude());
         double x2 = ecranX(troncon.destination().longitude());
         double y2 = ecranY(troncon.destination().latitude());
-        contexte.setStroke(couleur);
-        contexte.setLineWidth(LARGEUR_TOURNEE);
-        contexte.strokeLine(x1, y1, x2, y2);
         double longueur = Math.hypot(x2 - x1, y2 - y1);
+        double ux = longueur == 0 ? 0 : (x2 - x1) / longueur;
+        double uy = longueur == 0 ? 0 : (y2 - y1) / longueur;
+        // Le décalage est mesuré dans un sens fixe de la rue, pour qu'un
+        // aller et son retour tombent côte à côte et non l'un sur l'autre.
+        double sens = troncon.origine().identifiant()
+                < troncon.destination().identifiant() ? 1 : -1;
+        double decalage = (rang - (nombre - 1) / 2.0) * ECART_PASSAGES * sens;
+        x1 -= uy * decalage;
+        y1 += ux * decalage;
+        x2 -= uy * decalage;
+        y2 += ux * decalage;
+        contexte.setStroke(couleur);
+        contexte.setLineWidth(nombre > 1 ? LARGEUR_TOURNEE_REPETEE
+                : LARGEUR_TOURNEE);
+        contexte.strokeLine(x1, y1, x2, y2);
         if (longueur < LONGUEUR_MINIMALE_FLECHE) {
             return;
         }
-        double ux = (x2 - x1) / longueur;
-        double uy = (y2 - y1) / longueur;
+        double taille = nombre > 1 ? TAILLE_FLECHE * 0.6 : TAILLE_FLECHE;
         double mx = (x1 + x2) / 2;
         double my = (y1 + y2) / 2;
-        double[] abscisses = { mx + ux * TAILLE_FLECHE,
-                mx - ux * TAILLE_FLECHE * 0.6 - uy * TAILLE_FLECHE * 0.8,
-                mx - ux * TAILLE_FLECHE * 0.6 + uy * TAILLE_FLECHE * 0.8 };
-        double[] ordonnees = { my + uy * TAILLE_FLECHE,
-                my - uy * TAILLE_FLECHE * 0.6 + ux * TAILLE_FLECHE * 0.8,
-                my - uy * TAILLE_FLECHE * 0.6 - ux * TAILLE_FLECHE * 0.8 };
+        double[] abscisses = { mx + ux * taille,
+                mx - ux * taille * 0.6 - uy * taille * 0.8,
+                mx - ux * taille * 0.6 + uy * taille * 0.8 };
+        double[] ordonnees = { my + uy * taille,
+                my - uy * taille * 0.6 + ux * taille * 0.8,
+                my - uy * taille * 0.6 - ux * taille * 0.8 };
         contexte.setFill(Color.WHITE);
         contexte.fillPolygon(abscisses, ordonnees, 3);
+    }
+
+    /**
+     * Écrit « ×N » sur les tronçons repassés assez longs à l'écran, et
+     * toujours sur le plus long d'entre eux, pour que le doublement se lise
+     * aussi en vue d'ensemble.
+     */
+    private void dessinerNombresPassages(GraphicsContext contexte,
+            Map<Set<Noeud>, Integer> passages) {
+        Set<Noeud> plusLong = null;
+        for (Map.Entry<Set<Noeud>, Integer> entree : passages.entrySet()) {
+            Set<Noeud> extremites = entree.getKey();
+            if (entree.getValue() > 1) {
+                if (plusLong == null || longueurEcran(extremites)
+                        > longueurEcran(plusLong)) {
+                    plusLong = extremites;
+                }
+                if (longueurEcran(extremites) >= LONGUEUR_MINIMALE_NOMBRE) {
+                    dessinerNombrePassages(contexte, extremites,
+                            entree.getValue());
+                }
+            }
+        }
+        if (plusLong != null
+                && longueurEcran(plusLong) < LONGUEUR_MINIMALE_NOMBRE) {
+            dessinerNombrePassages(contexte, plusLong, passages.get(plusLong));
+        }
+    }
+
+    /** Longueur à l'écran d'un tronçon (ses deux extrémités), en pixels. */
+    private double longueurEcran(Set<Noeud> extremites) {
+        List<Noeud> bouts = List.copyOf(extremites);
+        return Math.hypot(
+                ecranX(bouts.get(1).longitude())
+                        - ecranX(bouts.get(0).longitude()),
+                ecranY(bouts.get(1).latitude())
+                        - ecranY(bouts.get(0).latitude()));
+    }
+
+    /** Écrit « ×N » au milieu d'un tronçon parcouru N fois. */
+    private void dessinerNombrePassages(GraphicsContext contexte,
+            Set<Noeud> extremites, int nombre) {
+        List<Noeud> bouts = List.copyOf(extremites);
+        double x = (ecranX(bouts.get(0).longitude())
+                + ecranX(bouts.get(1).longitude())) / 2;
+        double y = (ecranY(bouts.get(0).latitude())
+                + ecranY(bouts.get(1).latitude())) / 2;
+        String texte = "×" + nombre;
+        contexte.setFont(Font.font(null, FontWeight.BOLD, 11));
+        contexte.setTextAlign(TextAlignment.CENTER);
+        contexte.setTextBaseline(VPos.CENTER);
+        contexte.setLineWidth(3);
+        contexte.setStroke(Color.WHITE);
+        contexte.strokeText(texte, x, y - ECART_PASSAGES - 6);
+        contexte.setFill(COULEUR_FIN_TOURNEE);
+        contexte.fillText(texte, x, y - ECART_PASSAGES - 6);
+        contexte.setTextBaseline(VPos.BASELINE);
+        contexte.setFont(Font.getDefault());
     }
 
     /**
@@ -613,20 +797,25 @@ final class MapCanvas extends Pane {
                 boolean selectionne = entree.getKey() == livreurSelectionne
                         && rang == rangSelectionne;
                 double rayon = selectionne ? RAYON_NUMERO * 1.3 : RAYON_NUMERO;
-                boolean apres13h = arrets.get(rang).estApresHeureLimite();
+                boolean tardif = estTardif(arrets.get(rang));
                 contexte.setFill(selectionne ? Color.web("#fbbc04")
-                        : apres13h ? COULEUR_APRES_13H : Color.WHITE);
-                contexte.setStroke(apres13h ? COULEUR_APRES_13H_CONTOUR
-                        : COULEUR_FIN_TOURNEE);
+                        : tardif ? COULEUR_APRES_13H : Color.WHITE);
+                contexte.setStroke(tardif ? COULEUR_APRES_13H_CONTOUR
+                        : couleurLivreur(entree.getKey() - 1));
                 contexte.setLineWidth(selectionne ? 3 : 2);
                 contexte.fillOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
                 contexte.strokeOval(x - rayon, y - rayon, 2 * rayon, 2 * rayon);
-                contexte.setFill(apres13h && !selectionne ? Color.WHITE
+                contexte.setFill(tardif && !selectionne ? Color.WHITE
                         : Color.BLACK);
                 contexte.fillText(String.valueOf(rang), x, y);
             }
         }
         contexte.setTextBaseline(VPos.BASELINE);
+    }
+
+    /** Indique si l'arrivée sort de la plage annoncée ou dépasse 13 h. */
+    private static boolean estTardif(Tournee.Arret arret) {
+        return arret.estHorsPlage() || arret.estApresHeureLimite();
     }
 
     /** Dessine l'aperçu au-dessus des points déjà validés. */
@@ -657,13 +846,13 @@ final class MapCanvas extends Pane {
                 dessinerDemande(contexte, indice, false);
             }
         }
+        dessinerEntrepot(contexte);
         if (demandeEnEvidence >= 0 && demandeEnEvidence < demandes.size()) {
             dessinerDemande(contexte, demandeEnEvidence, true);
         }
-        dessinerEntrepot(contexte);
     }
 
-    /** Dessine l'entrepôt par-dessus le reste : losange étiqueté. */
+    /** Dessine l'entrepôt par-dessus les demandes, sauf celle en évidence. */
     private void dessinerEntrepot(GraphicsContext contexte) {
         Noeud depot = programme.obtenirEntrepot();
         if (depot == null) {
@@ -673,15 +862,204 @@ final class MapCanvas extends Pane {
         double y = ecranY(depot.latitude());
         double[] abscisses = { x, x + TAILLE_ENTREPOT, x, x - TAILLE_ENTREPOT };
         double[] ordonnees = { y - TAILLE_ENTREPOT, y, y + TAILLE_ENTREPOT, y };
+        boolean retourTardif = existeRetourTardif();
         contexte.setFill(COULEUR_ENTREPOT);
-        contexte.setStroke(COULEUR_FOND);
-        contexte.setLineWidth(2);
-        contexte.fillPolygon(abscisses, ordonnees, 4);
+        contexte.setStroke(retourTardif ? COULEUR_APRES_13H_CONTOUR
+                : COULEUR_CONTOUR_ENTREPOT);
+        contexte.setLineWidth(retourTardif ? 5 : 3);
         contexte.strokePolygon(abscisses, ordonnees, 4);
+        contexte.fillPolygon(abscisses, ordonnees, 4);
+        dessinerEtiquetteEntrepot(contexte, x, y - TAILLE_ENTREPOT - 6);
+    }
+
+    /** Dessine « Entrepôt » dans une étiquette blanche, lisible sur le plan. */
+    private void dessinerEtiquetteEntrepot(GraphicsContext contexte,
+            double x, double basY) {
+        Font police = Font.font(null, FontWeight.BOLD, 12);
+        Text mesure = new Text("Entrepôt");
+        mesure.setFont(police);
+        double largeur = mesure.getLayoutBounds().getWidth() + 12;
+        double hauteur = 18;
+        double gauche = x - largeur / 2;
+        double haut = basY - hauteur;
+        contexte.setFill(Color.WHITE);
+        contexte.setStroke(COULEUR_ENTREPOT);
+        contexte.setLineWidth(2);
+        contexte.fillRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.strokeRoundRect(gauche, haut, largeur, hauteur, 8, 8);
+        contexte.setFont(police);
         contexte.setTextAlign(TextAlignment.CENTER);
-        contexte.setLineWidth(3);
-        contexte.strokeText("Entrepôt", x, y - TAILLE_ENTREPOT - 4);
-        contexte.fillText("Entrepôt", x, y - TAILLE_ENTREPOT - 4);
+        contexte.setFill(COULEUR_TEXTE);
+        contexte.fillText("Entrepôt", x, basY - 5);
+        contexte.setFont(Font.getDefault());
+    }
+
+    /** Symboles de la légende à afficher, dans l'ordre. */
+    private List<Integer> symbolesLegende() {
+        List<Integer> symboles = new ArrayList<>(List.of(0, 1, 2));
+        if (!tournees.isEmpty()) {
+            symboles.add(3);
+            if (existePassageRepete()) {
+                symboles.add(4);
+            }
+            if (existeArretTardif() || existeRetourTardif()) {
+                symboles.add(5);
+            }
+        }
+        return symboles;
+    }
+
+    /** Largeur d'une entrée de la légende : symbole, texte et écart. */
+    private double largeurEntreeLegende(int symbole) {
+        if (largeursLibelles == null) {
+            Text mesure = new Text();
+            mesure.setFont(Font.getDefault());
+            largeursLibelles = new double[LIBELLES_LEGENDE.length];
+            for (int i = 0; i < LIBELLES_LEGENDE.length; i++) {
+                mesure.setText(LIBELLES_LEGENDE[i]);
+                largeursLibelles[i] = mesure.getLayoutBounds().getWidth();
+            }
+        }
+        return LARGEUR_SYMBOLE_LEGENDE + largeursLibelles[symbole]
+                + ECART_ENTREES_LEGENDE;
+    }
+
+    /**
+     * Répartit les entrées de la légende en lignes, de gauche à droite, pour
+     * qu'elles tiennent dans la largeur de la carte.
+     */
+    private List<List<Integer>> lignesLegende() {
+        double largeurMaximale = getWidth() - 2 * MARGE_LEGENDE;
+        List<List<Integer>> lignes = new ArrayList<>();
+        List<Integer> ligne = new ArrayList<>();
+        double utilise = 0;
+        for (int symbole : symbolesLegende()) {
+            double largeur = largeurEntreeLegende(symbole);
+            if (!ligne.isEmpty() && utilise + largeur > largeurMaximale) {
+                lignes.add(ligne);
+                ligne = new ArrayList<>();
+                utilise = 0;
+            }
+            ligne.add(symbole);
+            utilise += largeur;
+        }
+        lignes.add(ligne);
+        return lignes;
+    }
+
+    /**
+     * Hauteur de la bande de légende sous la carte, 0 tant qu'aucun plan
+     * n'est affiché.
+     */
+    private double hauteurLegende() {
+        if (plan == null || plan.obtenirNoeuds().isEmpty()) {
+            return 0;
+        }
+        return HAUTEUR_LIGNE_LEGENDE * lignesLegende().size() + 8;
+    }
+
+    /** Hauteur de la zone où le plan est dessiné, au-dessus de la légende. */
+    private double hauteurCarte() {
+        return Math.max(1, getHeight() - hauteurLegende());
+    }
+
+    /**
+     * Dessine la légende dans une bande sous la carte : entrepôt, collecte,
+     * livraison et, si une tournée est affichée, son tracé, les tronçons
+     * repassés et les arrêts tardifs. La bande n'empiète pas sur le plan.
+     */
+    private void dessinerLegende(GraphicsContext contexte) {
+        double hauteur = hauteurLegende();
+        if (hauteur == 0) {
+            return;
+        }
+        double haut = canevas.getHeight() - hauteur;
+        contexte.setFill(Color.WHITE);
+        contexte.fillRect(0, haut, canevas.getWidth(), hauteur);
+        contexte.setStroke(COULEUR_RUE);
+        contexte.setLineWidth(1);
+        contexte.strokeLine(0, haut, canevas.getWidth(), haut);
+        contexte.setFont(Font.getDefault());
+        contexte.setTextAlign(TextAlignment.LEFT);
+        List<List<Integer>> lignes = lignesLegende();
+        for (int numero = 0; numero < lignes.size(); numero++) {
+            double cy = haut + 4 + HAUTEUR_LIGNE_LEGENDE * (numero + 0.5);
+            double x = MARGE_LEGENDE;
+            for (int symbole : lignes.get(numero)) {
+                dessinerSymboleLegende(contexte, symbole, x + 10, cy);
+                contexte.setFill(COULEUR_TEXTE);
+                contexte.fillText(LIBELLES_LEGENDE[symbole], x + 26, cy + 4);
+                x += largeurEntreeLegende(symbole);
+            }
+        }
+    }
+
+    /** Indique si une tournée affichée parcourt un tronçon plus d'une fois. */
+    private boolean existePassageRepete() {
+        return tournees.values().stream().anyMatch(tournee -> tournee
+                .compterPassagesParTroncon().values().stream()
+                .anyMatch(nombre -> nombre > 1));
+    }
+
+    /**
+     * Indique si une tournée affichée a un arrêt numéroté hors plage ou après
+     * 13 h (le retour à l'entrepôt est signalé par le contour du losange).
+     */
+    private boolean existeArretTardif() {
+        return tournees.values().stream().anyMatch(tournee -> {
+            List<Tournee.Arret> arrets = tournee.arrets();
+            return arrets.subList(1, Math.max(1, arrets.size() - 1)).stream()
+                    .anyMatch(MapCanvas::estTardif);
+        });
+    }
+
+    /** Indique si une tournée affichée revient à l'entrepôt trop tard. */
+    private boolean existeRetourTardif() {
+        return tournees.values().stream().anyMatch(tournee -> {
+            List<Tournee.Arret> arrets = tournee.arrets();
+            return arrets.size() > 1
+                    && estTardif(arrets.get(arrets.size() - 1));
+        });
+    }
+
+    /** Dessine le symbole de la ligne i de la légende, centré en (cx, cy). */
+    private void dessinerSymboleLegende(GraphicsContext contexte, int i,
+            double cx, double cy) {
+        double t = TAILLE_SYMBOLE_LEGENDE;
+        if (i == 0) {
+            contexte.setFill(COULEUR_ENTREPOT);
+            contexte.setStroke(COULEUR_CONTOUR_ENTREPOT);
+            contexte.setLineWidth(1.5);
+            double[] xs = {cx, cx + t + 2, cx, cx - t - 2};
+            double[] ys = {cy - t - 2, cy, cy + t + 2, cy};
+            contexte.strokePolygon(xs, ys, 4);
+            contexte.fillPolygon(xs, ys, 4);
+        } else if (i == 1) {
+            contexte.setFill(COULEUR_RUE);
+            contexte.fillRect(cx - t, cy - t, 2 * t, 2 * t);
+        } else if (i == 2) {
+            contexte.setFill(COULEUR_RUE);
+            contexte.fillOval(cx - t, cy - t, 2 * t, 2 * t);
+        } else if (i == 3) {
+            contexte.setLineCap(StrokeLineCap.ROUND);
+            contexte.setLineWidth(4);
+            contexte.setStroke(COULEUR_DEBUT_TOURNEE);
+            contexte.strokeLine(cx - 8, cy, cx, cy);
+            contexte.setStroke(COULEUR_FIN_TOURNEE);
+            contexte.strokeLine(cx, cy, cx + 8, cy);
+        } else if (i == 5) {
+            contexte.setFill(COULEUR_APRES_13H);
+            contexte.setStroke(COULEUR_APRES_13H_CONTOUR);
+            contexte.setLineWidth(2);
+            contexte.fillOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
+            contexte.strokeOval(cx - t - 1, cy - t - 1, 2 * t + 2, 2 * t + 2);
+        } else {
+            contexte.setLineCap(StrokeLineCap.ROUND);
+            contexte.setLineWidth(LARGEUR_TOURNEE_REPETEE);
+            contexte.setStroke(COULEUR_FIN_TOURNEE);
+            contexte.strokeLine(cx - 8, cy - 2.5, cx + 8, cy - 2.5);
+            contexte.strokeLine(cx - 8, cy + 2.5, cx + 8, cy + 2.5);
+        }
     }
 
     /** Dessine la collecte (carré) et la livraison (rond) d'une demande. */

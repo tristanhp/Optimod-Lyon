@@ -10,9 +10,11 @@ EtatProgrammeCharge : Ajouter, Supprimer, Annuler*, Rétablir*
 EtatProgrammeCharge : Restaurer, champ Livreurs
 EtatCalculEnCours : boutons : aucun
 EtatTourneeCalculee : boutons : comme EtatProgrammeCharge (RECALCULER : Calculer affiche Recalculer)
-EtatTourneeCalculee : + Monter, Descendre, Déplacer, Sauvegarder (sous-classe)
+EtatTourneeCalculee : + Monter, Descendre, Déplacer (sous-classe)
+EtatTourneeCalculee : + Sauvegarder [un livreur]
 EtatTourneeCalculee : + Changer de livreur [plusieurs livreurs]
 EtatRestauration : boutons : aucun
+EtatLectureFichier : boutons : aucun
 EtatAjoutCollecte : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : boutons : Ajouter (= annuler l'ajout), Annuler
 EtatAjoutLivraison : idCollecte : long
@@ -20,15 +22,15 @@ EtatDeplacementPoint : boutons : Déplacer (= annuler le déplacement)
 EtatDeplacementPoint : livreur : int
 EtatDeplacementPoint : rang : int
 
-EtatInitial --> EtatPlanCharge : importerPlan [plan valide]
-EtatPlanCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
+EtatInitial --> EtatLectureFichier : importerPlan [fichier choisi]
+EtatLectureFichier --> EtatPlanCharge : finirLecturePlan [plan valide]
+EtatPlanCharge --> EtatLectureFichier : importerProgramme [fichier choisi]
+EtatLectureFichier --> EtatProgrammeCharge : finirLectureProgramme [demandes valides]
 EtatProgrammeCharge --> EtatCalculEnCours : calculer
 EtatCalculEnCours --> EtatTourneeCalculee : finirCalcul [tournées]
 EtatCalculEnCours --> choix : finirCalcul [erreur]
 EtatTourneeCalculee --> EtatCalculEnCours : calculer [confirmerRecalcul]
 EtatTourneeCalculee --> EtatTourneeCalculee : calculer [refusé] / rien ne change
-EtatProgrammeCharge --> EtatProgrammeCharge : importerProgramme [demandes valides]
-EtatTourneeCalculee --> EtatProgrammeCharge : importerProgramme [demandes valides]
 
 state "Choix de l'état selon les tournées du programme" as choix <<choice>>
 EtatProgrammeCharge --> choix : supprimerDemande / annuler / refaire
@@ -68,18 +70,22 @@ EtatCalculEnCours --> choix : fin du changement de livreur / CommandeChangerLivr
 EtatCalculEnCours --> choix : fin du changement de livreur [refusé]
 
 state "EtatInitial, EtatPlanCharge, EtatProgrammeCharge, EtatTourneeCalculee" as tous
-tous --> EtatPlanCharge : importerPlan [plan valide]
-tous --> EtatInitial : importerPlan [plan invalide]
+tous --> EtatLectureFichier : importerPlan ou importerProgramme [fichier choisi]
+EtatLectureFichier --> tous : fichier invalide ou erreur / retrouverEtatStable (rien n'est perdu)
 tous --> EtatInitial : erreurDessin [exception pendant le dessin]
 tous --> EtatRestauration : restaurer [fichier choisi]
 EtatRestauration --> EtatTourneeCalculee : succès / vider historique
-EtatRestauration --> tous : erreur / retrouver état précédent
-EtatTourneeCalculee --> EtatTourneeCalculee : sauvegarder
+EtatRestauration --> tous : erreur / retrouverEtatStable
+EtatCalculEnCours --> tous : erreur inattendue / retrouverEtatStable, alerte
+EtatTourneeCalculee --> EtatTourneeCalculee : sauvegarder [un livreur, autre fichier que le plan et les demandes]
 
 note bottom of tous
-Règles par défaut de l'interface Etat (EtatCalculEnCours et
-les états d'ajout bloquent les imports). Une annulation
-du sélecteur de fichier ne change jamais l'état ; des
-demandes invalides laissent l'état inchangé.
+Règles par défaut de l'interface Etat (EtatCalculEnCours,
+EtatLectureFichier, EtatRestauration et les états d'ajout
+bloquent les imports). Une annulation du sélecteur de fichier
+ne change jamais l'état ; un plan ou des demandes invalides
+ramènent à l'état d'avant la lecture. Le résultat d'un travail
+en arrière-plan est abandonné si l'état a changé entre-temps
+(erreurDessin).
 end note
 @enduml

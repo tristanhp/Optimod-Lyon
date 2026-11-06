@@ -20,6 +20,7 @@ import fr.insa.optimod.model.Plan;
 import fr.insa.optimod.model.ProgrammeLivraisons;
 import fr.insa.optimod.model.ProgrammeLivraisons.Demande;
 import fr.insa.optimod.model.Tournee;
+import javafx.collections.FXCollections;
 import javafx.event.ActionEvent;
 import javafx.geometry.Insets;
 import javafx.scene.control.Alert;
@@ -133,7 +134,7 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
      *                    départ
      *                    de l'entrepôt), ou -1 pour un titre
      * @param dernierRang rang du dernier arrêt (le retour à l'entrepôt)
-     * @param style style de l'arrêt, rouge en cas d'alerte
+     * @param style       style de l'arrêt, rouge en cas d'alerte
      */
     private record LigneTournee(int livreur, int rang, int dernierRang,
             String style) {
@@ -198,10 +199,24 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
             protected void updateItem(String texte, boolean vide) {
                 super.updateItem(texte, vide);
                 setText(vide ? null : texte);
-                String style = !vide && getIndex() >= 0
-                        && getIndex() < lignesTournee.size()
-                        ? lignesTournee.get(getIndex()).style() : "";
-                setStyle(style);
+
+                if (vide || getIndex() < 0
+                        || getIndex() >= lignesTournee.size()) {
+                    setStyle("");
+                    setGraphic(null);
+                    return;
+                }
+
+                LigneTournee ligne = lignesTournee.get(getIndex());
+
+                if (ligne.rang() == -1) {
+                    setGraphic(new Rectangle(10, 10,
+                            MapCanvas.couleurLivreur(ligne.livreur() - 1)));
+                    setStyle("-fx-font-weight: bold;");
+                } else {
+                    setGraphic(null);
+                    setStyle(ligne.style());
+                }
             }
         });
         listeDemandes.setPrefWidth(LARGEUR_DEMANDES);
@@ -215,17 +230,9 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                                 MapCanvas.couleurDemande(getIndex())));
             }
         });
-        carte.definirSurSurvol(indice -> {
-            if (indice >= 0) {
-                listeDemandes.getSelectionModel().select(indice);
-                listeDemandes.scrollTo(indice);
-            } else {
-                listeDemandes.getSelectionModel().clearSelection();
-            }
-        });
         listeDemandes.getSelectionModel().selectedIndexProperty().addListener(
                 (observable, ancien, nouveau) -> {
-                    carte.mettreEnEvidence(nouveau.intValue());
+                    carte.selectionnerDemande(nouveau.intValue());
                     actualiserBoutonSupprimer();
                     actualiserBoutonChangerLivreur();
                 });
@@ -444,23 +451,66 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
                 : programmeObserve.obtenirNombreLivreurs());
     }
 
+    /** Bouton « Affecter » : confier la demande au livreur choisi. */
+    static final ButtonType AFFECTER = new ButtonType("Affecter",
+            ButtonBar.ButtonData.OK_DONE);
+
+    /** Bouton « Garder ce livreur » : ajouter la demande malgré le retard. */
+    static final ButtonType GARDER = new ButtonType("Garder ce livreur",
+            ButtonBar.ButtonData.OTHER);
+
+    /**
+     * Bouton « Annuler » : abandonner l'ajout. C'est le bouton d'annulation,
+     * donc Échap et la croix valent un abandon.
+     */
+    static final ButtonType ANNULER = new ButtonType("Annuler",
+            ButtonBar.ButtonData.CANCEL_CLOSE);
+
+    /**
+     * Traduit la réponse de la fenêtre qui prévient d'un retour après 13 h.
+     *
+     * @param reponse   bouton choisi, vide si la fenêtre est fermée
+     * @param selection livreur sélectionné dans la liste, ou {@code null} si
+     *                  la liste est vide
+     * @return {@link MapScreen#GARDER_LIVREUR} pour « Garder ce livreur », le
+     *         livreur sélectionné pour « Affecter », vide sinon (annulation)
+     */
+    static Optional<Integer> traduireChoixLivreur(
+            Optional<ButtonType> reponse, Integer selection) {
+        if (reponse.filter(GARDER::equals).isPresent()) {
+            return Optional.of(MapScreen.GARDER_LIVREUR);
+        }
+        if (reponse.filter(AFFECTER::equals).isPresent()) {
+            return Optional.ofNullable(selection);
+        }
+        return Optional.empty();
+    }
+
     @Override
-    public Optional<Integer> choisirLivreurPossible(int livreurRefuse,
+    public Optional<Integer> choisirLivreurPossible(int livreur,
             List<Integer> livreurs, String detail) {
-        ChoiceDialog<Integer> dialogue = new ChoiceDialog<>(livreurs.get(0),
-                livreurs);
-        dialogue.setTitle("Ajout impossible chez ce livreur");
-        dialogue.setHeaderText("Ajout refusé chez le livreur " + livreurRefuse
-                + ".\n" + detail + "\nLivreurs qui rentrent avant 13 h avec "
-                + "la position de moindre coût (la position choisie ensuite "
-                + "peut encore être refusée) :");
-        dialogue.setContentText("Affecter la demande au livreur :");
-        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.OK))
-                .setText("Affecter");
-        ((Button) dialogue.getDialogPane().lookupButton(ButtonType.CANCEL))
-                .setText("Annuler");
+        Dialog<ButtonType> dialogue = new Dialog<>();
+        dialogue.setTitle("Retour après 13 h");
         dialogue.initOwner(getScene().getWindow());
-        return dialogue.showAndWait();
+        ComboBox<Integer> liste = new ComboBox<>(
+                FXCollections.observableArrayList(livreurs));
+        if (livreurs.isEmpty()) {
+            dialogue.setHeaderText(detail + "\nAucun autre livreur ne "
+                    + "rentrerait avant 13 h avec la position de moindre "
+                    + "coût.");
+            dialogue.getDialogPane().getButtonTypes().setAll(GARDER, ANNULER);
+        } else {
+            liste.getSelectionModel().selectFirst();
+            dialogue.setHeaderText(detail + "\nLivreurs qui rentrent avant "
+                    + "13 h avec la position de moindre coût (la position "
+                    + "choisie ensuite peut encore dépasser 13 h) :");
+            dialogue.getDialogPane().setContent(new HBox(8,
+                    new Label("Affecter la demande au livreur :"), liste));
+            dialogue.getDialogPane().getButtonTypes().setAll(AFFECTER,
+                    GARDER, ANNULER);
+        }
+        return traduireChoixLivreur(dialogue.showAndWait(),
+                liste.getValue());
     }
 
     /** Bouton « Oui » de la confirmation du recalcul. */
@@ -798,6 +848,43 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
     }
 
     @Override
+    public void afficherErreurEcriture(String detail) {
+        afficherAlerte(Alert.AlertType.ERROR, "Écriture impossible", detail);
+    }
+
+    @Override
+    public void afficherRefusSauvegarde(String detail) {
+        afficherAlerte(Alert.AlertType.WARNING, "Sauvegarde impossible",
+                detail);
+    }
+
+    @Override
+    public void afficherErreurInattendue(String detail) {
+        afficherAlerte(Alert.AlertType.ERROR,
+                GestionnaireErreursInattendues.MESSAGE,
+                "Détail technique : " + detail);
+    }
+
+    /**
+     * Ouvre une fenêtre d'alerte modale au-dessus de la fenêtre principale.
+     *
+     * @param type    type d'alerte (erreur, avertissement…)
+     * @param entete  titre en gras de l'alerte
+     * @param detail  explication
+     */
+    private void afficherAlerte(Alert.AlertType type, String entete,
+            String detail) {
+        Alert alert = new Alert(type);
+        alert.setTitle("Optimod'Lyon");
+        alert.setHeaderText(entete);
+        alert.setContentText(detail);
+        if (getScene() != null) {
+            alert.initOwner(getScene().getWindow());
+        }
+        alert.showAndWait();
+    }
+
+    @Override
     public void reinitialiser() {
         planAffiche = null;
         effacerListeTournee();
@@ -885,17 +972,26 @@ final class MainView extends BorderPane implements MapScreen, Observateur {
         lignesTournee.clear();
         for (Map.Entry<Integer, Tournee> entree : tournees.entrySet()) {
             int livreur = entree.getKey();
-            int dernierRang = entree.getValue().arrets().size() - 1;
+            Tournee tournee = entree.getValue();
+            int dernierRang = tournee.arrets().size() - 1;
+
             if (tournees.size() > 1) {
                 listeTournee.getItems().add("Livreur " + livreur);
-                lignesTournee.add(new LigneTournee(livreur, -1, dernierRang,
-                        ""));
+                lignesTournee.add(new LigneTournee(livreur, -1,
+                        dernierRang, ""));
             }
-            int rang = 0;
-            for (Tournee.Arret arret : entree.getValue().arrets()) {
-                listeTournee.getItems().add(decrireArret(arret));
-                lignesTournee.add(new LigneTournee(livreur, rang++,
-                        dernierRang, LibellesArrets.style(arret)));
+
+            if (tournee.arrets().size() <= 2) {
+                listeTournee.getItems().add("aucune demande");
+                lignesTournee.add(new LigneTournee(livreur, -2,
+                        dernierRang, ""));
+            } else {
+                int rang = 0;
+                for (Tournee.Arret arret : tournee.arrets()) {
+                    listeTournee.getItems().add(decrireArret(arret));
+                    lignesTournee.add(new LigneTournee(livreur, rang++,
+                            dernierRang, LibellesArrets.style(arret)));
+                }
             }
         }
         listeTournee.refresh();

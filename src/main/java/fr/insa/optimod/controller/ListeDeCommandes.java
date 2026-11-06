@@ -8,8 +8,8 @@ import fr.insa.optimod.model.Tournee;
 
 /**
  * Historique des commandes exécutées, pour annuler et rétablir (design pattern
- * Command). Exécuter une nouvelle commande oublie les commandes annulées qui
- * n'ont pas été rétablies.
+ * Command). Exécuter une nouvelle commande, ou calculer les tournées, oublie
+ * les commandes annulées qui n'ont pas été rétablies.
  */
 final class ListeDeCommandes {
 
@@ -33,9 +33,7 @@ final class ListeDeCommandes {
      * @param commande commande à exécuter
      */
     void executer(Commande commande) {
-        commandes.subList(nombreAppliquees, commandes.size()).clear();
-        consignesOrdre.subList(nombreAppliquees + 1, consignesOrdre.size())
-                .clear();
+        oublierAnnulees();
         commande.executer();
         commandes.add(commande);
         nombreAppliquees++;
@@ -99,21 +97,28 @@ final class ListeDeCommandes {
     }
 
     /**
-     * Transmet des tournées calculées après coup (« Calculer ») aux commandes
-     * voisines de l'état actuel : la dernière commande appliquée les remettra
-     * en rétablissant, la prochaine à rétablir en annulant.
+     * Retient des tournées calculées après coup (« Calculer ») : la dernière
+     * commande appliquée les remettra en rétablissant. Comme une nouvelle
+     * commande, le calcul oublie les commandes annulées : rétablies, elles
+     * remettraient des tournées calculées avant lui et effaceraient ce calcul
+     * (TIG-107).
      *
      * @param tournees tournées calculées pour l'état actuel
      */
     void memoriserTournees(Map<Integer, Tournee> tournees) {
+        oublierAnnulees();
         consignesOrdre.set(nombreAppliquees, "");
         if (peutAnnuler()) {
             commandes.get(nombreAppliquees - 1)
                     .memoriserTourneesApres(tournees);
         }
-        if (peutRefaire()) {
-            commandes.get(nombreAppliquees).memoriserTourneesAvant(tournees);
-        }
+    }
+
+    /** Oublie les commandes annulées : il n'y a plus rien à rétablir. */
+    private void oublierAnnulees() {
+        commandes.subList(nombreAppliquees, commandes.size()).clear();
+        consignesOrdre.subList(nombreAppliquees + 1, consignesOrdre.size())
+                .clear();
     }
 
     /** Oublie tout l'historique (nouveau plan ou nouvelles demandes). */

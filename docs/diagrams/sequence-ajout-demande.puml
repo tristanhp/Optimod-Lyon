@@ -32,7 +32,7 @@ end
 MainController -> Plan : insererDemande(tournée, demande, position)
 Plan -> Plan : trois chemins A* entre voisins et nouveaux arrêts
 Plan -> Plan : réutiliser les autres chemins, propager les horaires
-alt insertion possible
+alt tournée à la position choisie, retour avant 13 h
   Plan --> MainController : tournée à la position choisie, plages conservées
   MainController -> MainController : exécuteur de l'interface, tournées avant et après
   MainController -> ListeDeCommandes : executer(CommandeAjouterDemande)
@@ -40,18 +40,23 @@ alt insertion possible
   ProgrammeLivraisons -> MainView : notifierObservateurs
   MainController -> MainView : signalerArretsHorsPlage
 else retour après 13 h à la position choisie
-  Plan --> MainController : IllegalStateException
+  Plan --> MainController : tournée renvoyée, estPossible() faux
   MainController -> Plan : trouverLivreursPossibles(tournées, demande)
   note right : Moindre coût de chaque livreur,\nrien n'est inséré ni modifié.
-  Plan --> MainController : livreurs qui rentrent avant 13 h
-  alt aucun livreur possible
-    MainController -> MainView : afficherRefusAjout, rien n'est modifié
-  else livreurs possibles
-    MainController -> MainView : choisirLivreurPossible(livreur refusé, livreurs, raison)
-    MainView --> MainController : livreur choisi, ou annulation sans mutation
-    note right : Le livreur choisi, la position est\nredemandée : retour à choisirPositionInsertion.
+  Plan --> MainController : livreurs qui rentrent avant 13 h, liste éventuellement vide
+  MainController -> MainView : choisirLivreurPossible(livreur, livreurs, heure de retour)
+  alt un livreur de la liste
+    MainView --> MainController : livreur choisi
+    note right : La position est redemandée :\nretour à choisirPositionInsertion.
+  else garder le livreur (GARDER_LIVREUR)
+    MainView --> MainController : GARDER_LIVREUR
+    MainController -> ListeDeCommandes : executer(CommandeAjouterDemande)
+    note right : Position déjà choisie, aucun autre calcul.\nLa consigne annonce le retour après 13 h.
+  else annulation
+    MainView --> MainController : vide
+    MainController -> MainView : afficherConfirmation("Ajout annulé."), rien n'est modifié
   end
-else autre refus (position invalide, adresse inaccessible)
+else refus (position invalide, adresse inaccessible, minuit dépassé)
   Plan --> MainController : IllegalArgumentException ou IllegalStateException
   MainController -> MainView : afficherRefusAjout, rien n'est modifié
 end

@@ -673,15 +673,66 @@ public class PlanTest {
         assertEquals(4, apres.arrets().size());
     }
 
-    /** Une insertion impossible laisse la tournée d'origine intacte. */
-    @Test(expected = IllegalStateException.class)
-    public void insertionImpossible() throws Exception {
+    /**
+     * Une insertion qui fait rentrer après 13 h n'est pas refusée : la tournée
+     * est renvoyée, signalée par {@code estPossible()}, et celle d'origine
+     * reste intacte. C'est à l'appelant de prévenir l'utilisateur.
+     */
+    @Test
+    public void insertionApres13hRenvoyeeEtSignalee() throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         Noeud entrepot = plan.obtenirNoeud(1);
         Tournee avant = tourneeImposee(plan, LocalTime.of(12, 59),
                 List.of(entrepot), List.of(0));
-        plan.insererDemande(avant, new Demande(plan.obtenirNoeud(3),
-                plan.obtenirNoeud(2), 60, 60), 1);
+        Tournee apres = plan.insererDemande(avant,
+                new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 60,
+                        60), 1);
+        assertEquals(4, apres.arrets().size());
+        assertFalse(apres.estPossible());
+        assertTrue(apres.obtenirHeureRetour()
+                .isAfter(Plan.HEURE_LIMITE_RETOUR));
+        assertEquals(1, avant.arrets().size());
+    }
+
+    /**
+     * Une tournée qui rentre déjà après 13 h reçoit elle aussi la demande :
+     * le retour est plus tardif, et les anciens arrêts gardent leur plage
+     * annoncée.
+     */
+    @Test
+    public void insertionDansUneTourneeDejaApres13hRenvoyee()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeDeTroisArretsAu(plan, LocalTime.of(12, 59));
+        assertFalse(avant.estPossible());
+        Tournee apres = plan.insererDemande(avant,
+                demandeDuPetitReseau(plan), 1);
+        assertEquals(avant.arrets().size() + 2, apres.arrets().size());
+        assertFalse(apres.estPossible());
+        assertTrue(apres.obtenirHeureRetour()
+                .isAfter(avant.obtenirHeureRetour()));
+        Tournee.Arret retourAvant = avant.arrets().get(
+                avant.arrets().size() - 1);
+        Tournee.Arret retourApres = apres.arrets().get(
+                apres.arrets().size() - 1);
+        assertEquals(retourAvant.debutPlage(), retourApres.debutPlage());
+        assertEquals(retourAvant.finPlage(), retourApres.finPlage());
+    }
+
+    /**
+     * Minuit reste un refus : une insertion qui ferait déborder la journée est
+     * refusée, car les heures sont des {@code LocalTime}.
+     */
+    @Test
+    public void insertionQuiDepasseMinuitRefusee() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeVideA(plan, LocalTime.of(23, 59));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.insererDemande(avant, new Demande(
+                        plan.obtenirNoeud(3), plan.obtenirNoeud(2), 300, 300),
+                        1));
+        assertTrue(erreur.getMessage().contains("minuit"));
     }
 
     /** Une durée d'une journée ne doit pas être ramenée à zéro à minuit. */
@@ -885,6 +936,22 @@ public class PlanTest {
     }
 
     /**
+     * La demande ferait déborder la journée chez tous les livreurs : la liste
+     * est vide, sans exception (minuit n'est pas 13 h, aucun livreur ne peut
+     * la prendre).
+     */
+    @Test
+    public void livreursPossiblesVideSiToutDepasseMinuit() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Map<Integer, Tournee> tournees = Map.of(
+                1, tourneeVideA(plan, LocalTime.of(23, 59)),
+                2, tourneeVideA(plan, LocalTime.of(23, 59)));
+        assertTrue(plan.trouverLivreursPossibles(tournees, new Demande(
+                plan.obtenirNoeud(3), plan.obtenirNoeud(2), 300, 300))
+                .isEmpty());
+    }
+
+    /**
      * Une livraison inaccessible depuis la collecte l'est pour tous les
      * livreurs : la liste est vide, sans exception.
      */
@@ -1015,17 +1082,28 @@ public class PlanTest {
     // --- Recalcul local d'une tournée, sans relancer le TSP (TIG-101) ---
 
     /**
-     * Arrêt à fabriquer pour une tournée écrite à la main : seuls l'adresse, la
-     * durée sur place (en secondes), le type et la demande comptent, les
-     * heures sont calculées par {@link #tourneeDansLOrdre}.
+     * Arrêt à fabriquer pour une tournée écrite à la main : l'adresse, la
+     * durée sur place (en secondes), le type, la demande et la plage
+     * annoncée ; les heures sont calculées par {@link #tourneeDansLOrdre}. Une
+     * plage {@code null} est fixée au calcul : une heure de part et d'autre de
+     * l'arrivée.
      */
     private record ArretPrevu(Noeud noeud, int duree, TypeArret type,
-            Demande demande) {
+            Demande demande, LocalTime debutPlage, LocalTime finPlage) {
 
-        /** Reprend l'adresse, la durée sur place, le type et la demande. */
+        /** Arrêt neuf, dont la plage sera fixée au calcul. */
+        ArretPrevu(Noeud noeud, int duree, TypeArret type, Demande demande) {
+            this(noeud, duree, type, demande, null, null);
+        }
+
+        /**
+         * Reprend l'adresse, la durée sur place, le type, la demande et la
+         * plage annoncée : un arrêt gardé par une modification garde sa plage.
+         */
         ArretPrevu(Tournee.Arret arret) {
             this(arret.noeud(), (int) arret.arrivee().until(arret.depart(),
-                    ChronoUnit.SECONDS), arret.type(), arret.demande());
+                    ChronoUnit.SECONDS), arret.type(), arret.demande(),
+                    arret.debutPlage(), arret.finPlage());
         }
     }
 
@@ -1062,8 +1140,12 @@ public class PlanTest {
             }
             LocalTime arrivee = heure;
             heure = arrivee.plusSeconds(prevu.duree());
-            arrets.add(new Tournee.Arret(prevu.noeud(), arrivee, heure,
-                    prevu.type(), prevu.demande()));
+            arrets.add(prevu.debutPlage() == null
+                    ? new Tournee.Arret(prevu.noeud(), arrivee, heure,
+                            prevu.type(), prevu.demande())
+                    : new Tournee.Arret(prevu.noeud(), arrivee, heure,
+                            prevu.type(), prevu.demande(), prevu.debutPlage(),
+                            prevu.finPlage()));
         }
         // Ordre imposé, pas trouvé par le voyageur de commerce : non prouvé.
         return new Tournee(arrets, chemins, false);
@@ -1625,7 +1707,8 @@ public class PlanTest {
                 attendus.add(new ArretPrevu(
                         i == rang ? nouveau : prevu.noeud(), prevu.duree(),
                         prevu.type(),
-                        memeDemande ? demande : prevu.demande()));
+                        memeDemande ? demande : prevu.demande(),
+                        prevu.debutPlage(), prevu.finPlage()));
             }
             assertEquals(tourneeDansLOrdre(plan, programme.obtenirHeureDepart(),
                     attendus), deplacee);
@@ -1683,6 +1766,128 @@ public class PlanTest {
         assertFalse(deplacee.estPossible());
     }
 
+    // --- Plages annoncées gardées par le recalcul local (TIG-82, TIG-107) ---
+
+    /**
+     * Tournée de {@link #tourneeDeDeuxDemandes} (départ à 8 h) où une demande
+     * de deux heures de collecte a été ajoutée en première position : les
+     * arrêts suivants arrivent plus de deux heures après leur arrivée
+     * annoncée, ils sont hors plage. Ordre : 1, 3 (7200), 2 (60), 3, 2, 2, 3,
+     * 1.
+     */
+    private static Tournee tourneeRetardeeParUnAjout(Plan plan) {
+        Tournee apres = plan.insererDemande(
+                tourneeDeDeuxDemandes(plan, LocalTime.of(8, 0)),
+                new Demande(plan.obtenirNoeud(3), plan.obtenirNoeud(2), 7200,
+                        60),
+                1);
+        for (int rang = 3; rang < apres.arrets().size(); rang++) {
+            assertTrue("rang " + rang, apres.arrets().get(rang).estHorsPlage());
+        }
+        return apres;
+    }
+
+    /** Arrêt d'une tournée qui sert cette demande avec ce type. */
+    private static Tournee.Arret arretDe(Tournee tournee, Demande demande,
+            TypeArret type) {
+        return tournee.arrets().stream()
+                .filter(arret -> arret.type() == type
+                        && demande.equals(arret.demande()))
+                .findFirst().orElseThrow();
+    }
+
+    /** Vérifie qu'un arrêt a gardé la plage annoncée d'un autre. */
+    private static void verifierMemePlage(Tournee.Arret attendu,
+            Tournee.Arret arret) {
+        assertEquals(attendu.debutPlage(), arret.debutPlage());
+        assertEquals(attendu.finPlage(), arret.finPlage());
+    }
+
+    /**
+     * Supprimer une demande ne change pas la plage annoncée des arrêts qui
+     * restent : ceux qu'un ajout a retardés de plus d'une heure restent
+     * signalés hors plage (avant TIG-107, les plages étaient recalées sur les
+     * nouvelles heures et le signalement disparaissait).
+     */
+    @Test
+    public void suppressionGardeLesPlagesEtLesSignalements() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeRetardeeParUnAjout(plan);
+        Demande premiere = deuxDemandesDuPetitReseau(plan).get(0);
+        Tournee sans = plan.calculerTourneeSansDemande(avant,
+                deuxDemandesDuPetitReseau(plan).get(1));
+        for (TypeArret type : List.of(TypeArret.COLLECTE,
+                TypeArret.LIVRAISON)) {
+            Tournee.Arret arret = arretDe(sans, premiere, type);
+            verifierMemePlage(arretDe(avant, premiere, type), arret);
+            assertTrue(type.toString(), arret.estHorsPlage());
+        }
+        Tournee.Arret retour = sans.arrets().get(sans.arrets().size() - 1);
+        verifierMemePlage(avant.arrets().get(avant.arrets().size() - 1),
+                retour);
+        assertTrue(retour.estHorsPlage());
+    }
+
+    /**
+     * Descendre un arrêt sous une collecte de deux heures le retarde de plus
+     * d'une heure : il garde sa plage annoncée et il est signalé hors plage.
+     * L'arrêt monté arrive à peine plus tôt : il reste dans sa plage.
+     */
+    @Test
+    public void changementDOrdreGardeLesPlagesEtSignaleUnRetard()
+            throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        Demande premiere = new Demande(plan.obtenirNoeud(3),
+                plan.obtenirNoeud(2), 60, 120);
+        Demande longue = new Demande(plan.obtenirNoeud(2),
+                plan.obtenirNoeud(3), 7200, 45);
+        Tournee tournee = tourneeDansLOrdre(plan, LocalTime.of(8, 0), List.of(
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null),
+                new ArretPrevu(plan.obtenirNoeud(3), 60, TypeArret.COLLECTE,
+                        premiere),
+                new ArretPrevu(plan.obtenirNoeud(2), 7200, TypeArret.COLLECTE,
+                        longue),
+                new ArretPrevu(plan.obtenirNoeud(2), 120, TypeArret.LIVRAISON,
+                        premiere),
+                new ArretPrevu(plan.obtenirNoeud(3), 45, TypeArret.LIVRAISON,
+                        longue),
+                new ArretPrevu(entrepot, 0, TypeArret.ENTREPOT, null)));
+        Tournee apres = plan.calculerTourneeOrdreChange(tournee, 1, 1);
+        Tournee.Arret descendu = apres.arrets().get(2);
+        assertEquals(premiere, descendu.demande());
+        verifierMemePlage(tournee.arrets().get(1), descendu);
+        assertTrue(descendu.obtenirDecalageSecondes() > 7200);
+        assertTrue(descendu.estHorsPlage());
+        Tournee.Arret monte = apres.arrets().get(1);
+        verifierMemePlage(tournee.arrets().get(2), monte);
+        assertFalse(monte.estHorsPlage());
+    }
+
+    /**
+     * Déplacer un point ne change aucune plage annoncée, pas même celle du
+     * point déplacé : les arrêts qu'un ajout a retardés de plus d'une heure
+     * restent signalés hors plage.
+     */
+    @Test
+    public void deplacementGardeLesPlagesEtLesSignalements() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Tournee avant = tourneeRetardeeParUnAjout(plan);
+        int rangDeplace = 6; // livraison de la seconde demande, en 3
+        assertEquals(plan.obtenirNoeud(3),
+                avant.arrets().get(rangDeplace).noeud());
+        Tournee deplacee = plan.calculerTourneeAvecPointDeplace(avant,
+                rangDeplace, plan.obtenirNoeud(1));
+        assertEquals(plan.obtenirNoeud(1),
+                deplacee.arrets().get(rangDeplace).noeud());
+        for (int rang = 0; rang < avant.arrets().size(); rang++) {
+            verifierMemePlage(avant.arrets().get(rang),
+                    deplacee.arrets().get(rang));
+            assertEquals("rang " + rang, rang >= 3,
+                    deplacee.arrets().get(rang).estHorsPlage());
+        }
+    }
+
     // --- Position de moindre coût et livreurs possibles ---
 
     /** Tournée 1, 3, 2, 1 partant à l'heure donnée. */
@@ -1722,12 +1927,8 @@ public class PlanTest {
             boolean uneFaisable = false;
             for (int position = 1; position < tournee.arrets().size();
                     position++) {
-                try {
-                    uneFaisable |= plan.insererDemande(tournee, demande,
-                            position).estPossible();
-                } catch (IllegalStateException refus) {
-                    continue;
-                }
+                uneFaisable |= plan.insererDemande(tournee, demande,
+                        position).estPossible();
             }
             assertEquals("départ " + depart, uneFaisable,
                     !plan.trouverLivreursPossibles(Map.of(1, tournee),
@@ -1737,10 +1938,11 @@ public class PlanTest {
 
     /**
      * Le livreur est proposé parce que la position de moindre coût
-     * rentre à 13 h, mais une autre position est refusée.
+     * rentre à 13 h, mais une autre position le fait rentrer après 13 h :
+     * la tournée est renvoyée, signalée impossible.
      */
     @Test
-    public void livreurPossibleMaisAutrePositionRefusee()
+    public void livreurPossibleMaisAutrePositionApres13h()
             throws Exception {
         Plan plan = PlansPourTests.petitReseau();
         Demande demande = new Demande(plan.obtenirNoeud(1),
@@ -1766,8 +1968,395 @@ public class PlanTest {
                 .plusSeconds(marge));
         assertEquals(List.of(1), plan.trouverLivreursPossibles(
                 Map.of(1, tournee), demande));
-        int positionRefusee = pire;
-        assertThrows(IllegalStateException.class,
-                () -> plan.insererDemande(tournee, demande, positionRefusee));
+        assertFalse(plan.insererDemande(tournee, demande, pire)
+                .estPossible());
+    }
+
+    // --- Fichiers de plan piégés ---
+
+    /** Mots qui trahissent un message technique en anglais. */
+    private static final List<String> MOTS_TECHNIQUES = List.of("For input",
+            "empty String", "is not allowed", "Premature", "DOCTYPE",
+            "must", "Content", "No such file", "prolog", "markup",
+            "Exception", "null");
+
+    /** Message de l'erreur levée par la lecture du plan, ou null. */
+    private static String erreurDeLecture(String xml) {
+        return erreurDeLecture(xml.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String erreurDeLecture(byte[] octets) {
+        try {
+            new Plan(new ByteArrayInputStream(octets));
+        } catch (IOException | SAXException erreur) {
+            return erreur.getMessage();
+        }
+        return null;
+    }
+
+    /** Vérifie qu'une erreur est signalée, en français, sans jargon. */
+    private static void verifierMessageFrancais(String message) {
+        assertNotNull("le fichier aurait dû être refusé", message);
+        for (String mot : MOTS_TECHNIQUES) {
+            assertFalse("message technique : " + message,
+                    message.contains(mot));
+        }
+    }
+
+    /** Plan de deux nœuds reliés par un tronçon de cette longueur. */
+    private static String planAvecLongueur(String longueur) {
+        return "<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\""
+                + longueur + "\" nomRue=\"a\"/></reseau>";
+    }
+
+    /** Une longueur négative est refusée : A* ne finirait pas. */
+    @Test
+    public void longueurNegativeRefusee() {
+        String message = erreurDeLecture(planAvecLongueur("-10"));
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("longueur"));
+    }
+
+    /** Une longueur NaN est refusée. */
+    @Test
+    public void longueurNaNRefusee() {
+        verifierMessageFrancais(erreurDeLecture(planAvecLongueur("NaN")));
+    }
+
+    /** Une longueur infinie est refusée. */
+    @Test
+    public void longueurInfinieRefusee() {
+        verifierMessageFrancais(erreurDeLecture(planAvecLongueur(
+                "Infinity")));
+    }
+
+    /**
+     * Un cycle de longueurs négatives ne gèle plus le calcul : le plan est
+     * refusé dès la lecture.
+     */
+    @Test(timeout = 5000)
+    public void cycleNegatifRefuseALaLecture() {
+        verifierMessageFrancais(erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" "
+                + "longueur=\"-1000\" nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"1\" "
+                + "longueur=\"-1000\" nomRue=\"a\"/></reseau>"));
+    }
+
+    /** Une latitude hors de [-90, 90] est refusée. */
+    @Test
+    public void latitudeHorsBornesRefusee() {
+        String message = erreurDeLecture("<reseau><noeud id=\"1\" "
+                + "latitude=\"95\" longitude=\"4\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("latitude"));
+    }
+
+    /** Une longitude NaN est refusée. */
+    @Test
+    public void longitudeNaNRefusee() {
+        verifierMessageFrancais(erreurDeLecture("<reseau><noeud id=\"1\" "
+                + "latitude=\"45\" longitude=\"NaN\"/></reseau>"));
+    }
+
+    /** Deux nœuds de même identifiant sont refusés. */
+    @Test
+    public void identifiantEnDoubleRefuse() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"1\" latitude=\"46\" longitude=\"4\"/>"
+                + "</reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("même identifiant"));
+    }
+
+    /** Un fichier dont la balise principale n'est pas reseau est refusé. */
+    @Test
+    public void racineInattendueRefusee() {
+        String message = erreurDeLecture("<demandeDeLivraisons>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "</demandeDeLivraisons>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("pas un plan"));
+    }
+
+    /** Un tronçon vers un nœud absent est refusé en nommant le nœud. */
+    @Test
+    public void tronconVersNoeudAbsentMessageFrancais() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"7\" longueur=\"1\" "
+                + "nomRue=\"a\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("7"));
+    }
+
+    /** Un identifiant non numérique est cité dans un message français. */
+    @Test
+    public void identifiantNonNumeriqueMessageFrancais() {
+        String message = erreurDeLecture("<reseau><noeud id=\"abc\" "
+                + "latitude=\"45\" longitude=\"4\"/></reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("« id »"));
+        assertTrue(message, message.contains("« abc »"));
+    }
+
+    /** Un tronçon sans longueur est refusé en nommant l'attribut. */
+    @Test
+    public void tronconSansLongueurMessageFrancais() {
+        String message = erreurDeLecture("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"1\" nomRue=\"a\"/>"
+                + "</reseau>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("« longueur »"));
+    }
+
+    /** Un fichier vide est refusé avec un message français. */
+    @Test
+    public void fichierVideMessageFrancais() {
+        String message = erreurDeLecture("");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("vide"));
+    }
+
+    /** Un XML incomplet donne un message français avec la ligne. */
+    @Test
+    public void xmlIncompletMessageFrancaisAvecLigne() {
+        String message = erreurDeLecture("<reseau>\n<noeud id=\"1\"");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("ligne 2"));
+    }
+
+    /** Même avec la JVM en français, le message reste lisible. */
+    @Test
+    public void xmlMalFormeMessageFrancaisAvecLocaleFrancaise() {
+        java.util.Locale avant = java.util.Locale.getDefault();
+        java.util.Locale.setDefault(java.util.Locale.FRANCE);
+        try {
+            verifierMessageFrancais(erreurDeLecture("<reseau><noeud/>"));
+        } finally {
+            java.util.Locale.setDefault(avant);
+        }
+    }
+
+    /** Un DOCTYPE est refusé avec un message français. */
+    @Test
+    public void doctypeMessageFrancais() {
+        String message = erreurDeLecture("<?xml version=\"1.0\"?>"
+                + "<!DOCTYPE reseau [<!ENTITY x \"y\">]><reseau/>");
+        verifierMessageFrancais(message);
+        assertTrue(message, message.contains("type de document"));
+    }
+
+    /** Une image renommée en .xml est refusée avec un message français. */
+    @Test
+    public void fichierBinaireMessageFrancais() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0,
+            0, 0, 13, 'I', 'H', 'D', 'R', (byte) 0xff, (byte) 0xfe};
+        verifierMessageFrancais(erreurDeLecture(png));
+    }
+
+    /** Un texte quelconque renommé en .xml est refusé en français. */
+    @Test
+    public void texteNonXmlMessageFrancais() {
+        verifierMessageFrancais(erreurDeLecture("bonjour, ceci n'est pas "
+                + "un plan"));
+    }
+
+    /** Un plan précédé d'une marque d'ordre des octets (BOM) est lu. */
+    @Test
+    public void planAvecBomLu() throws Exception {
+        byte[] xml = PETIT_PLAN.getBytes(StandardCharsets.UTF_8);
+        byte[] avecBom = new byte[xml.length + 3];
+        avecBom[0] = (byte) 0xEF;
+        avecBom[1] = (byte) 0xBB;
+        avecBom[2] = (byte) 0xBF;
+        System.arraycopy(xml, 0, avecBom, 3, xml.length);
+        assertEquals(3, new Plan(new ByteArrayInputStream(avecBom))
+                .obtenirNoeuds().size());
+    }
+
+    /** Un plan en ISO-8859-1 qui le déclare est lu avec ses accents. */
+    @Test
+    public void planEnIsoLatinLu() throws Exception {
+        String xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>"
+                + "<reseau><noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"1\" longueur=\"1\" "
+                + "nomRue=\"Rue de l'Hôtel\"/></reseau>";
+        Plan plan = new Plan(new ByteArrayInputStream(
+                xml.getBytes(StandardCharsets.ISO_8859_1)));
+        assertEquals("Rue de l'Hôtel", plan.obtenirTroncons().get(0)
+                .nomRue());
+    }
+
+    /** Un plan mal encodé (Latin-1 déclaré UTF-8) est refusé en français. */
+    @Test
+    public void mauvaisEncodageMessageFrancais() {
+        String xml = "<reseau><noeud id=\"1\" latitude=\"45\" longitude=\"4\""
+                + "/><troncon origine=\"1\" destination=\"1\" longueur=\"1\" "
+                + "nomRue=\"Hôtel\"/></reseau>";
+        verifierMessageFrancais(erreurDeLecture(xml.getBytes(
+                StandardCharsets.ISO_8859_1)));
+    }
+
+    /** Un XML imbriqué sur 100 000 niveaux est refusé vite. */
+    @Test(timeout = 10000)
+    public void imbricationProfondeRefusee() {
+        StringBuilder xml = new StringBuilder("<reseau>");
+        xml.append("<a>".repeat(100_000)).append("</a>".repeat(100_000));
+        xml.append("</reseau>");
+        verifierMessageFrancais(erreurDeLecture(xml.toString()));
+    }
+
+    /** Un fichier introuvable est signalé en français, par son nom. */
+    @Test
+    public void fichierIntrouvableMessageFrancais() {
+        IOException erreur = assertThrows(IOException.class,
+                () -> new Plan("/nexiste/pas/plan.xml"));
+        verifierMessageFrancais(erreur.getMessage());
+        assertTrue(erreur.getMessage().contains("plan.xml"));
+    }
+
+    /**
+     * Un plan de 60 000 nœuds et 120 000 tronçons (13 Mo) se lit en
+     * quelques secondes : la lecture n'est plus quasi quadratique.
+     */
+    @Test(timeout = 60000)
+    public void planEnormeLuRapidement() throws Exception {
+        int nombre = 60_000;
+        StringBuilder xml = new StringBuilder("<reseau>");
+        for (int i = 0; i < nombre; i++) {
+            xml.append("<noeud id=\"").append(i).append("\" latitude=\"")
+                    .append(45 + i * 1e-6).append("\" longitude=\"")
+                    .append(4 + (i % 300) * 1e-4).append("\"/>");
+        }
+        for (int i = 0; i < 2 * nombre; i++) {
+            xml.append("<troncon origine=\"").append(i % nombre)
+                    .append("\" destination=\"").append((i * 7 + 1) % nombre)
+                    .append("\" longueur=\"50.5\" nomRue=\"Rue ").append(i)
+                    .append("\"/>");
+        }
+        xml.append("</reseau>");
+        byte[] octets = xml.toString().getBytes(StandardCharsets.UTF_8);
+        long debut = System.nanoTime();
+        Plan plan = new Plan(new ByteArrayInputStream(octets));
+        long millisecondes = (System.nanoTime() - debut) / 1_000_000;
+        assertEquals(nombre, plan.obtenirNoeuds().size());
+        assertTrue("lecture en " + millisecondes + " ms",
+                millisecondes < 5000);
+    }
+
+    /**
+     * Des tronçons démesurés (mais finis) ne font pas déborder les coûts du
+     * voyageur de commerce : la tournée est refusée car elle dépasse minuit.
+     */
+    @Test
+    public void tronconsDemesuresSansDebordement() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"45.002\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"1e300\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"3\" longueur=\"1e300\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"3\" destination=\"1\" longueur=\"1e300\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        assertTrue(erreur.getMessage(), erreur.getMessage().contains(
+                "minuit"));
+    }
+
+    /**
+     * Des nœuds aux coordonnées identiques ne gênent ni la lecture ni le
+     * calcul.
+     */
+    @Test
+    public void noeudsAuxCoordonneesIdentiques() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"45\" longitude=\"4\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"3\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"3\" destination=\"1\" longueur=\"10\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        assertEquals(4, plan.calculerTournees(programme).get(1).arrets()
+                .size());
+    }
+
+    /**
+     * Plan non connexe : une adresse inaccessible est refusée par une
+     * IllegalStateException au message français, sans gel.
+     */
+    @Test(timeout = 5000)
+    public void planNonConnexeRefuseProprement() throws Exception {
+        Plan plan = lire("<reseau>"
+                + "<noeud id=\"1\" latitude=\"45\" longitude=\"4\"/>"
+                + "<noeud id=\"2\" latitude=\"45.001\" longitude=\"4\"/>"
+                + "<noeud id=\"3\" latitude=\"46\" longitude=\"5\"/>"
+                + "<troncon origine=\"1\" destination=\"2\" longueur=\"10\""
+                + " nomRue=\"a\"/>"
+                + "<troncon origine=\"2\" destination=\"1\" longueur=\"10\""
+                + " nomRue=\"a\"/></reseau>");
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(3), 60, 60)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        verifierMessageFrancais(erreur.getMessage());
+    }
+
+    /**
+     * Une demande dont la collecte et la livraison sont à l'entrepôt donne
+     * une tournée sans trajet.
+     */
+    @Test
+    public void demandeEntierementALEntrepot() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        Noeud entrepot = plan.obtenirNoeud(1);
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(entrepot,
+                LocalTime.of(8, 0), List.of(new Demande(entrepot, entrepot,
+                        60, 60)));
+        Tournee tournee = plan.calculerTournees(programme).get(1);
+        assertEquals(LocalTime.of(8, 2), tournee.obtenirHeureRetour());
+    }
+
+    /**
+     * Des durées sur place énormes ne font pas déborder les heures : la
+     * tournée est refusée car elle dépasse minuit.
+     */
+    @Test
+    public void dureesEnormesRefuseesCarApresMinuit() throws Exception {
+        Plan plan = PlansPourTests.petitReseau();
+        ProgrammeLivraisons programme = new ProgrammeLivraisons(
+                plan.obtenirNoeud(1), LocalTime.of(8, 0), List.of(
+                        new Demande(plan.obtenirNoeud(2),
+                                plan.obtenirNoeud(1), Integer.MAX_VALUE,
+                                Integer.MAX_VALUE)));
+        IllegalStateException erreur = assertThrows(
+                IllegalStateException.class,
+                () -> plan.calculerTournees(programme));
+        assertTrue(erreur.getMessage().contains("minuit"));
     }
 }

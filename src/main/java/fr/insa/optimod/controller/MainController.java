@@ -3,7 +3,10 @@ package fr.insa.optimod.controller;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileSystemException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +16,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -97,29 +101,54 @@ public final class MainController {
     static final String CONSIGNE_NON_PROUVEE_LIVREURS = "Livreur(s) %s : "
             + "solution non prouvée optimale (limite de temps atteinte).";
 
+    /**
+     * Avertissement ajouté à la consigne quand le seul livreur rentre après
+     * 13 h : {@code %s} est son heure de retour. Un retour après 13 h n'est
+     * jamais refusé, il est signalé ici et par le rouge des arrêts.
+     */
+    static final String CONSIGNE_RETOUR_APRES_LIMITE = " Retour à l'entrepôt à "
+            + "%s, après 13 h.";
+
+    /**
+     * Même avertissement avec plusieurs livreurs : {@code %s} nomme chaque
+     * livreur qui rentre après 13 h avec son heure de retour.
+     */
+    static final String CONSIGNE_RETOURS_APRES_LIMITE = " Retour après 13 h : "
+            + "%s.";
+
+    /**
+     * Détail montré à l'administrateur quand un ajout ferait rentrer un
+     * livreur après 13 h : le livreur, son heure de retour, l'heure limite.
+     */
+    static final String DETAIL_RETOUR_APRES_LIMITE = "Le livreur %d rentrerait "
+            + "à %s, après %s.";
+
     /** Consigne quand aucun point de collecte ou de livraison est choisi. */
     static final String CONSIGNE_AUCUN_POINT = "Sélectionnez d'abord, dans la "
             + "liste de la tournée, le point de collecte ou de livraison à "
             + "déplacer.";
 
-    /** Début de consigne quand la nouvelle adresse est déjà celle du couple. */
+    /**
+     * Début de consigne quand la nouvelle adresse est celle de l'autre point
+     * de la demande.
+     */
     static final String CONSIGNE_MEME_ADRESSE = "La collecte et la livraison "
             + "d'une demande doivent être à des adresses différentes. ";
+
+    /** Début de consigne quand la nouvelle adresse est celle du point. */
+    static final String CONSIGNE_DEJA_A_CETTE_ADRESSE = "Ce point est déjà à "
+            + "cette adresse. ";
+
+    /** Refus de sauvegarder des tournées de plusieurs livreurs. */
+    static final String CONSIGNE_SAUVEGARDE_UN_LIVREUR = "La sauvegarde ne "
+            + "gère qu'un livreur pour l'instant : revenez à 1 livreur pour "
+            + "sauvegarder.";
+
 
     /** Consigne affichée quand les arrêts d'une demande sont introuvables. */
     static final String CONSIGNE_ORDRE_NON_GARDE = "Tournées retirées : les "
             + "arrêts de la demande n'ont pas pu être identifiés. Cliquez sur "
             + "Calculer pour recalculer les tournées.";
-
-    /** Issue de la lecture d'un fichier choisi par l'utilisateur. */
-    enum Lecture {
-        /** L'utilisateur a annulé le choix du fichier. */
-        ANNULEE,
-        /** Le fichier a été lu et le modèle mis à jour. */
-        REUSSIE,
-        /** Le fichier est invalide ; l'erreur a été affichée. */
-        ECHOUEE
-    }
 
     /** Écran piloté. */
     private final MapScreen ecran;
@@ -144,6 +173,9 @@ public final class MainController {
 
     /** Programme de livraisons actuellement chargé, ou {@code null}. */
     private ProgrammeLivraisons programme;
+
+    /** Fichier du programme courant, ou {@code null} (restauration). */
+    private Path fichierProgramme;
 
     /** Modifications des demandes, pour annuler et rétablir. */
     private final ListeDeCommandes historique = new ListeDeCommandes();
@@ -230,64 +262,174 @@ public final class MainController {
     }
 
     /**
-     * Fait choisir un fichier de plan et l'affiche. Un nouveau plan rend le
-     * programme précédent caduc ; un plan invalide ouvre la fenêtre d'erreur
-     * et vide la page.
-     *
-     * @return l'issue de la lecture
+     * Fait choisir un fichier de plan et le lit hors du thread de
+     * l'interface, avec l'attente affichée et les actions bloquées
+     * ({@link EtatLectureFichier}). Un plan valide remplace le plan, rend le
+     * programme précédent caduc et vide l'historique
+     * ({@link EtatPlanCharge}). Un plan invalide ouvre la fenêtre d'erreur et
+     * ne change rien : plan, programme, tournées et historique sont gardés.
+     * Une annulation ne fait rien.
      */
-    Lecture lirePlan() {
+    void lirePlan() {
         File fichier = ecran.choisirFichierPlan().orElse(null);
         if (fichier == null) {
-            return Lecture.ANNULEE;
+            return;
         }
-        programme = null;
-        oublierModifications();
-        try {
-            Plan nouveauPlan = new Plan(fichier.getPath());
-            if (nouveauPlan.obtenirNoeuds().isEmpty()
-                    && nouveauPlan.obtenirTroncons().isEmpty()) {
-                throw new SAXException("Le plan ne contient ni nœud ni "
-                        + "tronçon : il n'y a rien à afficher.");
+        changerEtat(new EtatLectureFichier());
+        ecran.afficherAttente(true);
+        enArrierePlan(() -> {
+            try {
+                Plan nouveauPlan = new Plan(fichier.getPath());
+                if (nouveauPlan.obtenirNoeuds().isEmpty()) {
+                    throw new SAXException("Le plan ne contient aucun nœud : "
+                            + "il n'y a rien à afficher.");
+                }
+                return () -> finirLecturePlan(nouveauPlan, fichier.toPath());
+            } catch (IOException | SAXException erreur) {
+                return () -> refuserFichier(erreur.getMessage());
             }
-            plan = nouveauPlan;
-            fichierPlan = fichier.toPath();
-            ecran.afficherPlan(plan);
-            ecran.afficherConfirmation("Plan chargé.");
-            return Lecture.REUSSIE;
-        } catch (IOException | SAXException | IllegalArgumentException e) {
-            plan = null;
-            ecran.afficherErreurXml(e.getMessage());
-            ecran.reinitialiser();
-            return Lecture.ECHOUEE;
+        });
+    }
+
+    /**
+     * Fin de la lecture d'un plan valide, sur le thread de l'interface : le
+     * nouveau plan remplace l'ancien, le programme et l'historique sont
+     * oubliés.
+     */
+    private void finirLecturePlan(Plan nouveauPlan, Path fichier) {
+        ecran.afficherAttente(false);
+        plan = nouveauPlan;
+        fichierPlan = fichier;
+        programme = null;
+        fichierProgramme = null;
+        oublierModifications();
+        ecran.afficherPlan(plan);
+        changerEtat(new EtatPlanCharge());
+        ecran.afficherConfirmation("Plan chargé.");
+    }
+
+    /**
+     * Fait choisir un fichier de demandes et le lit hors du thread de
+     * l'interface ({@link EtatLectureFichier}), sans modifier le plan. Un
+     * fichier invalide ou une adresse absente du plan ouvre la fenêtre
+     * d'erreur ; le programme précédent est conservé.
+     */
+    void lireProgramme() {
+        File fichier = ecran.choisirFichierDemandes().orElse(null);
+        if (fichier == null) {
+            return;
+        }
+        Plan planLu = plan;
+        changerEtat(new EtatLectureFichier());
+        ecran.afficherAttente(true);
+        enArrierePlan(() -> {
+            try {
+                ProgrammeLivraisons lu = new ProgrammeLivraisons(
+                        fichier.getPath(), planLu);
+                return () -> finirLectureProgramme(lu, fichier.toPath());
+            } catch (IOException | SAXException erreur) {
+                return () -> refuserFichier(erreur.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Fin de la lecture d'un programme valide, sur le thread de l'interface :
+     * il remplace le programme précédent et l'historique est oublié.
+     */
+    private void finirLectureProgramme(ProgrammeLivraisons lu, Path fichier) {
+        ecran.afficherAttente(false);
+        programme = lu;
+        fichierProgramme = fichier;
+        oublierModifications();
+        ecran.afficherProgramme(programme);
+        ecran.signalerArretsHorsPlage(List.of());
+        changerEtat(new EtatProgrammeCharge());
+        int nombre = programme.obtenirDemandes().size();
+        ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
+                : nombre + " demandes chargées.");
+    }
+
+    /**
+     * Fichier refusé (plan, demandes ou sauvegarde), sur le thread de
+     * l'interface : rien n'a changé, on revient à l'état d'avant la lecture
+     * et la fenêtre d'erreur explique pourquoi.
+     *
+     * @param detail explication en français
+     */
+    private void refuserFichier(String detail) {
+        ecran.afficherAttente(false);
+        retrouverEtatStable();
+        ecran.afficherErreurXml(detail);
+    }
+
+    /**
+     * Revient à l'état qui correspond aux données chargées :
+     * {@link EtatInitial} sans plan, {@link EtatPlanCharge} sans programme,
+     * sinon l'état du programme ({@link #retrouverEtatProgramme}). Sert après
+     * un refus ou une erreur pendant un travail en arrière-plan.
+     */
+    void retrouverEtatStable() {
+        if (plan == null) {
+            changerEtat(new EtatInitial());
+        } else if (programme == null) {
+            changerEtat(new EtatPlanCharge());
+        } else {
+            retrouverEtatProgramme();
         }
     }
 
     /**
-     * Fait choisir un fichier de demandes et affiche le programme, sans
-     * modifier le plan. Un fichier invalide ou une adresse absente du plan
-     * ouvre la fenêtre d'erreur ; le programme précédent est conservé.
+     * Exécute un travail hors du thread de l'interface, puis la suite qu'il
+     * renvoie sur le thread de l'interface. Quoi qu'il arrive, l'interface
+     * ne reste pas bloquée : une exception ou une erreur imprévue, pendant
+     * le travail ou pendant la suite, éteint l'attente, ramène à un état
+     * stable et est signalée ({@link #signalerErreurInattendue}). Si l'état a
+     * changé entre-temps (page vidée après une erreur de dessin), la suite
+     * est abandonnée : elle porterait sur des données oubliées.
      *
-     * @return l'issue de la lecture
+     * @param travail calcul à faire en arrière-plan ; renvoie la suite à
+     *                exécuter sur le thread de l'interface
      */
-    Lecture lireProgramme() {
-        File fichier = ecran.choisirFichierDemandes().orElse(null);
-        if (fichier == null) {
-            return Lecture.ANNULEE;
-        }
-        try {
-            programme = new ProgrammeLivraisons(fichier.getPath(), plan);
-            oublierModifications();
-            ecran.afficherProgramme(programme);
-            ecran.signalerArretsHorsPlage(List.of());
-            int nombre = programme.obtenirDemandes().size();
-            ecran.afficherConfirmation(nombre == 1 ? "1 demande chargée."
-                    : nombre + " demandes chargées.");
-            return Lecture.REUSSIE;
-        } catch (IOException | SAXException e) {
-            ecran.afficherErreurXml(e.getMessage());
-            return Lecture.ECHOUEE;
-        }
+    private void enArrierePlan(Supplier<Runnable> travail) {
+        Etat etatAuLancement = etat;
+        arrierePlan.execute(() -> {
+            Runnable suite;
+            try {
+                suite = travail.get();
+            } catch (RuntimeException | Error erreur) {
+                // Toute erreur, même une Error (pile ou mémoire épuisée sur
+                // un fichier piégé), doit rendre la main à l'interface.
+                suite = () -> signalerErreurInattendue(erreur);
+            }
+            Runnable suiteRetenue = suite;
+            interfaceUtilisateur.execute(() -> {
+                if (etat != etatAuLancement) {
+                    return;
+                }
+                try {
+                    suiteRetenue.run();
+                } catch (RuntimeException | StackOverflowError erreur) {
+                    signalerErreurInattendue(erreur);
+                }
+            });
+        });
+    }
+
+    /**
+     * Erreur imprévue (défaut de l'application) : elle est journalisée,
+     * l'attente est retirée, l'état revient à celui des données chargées et
+     * l'utilisateur est prévenu que son travail est conservé.
+     *
+     * @param erreur erreur survenue
+     */
+    private void signalerErreurInattendue(Throwable erreur) {
+        JOURNAL.log(Level.SEVERE, "Erreur inattendue", erreur);
+        ecran.afficherAttente(false);
+        retrouverEtatStable();
+        ecran.afficherConfirmation("");
+        ecran.afficherErreurInattendue(erreur.getMessage() != null
+                ? erreur.getMessage() : erreur.getClass().getSimpleName());
     }
 
     /**
@@ -300,17 +442,15 @@ public final class MainController {
         ProgrammeLivraisons programmeCalcule = programme;
         ecran.afficherConfirmation("");
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Map<Integer, Tournee> tournees = calculTournees.apply(
                         planCalcule, programmeCalcule);
-                interfaceUtilisateur.execute(
-                        () -> etat.finirCalcul(this, tournees, null));
+                return () -> etat.finirCalcul(this, tournees, null);
             } catch (RuntimeException e) {
                 String detail = e.getMessage() != null ? e.getMessage()
                         : e.getClass().getSimpleName();
-                interfaceUtilisateur.execute(
-                        () -> etat.finirCalcul(this, null, detail));
+                return () -> etat.finirCalcul(this, null, detail);
             }
         });
     }
@@ -368,13 +508,15 @@ public final class MainController {
      * Comme pour la suppression, le calcul se fait avant la commande : annuler
      * et rétablir ne recalculent rien.
      *
-     * <p>Si l'insertion est refusée parce que le livreur rentrerait après
-     * 13 h, l'administrateur se voit proposer les livreurs qui peuvent prendre
-     * la demande ({@link Plan#trouverLivreursPossibles}), y compris celui de
-     * la demande, puisqu'une autre position peut suffire. Le livreur choisi,
-     * il choisit la position dans sa tournée, comme à l'ajout. S'il n'y a
-     * aucun livreur possible, ou s'il annule, l'ajout est abandonné : rien
-     * n'est modifié.
+     * <p>Si l'insertion fait rentrer le livreur après 13 h, ce n'est pas un
+     * refus : l'administrateur est prévenu et se voit proposer les livreurs qui
+     * peuvent prendre la demande avant 13 h
+     * ({@link Plan#trouverLivreursPossibles}), y compris celui de la demande,
+     * puisqu'une autre position peut suffire. Il peut choisir un de ces
+     * livreurs, puis la position dans sa tournée comme à l'ajout, garder le
+     * livreur malgré le retard, ou annuler : l'ajout est alors abandonné et
+     * rien n'est modifié. Seuls une adresse inaccessible, une position invalide
+     * ou une tournée qui dépasse minuit refusent l'ajout.
      *
      * @param demande demande validée
      */
@@ -389,8 +531,9 @@ public final class MainController {
 
     /**
      * Fait choisir la position de la demande dans la tournée de son livreur,
-     * puis l'insère hors du thread de l'interface. Un refus pour cause de
-     * retour après 13 h mène à la proposition d'autres livreurs
+     * puis l'insère hors du thread de l'interface. Une insertion qui fait
+     * rentrer le livreur après 13 h n'est pas refusée : elle mène à
+     * l'avertissement et à la proposition d'autres livreurs
      * ({@link #proposerLivreurs}), qui peut rappeler cette méthode.
      *
      * @param demande demande à insérer chez son livreur
@@ -407,73 +550,53 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.insererDemande(tourneeLivreur,
                         demande, positionEffective(planCalcule,
                                 tourneeLivreur, demande, position));
-                interfaceUtilisateur.execute(
-                        () -> finirAjout(demande, avant, apres));
-            } catch (IllegalStateException refus) {
-                chercherLivreurs(planCalcule, demande, avant, refus);
+                if (apres.estPossible()) {
+                    return () -> finirAjout(demande, avant, apres);
+                }
+                List<Integer> possibles =
+                        planCalcule.trouverLivreursPossibles(avant, demande);
+                return () -> proposerLivreurs(demande, avant, apres,
+                        possibles);
             } catch (RuntimeException erreur) {
-                interfaceUtilisateur.execute(() -> refuserAjout(erreur));
+                return () -> refuserAjout(erreur);
             }
         });
     }
 
     /**
-     * Cherche les livreurs possibles après un refus, hors du thread de
-     * l'interface, puis les propose sur ce thread.
+     * Sur le thread de l'interface, quand l'ajout ferait rentrer le livreur
+     * après 13 h : l'administrateur est prévenu de l'heure de retour et
+     * choisit parmi les livreurs qui rentrent avant 13 h (la liste peut être
+     * vide). Un livreur choisi, il choisit la position chez lui
+     * ({@link #placerDemande}). S'il garde le livreur de la demande, elle est
+     * ajoutée à la position déjà choisie, sans autre calcul. S'il annule,
+     * l'ajout est abandonné : rien n'est modifié, pas même l'historique.
      *
-     * @param planCalcule plan sur lequel chercher
-     * @param demande demande refusée
+     * @param demande demande à ajouter, chez son livreur actuel
      * @param avant tournées d'avant l'ajout, par livreur
-     * @param refus cause du refus chez le livreur de la demande
-     */
-    private void chercherLivreurs(Plan planCalcule, Demande demande,
-            Map<Integer, Tournee> avant, IllegalStateException refus) {
-        List<Integer> possibles;
-        try {
-            possibles = planCalcule.trouverLivreursPossibles(avant, demande);
-        } catch (RuntimeException erreur) {
-            interfaceUtilisateur.execute(() -> refuserAjout(erreur));
-            return;
-        }
-        String raison = refus.getMessage() != null ? refus.getMessage()
-                : "L'ajout de la demande est impossible.";
-        interfaceUtilisateur.execute(
-                () -> proposerLivreurs(demande, avant, raison, possibles));
-    }
-
-    /**
-     * Sur le thread de l'interface, après un refus : sans livreur possible le
-     * refus est expliqué ; sinon l'administrateur choisit un livreur, puis la
-     * position chez lui ({@link #placerDemande}). Sans choix, l'ajout est
-     * abandonné. Dans tous les cas où l'ajout s'arrête, rien n'est modifié,
-     * pas même l'historique.
-     *
-     * @param demande demande refusée
-     * @param avant tournées d'avant l'ajout, par livreur
-     * @param raison cause du refus chez le livreur de la demande
+     * @param apres tournée du livreur de la demande avec l'ajout, après 13 h
      * @param possibles livreurs qui peuvent prendre la demande avant 13 h
      */
     private void proposerLivreurs(Demande demande, Map<Integer, Tournee> avant,
-            String raison, List<Integer> possibles) {
+            Tournee apres, List<Integer> possibles) {
         ecran.afficherAttente(false);
-        if (possibles.isEmpty()) {
-            retrouverEtatProgramme();
-            ecran.afficherRefusAjout(raison + " Aucun livreur ne peut la "
-                    + "prendre.");
-            return;
+        String detail = DETAIL_RETOUR_APRES_LIMITE.formatted(
+                demande.livreur(), apres.obtenirHeureRetour(),
+                Plan.HEURE_LIMITE_RETOUR);
+        Integer choix = ecran.choisirLivreurPossible(demande.livreur(),
+                possibles, detail).orElse(null);
+        if (choix != null && choix == MapScreen.GARDER_LIVREUR) {
+            finirAjout(demande, avant, apres);
+        } else if (choix != null && possibles.contains(choix)) {
+            placerDemande(demande.avecLivreur(choix), avant);
+        } else {
+            annulerAjout();
         }
-        Integer livreur = ecran.choisirLivreurPossible(demande.livreur(),
-                possibles, raison).orElse(null);
-        if (livreur == null || !possibles.contains(livreur)) {
-            retrouverEtatProgramme();
-            return;
-        }
-        placerDemande(demande.avecLivreur(livreur), avant);
     }
 
     /**
@@ -564,7 +687,7 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee sans = planCalcule.calculerTourneeSansDemande(
                         avant.get(ancienne.livreur()), ancienne);
@@ -574,27 +697,26 @@ public final class MainController {
                 Map<Integer, Tournee> apres = new TreeMap<>(avant);
                 apres.put(ancienne.livreur(), sans);
                 apres.put(livreur, avec);
-                interfaceUtilisateur.execute(() -> finirChangementLivreur(
-                        position, ancienne, nouvelle, avant,
-                        Collections.unmodifiableMap(apres), null));
+                return () -> finirChangementLivreur(position, ancienne,
+                        nouvelle, avant, Collections.unmodifiableMap(apres),
+                        null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirChangementLivreur(
-                        position, ancienne, nouvelle, avant, null, e));
+                return () -> finirChangementLivreur(position, ancienne,
+                        nouvelle, avant, null, e);
             }
         });
     }
 
     /**
      * Fin du changement de livreur, sur le thread de l'interface. S'il est
-     * refusé (adresse inaccessible, ou retour à l'entrepôt du nouveau livreur
-     * rendu impossible après 13 h), l'écran affiche la raison et rien n'est
-     * modifié, pas même l'historique. Sinon la commande remplace la demande par
-     * la même confiée au nouveau livreur et range les tournées recalculées.
+     * refusé (adresse inaccessible, ou tournée du nouveau livreur qui dépasse
+     * minuit), l'écran affiche la raison et rien n'est modifié, pas même
+     * l'historique. Sinon la commande remplace la demande par la même confiée
+     * au nouveau livreur et range les tournées recalculées.
      *
      * <p>
-     * Un livreur qui rentrait déjà après 13 h peut recevoir une demande de
-     * plus : seul un changement qui rend impossible une tournée possible est
-     * refusé ({@link Plan#insererDemande}).
+     * Un retour après 13 h n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param position rang de la demande dans le programme
      * @param ancienne la demande chez son ancien livreur
@@ -759,50 +881,121 @@ public final class MainController {
                 .filter(Tournee.Arret::estHorsPlage).toList());
     }
 
-    /** Sauvegarde les tournées calculées dans le fichier choisi. */
+    /**
+     * Sauvegarde les tournées calculées dans le fichier choisi. Refusée avec
+     * plusieurs livreurs (le format n'en gère qu'un) ou si le fichier choisi
+     * est celui du plan ou du programme chargé, qu'elle détruirait. Une
+     * écriture impossible (dossier protégé, introuvable) est signalée comme
+     * telle.
+     */
     void sauvegarderTournee() {
+        if (programme.obtenirNombreLivreurs() != 1) {
+            ecran.afficherConfirmation("");
+            ecran.afficherConsigne(CONSIGNE_SAUVEGARDE_UN_LIVREUR);
+            return;
+        }
         ecran.choisirFichierSauvegarde().ifPresent(fichier -> {
+            Path destination = fichier.toPath();
+            if (estLeMemeFichier(destination, fichierPlan)
+                    || estLeMemeFichier(destination, fichierProgramme)) {
+                ecran.afficherConfirmation("");
+                ecran.afficherRefusSauvegarde("Le fichier "
+                        + fichier.getName() + " est celui du plan ou des "
+                        + "demandes chargés : la sauvegarde l'écraserait. "
+                        + "Choisissez un autre nom de fichier.");
+                return;
+            }
             try {
-                SauvegardeTournee.sauvegarder(fichier.toPath(), fichierPlan,
+                SauvegardeTournee.sauvegarder(destination, fichierPlan,
                         programme);
                 ecran.afficherConfirmation("Tournée sauvegardée.");
             } catch (IOException erreur) {
                 ecran.afficherConfirmation("");
-                ecran.afficherErreurXml(erreur.getMessage());
+                ecran.afficherErreurEcriture(decrireErreurEcriture(erreur,
+                        destination));
             }
         });
     }
 
-    /** Restaure intégralement avant de remplacer l'état courant. */
+    /**
+     * Vrai si les deux chemins désignent le même fichier, y compris par un
+     * autre chemin (lien, « .. »). Faux si l'un est {@code null}.
+     */
+    private static boolean estLeMemeFichier(Path premier, Path second) {
+        if (premier == null || second == null) {
+            return false;
+        }
+        if (premier.toAbsolutePath().normalize().equals(
+                second.toAbsolutePath().normalize())) {
+            return true;
+        }
+        try {
+            return Files.exists(premier) && Files.exists(second)
+                    && Files.isSameFile(premier, second);
+        } catch (IOException illisible) {
+            return false;
+        }
+    }
+
+    /**
+     * Explique en français pourquoi un fichier n'a pas pu être écrit.
+     *
+     * @param erreur  erreur d'écriture
+     * @param fichier fichier ou dossier visé
+     * @return message pour l'utilisateur
+     */
+    static String decrireErreurEcriture(IOException erreur, Path fichier) {
+        if (erreur instanceof AccessDeniedException) {
+            return "Accès refusé : l'application n'a pas le droit d'écrire "
+                    + "dans " + fichier + ". Choisissez un autre dossier.";
+        }
+        if (erreur instanceof NoSuchFileException) {
+            return "Dossier introuvable : " + fichier + ". Il a peut-être "
+                    + "été déplacé ou supprimé.";
+        }
+        if (erreur instanceof FileSystemException) {
+            return "Impossible d'écrire " + fichier + " (fichier protégé, "
+                    + "ouvert ailleurs ou disque plein).";
+        }
+        return "Impossible d'écrire " + fichier + " : "
+                + erreur.getMessage();
+    }
+
+    /**
+     * Fait choisir une sauvegarde, puis la lit et recalcule ses trajets hors
+     * du thread de l'interface ({@link EtatRestauration}). Rien n'est
+     * remplacé avant que tout soit relu : une sauvegarde invalide, ou toute
+     * erreur pendant la lecture, laisse l'état courant intact.
+     */
     void restaurerSauvegarde() {
         ecran.choisirFichierRestauration().ifPresent(fichier -> {
-            Etat ancienEtat = etat;
             changerEtat(new EtatRestauration());
             ecran.afficherAttente(true);
-            arrierePlan.execute(() -> {
+            enArrierePlan(() -> {
                 try {
-                    SauvegardeTournee sauvegarde = SauvegardeTournee.restaurer(fichier.toPath());
-                    interfaceUtilisateur.execute(() -> {
-                        plan = sauvegarde.plan();
-                        fichierPlan = sauvegarde.fichierPlan();
-                        programme = sauvegarde.programme();
-                        oublierModifications();
-                        ecran.afficherPlan(plan);
-                        ecran.afficherProgramme(programme);
-                        rangerTournees(Map.of(1, sauvegarde.tournee()));
-                        ecran.afficherAttente(false);
-                        retrouverEtatProgramme();
-                        ecran.afficherConfirmation("Tournée restaurée.");
-                    });
+                    SauvegardeTournee sauvegarde = SauvegardeTournee
+                            .restaurer(fichier.toPath());
+                    return () -> finirRestauration(sauvegarde);
                 } catch (SAXException erreur) {
-                    interfaceUtilisateur.execute(() -> {
-                        ecran.afficherAttente(false);
-                        changerEtat(ancienEtat);
-                        ecran.afficherErreurXml(erreur.getMessage());
-                    });
+                    return () -> refuserFichier(erreur.getMessage());
                 }
             });
         });
+    }
+
+    /** Fin de la restauration, sur le thread de l'interface. */
+    private void finirRestauration(SauvegardeTournee sauvegarde) {
+        plan = sauvegarde.plan();
+        fichierPlan = sauvegarde.fichierPlan();
+        programme = sauvegarde.programme();
+        fichierProgramme = null;
+        oublierModifications();
+        ecran.afficherPlan(plan);
+        ecran.afficherProgramme(programme);
+        rangerTournees(Map.of(1, sauvegarde.tournee()));
+        ecran.afficherAttente(false);
+        retrouverEtatProgramme();
+        ecran.afficherConfirmation("Tournée restaurée.");
     }
 
     /**
@@ -828,15 +1021,15 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee locale = planCalcule.calculerTourneeSansDemande(
                         avant.get(retiree.livreur()), retiree);
-                interfaceUtilisateur.execute(() -> finirSuppression(position,
-                        retiree.livreur(), avant, locale, null));
+                return () -> finirSuppression(position, retiree.livreur(),
+                        avant, locale, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirSuppression(position,
-                        retiree.livreur(), avant, null, e));
+                return () -> finirSuppression(position, retiree.livreur(),
+                        avant, null, e);
             }
         });
     }
@@ -898,7 +1091,7 @@ public final class MainController {
      */
     private void garderOrdre(String consigne) {
         historique.definirConsigneOrdre(consigne);
-        ecran.afficherConsigne(consigne);
+        ecran.afficherConsigne(consigne + obtenirAvertissementRetour());
     }
 
     /**
@@ -907,6 +1100,35 @@ public final class MainController {
      */
     String obtenirConsigneOrdreGarde() {
         return historique.consigneOrdre();
+    }
+
+    /**
+     * Prévient des livreurs qui rentrent après
+     * {@link Plan#HEURE_LIMITE_RETOUR}. L'avertissement est déduit des
+     * tournées affichées, sans rien retenir : il suit donc Annuler, Rétablir,
+     * un recalcul ou un nouveau réglage du nombre de livreurs. Avec un seul
+     * livreur, seule son heure de retour est citée ; avec plusieurs, chaque
+     * livreur en retard est nommé, dans l'ordre de leur numéro.
+     *
+     * @return texte à ajouter à une consigne, commençant par une espace, ou
+     *         chaîne vide si tous les livreurs rentrent à l'heure
+     */
+    String obtenirAvertissementRetour() {
+        Map<Integer, Tournee> tournees = programme.obtenirTournees();
+        List<String> retards = tournees.entrySet().stream()
+                .filter(entree -> !entree.getValue().estPossible())
+                .sorted(Map.Entry.comparingByKey())
+                .map(entree -> tournees.size() > 1
+                        ? "livreur " + entree.getKey() + " à "
+                                + entree.getValue().obtenirHeureRetour()
+                        : entree.getValue().obtenirHeureRetour().toString())
+                .toList();
+        if (retards.isEmpty()) {
+            return "";
+        }
+        return (tournees.size() > 1 ? CONSIGNE_RETOURS_APRES_LIMITE
+                : CONSIGNE_RETOUR_APRES_LIMITE)
+                .formatted(String.join(", ", retards));
     }
 
     /**
@@ -952,31 +1174,30 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.calculerTourneeOrdreChange(
                         avant.get(livreur), rang, decalage);
-                interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        livreur, avant, apres, rang + decalage, null));
+                return () -> finirChangementOrdre(livreur, avant, apres,
+                        rang + decalage, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirChangementOrdre(
-                        livreur, avant, null, rang + decalage, e));
+                return () -> finirChangementOrdre(livreur, avant, null,
+                        rang + decalage, e);
             }
         });
     }
 
     /**
      * Fin du changement d'ordre, sur le thread de l'interface. S'il est refusé
-     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou retour à
-     * l'entrepôt rendu impossible après 13 h), l'écran affiche la raison et
-     * rien n'est modifié, pas même l'historique. Sinon la commande range, à la
-     * place des tournées d'avant, les mêmes avec la nouvelle tournée du
-     * livreur, et l'arrêt déplacé reste sélectionné.
+     * (contrainte d'ordre, arrêt qui ne peut pas bouger, ou tournée qui
+     * dépasse minuit), l'écran affiche la raison et rien n'est modifié, pas
+     * même l'historique. Sinon la commande range, à la place des tournées
+     * d'avant, les mêmes avec la nouvelle tournée du livreur, et l'arrêt
+     * déplacé reste sélectionné.
      *
      * <p>
-     * Un changement qui ne fait que garder une tournée déjà en retard est
-     * accepté : seul un changement qui rend possible une tournée impossible est
-     * refusé.
+     * Un retour après 13 h n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param livreur     numéro du livreur de la tournée
      * @param avant       tournées d'avant le changement
@@ -990,17 +1211,9 @@ public final class MainController {
             Map<Integer, Tournee> avant, Tournee apres, int nouveauRang,
             RuntimeException echec) {
         ecran.afficherAttente(false);
-        RuntimeException refus = echec;
-        if (refus == null && !apres.estPossible()
-                && avant.get(livreur).estPossible()) {
-            refus = new IllegalStateException("Changement d'ordre refusé : le "
-                    + "retour à l'entrepôt serait à "
-                    + apres.obtenirHeureRetour() + ", après "
-                    + Plan.HEURE_LIMITE_RETOUR + ".");
-        }
-        if (refus != null) {
+        if (echec != null) {
             changerEtat(new EtatTourneeCalculee());
-            signalerRefus(refus, ecran::afficherRefusOrdre,
+            signalerRefus(echec, ecran::afficherRefusOrdre,
                     "du changement d'ordre");
             return;
         }
@@ -1016,7 +1229,7 @@ public final class MainController {
 
     /**
      * Distingue les refus d'une modification de la tournée : une raison
-     * attendue (par exemple contrainte d'ordre, retour après 13 h) est
+     * attendue (par exemple contrainte d'ordre, tournée qui dépasse minuit) est
      * expliquée à l'utilisateur ; une erreur inattendue est signalée et
      * journalisée, au lieu de laisser les actions bloquées.
      *
@@ -1081,7 +1294,13 @@ public final class MainController {
         if (nouveau == null || actuelle == null) {
             return; // clic hors du plan : ignoré
         }
-        Demande demande = actuelle.arrets().get(rang).demande();
+        Tournee.Arret arret = actuelle.arrets().get(rang);
+        Demande demande = arret.demande();
+        if (nouveau.equals(arret.noeud())) {
+            ecran.afficherConsigne(CONSIGNE_DEJA_A_CETTE_ADRESSE
+                    + EtatDeplacementPoint.CONSIGNE);
+            return;
+        }
         if (nouveau.equals(demande.collecte())
                 || nouveau.equals(demande.livraison())) {
             ecran.afficherConsigne(CONSIGNE_MEME_ADRESSE
@@ -1091,27 +1310,28 @@ public final class MainController {
         Plan planCalcule = plan;
         changerEtat(new EtatCalculEnCours());
         ecran.afficherAttente(true);
-        arrierePlan.execute(() -> {
+        enArrierePlan(() -> {
             try {
                 Tournee apres = planCalcule.calculerTourneeAvecPointDeplace(
                         actuelle, rang, nouveau);
-                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
-                        rang, demande, avant, apres, null));
+                return () -> finirDeplacement(livreur, rang, demande, avant,
+                        apres, null);
             } catch (RuntimeException e) {
-                interfaceUtilisateur.execute(() -> finirDeplacement(livreur,
-                        rang, demande, avant, null, e));
+                return () -> finirDeplacement(livreur, rang, demande, avant,
+                        null, e);
             }
         });
     }
 
     /**
      * Fin du déplacement, sur le thread de l'interface. S'il est refusé
-     * (adresse inaccessible, ou retour à l'entrepôt rendu impossible après
-     * 13 h), l'écran affiche la raison et rien n'est modifié, pas même
-     * l'historique. Sinon la commande remplace la demande par celle dont le
-     * point a changé de nœud, range à la place des tournées d'avant les mêmes
-     * avec la nouvelle tournée du livreur, et l'arrêt déplacé reste
-     * sélectionné.
+     * (adresse inaccessible, ou tournée qui dépasse minuit), l'écran affiche
+     * la raison et rien n'est modifié, pas même l'historique. Sinon la
+     * commande remplace la demande par celle dont le point a changé de nœud,
+     * range à la place des tournées d'avant les mêmes avec la nouvelle tournée
+     * du livreur, et l'arrêt déplacé reste sélectionné. Un retour après 13 h
+     * n'est pas un refus : la consigne le signale
+     * ({@link #obtenirAvertissementRetour}).
      *
      * @param livreur  numéro du livreur de la tournée
      * @param rang     rang de l'arrêt déplacé dans la tournée de ce livreur
@@ -1125,16 +1345,9 @@ public final class MainController {
             Map<Integer, Tournee> avant, Tournee apres,
             RuntimeException echec) {
         ecran.afficherAttente(false);
-        RuntimeException refus = echec;
-        if (refus == null && !apres.estPossible()
-                && avant.get(livreur).estPossible()) {
-            refus = new IllegalStateException("Déplacement refusé : le retour "
-                    + "à l'entrepôt serait à " + apres.obtenirHeureRetour()
-                    + ", après " + Plan.HEURE_LIMITE_RETOUR + ".");
-        }
-        if (refus != null) {
+        if (echec != null) {
             retrouverEtatProgramme();
-            signalerRefus(refus, ecran::afficherRefusDeplacement,
+            signalerRefus(echec, ecran::afficherRefusDeplacement,
                     "du déplacement d'un point");
             return;
         }
@@ -1158,8 +1371,11 @@ public final class MainController {
      * @param detail explication de l'erreur
      */
     void abandonnerAffichage(String detail) {
+        ecran.afficherAttente(false);
         plan = null;
+        fichierPlan = null;
         programme = null;
+        fichierProgramme = null;
         oublierModifications();
         ecran.reinitialiser();
         ecran.afficherErreurCarte(detail);
@@ -1192,8 +1408,17 @@ public final class MainController {
                         ? "Feuille de route générée dans " + dossier + "."
                         : tournees.size() + " feuilles de route générées dans "
                                 + dossier + ".");
-            } catch (IOException | IllegalArgumentException erreur) {
-                ecran.afficherErreurXml(erreur.getMessage());
+            } catch (IOException erreur) {
+                ecran.afficherConfirmation("");
+                ecran.afficherErreurEcriture(decrireErreurEcriture(erreur,
+                        dossier.toPath()));
+            } catch (RuntimeException erreur) {
+                JOURNAL.log(Level.SEVERE,
+                        "Erreur inattendue des feuilles de route", erreur);
+                ecran.afficherConfirmation("");
+                ecran.afficherErreurInattendue(erreur.getMessage() != null
+                        ? erreur.getMessage()
+                        : erreur.getClass().getSimpleName());
             }
         });
     }

@@ -25,7 +25,9 @@ public abstract class TemplateTSP implements TSP {
         if (tpsLimite <= 0) {
             return ResultatCalculTSP.TEMPS_LIMITE_NEGATIF;
         }
-        tpsDebut = System.currentTimeMillis();
+        // nanoTime est monotone : un réglage de l'horloge du système ne fausse
+        // pas la limite de temps.
+        tpsDebut = System.nanoTime();
         this.tpsLimite = tpsLimite;
         this.g = g;
         meilleureSolution = new Integer[g.obtenirNombreSommets()];
@@ -41,7 +43,7 @@ public abstract class TemplateTSP implements TSP {
         vus.add(0); // le premier sommet visite est 0
         coutMeilleureSolution = Integer.MAX_VALUE;
         branchAndBound(0, nonVus, accessible, vus, 0);
-        tpsFin = System.currentTimeMillis();
+        tpsFin = System.nanoTime();
 
         // Si le temps limite est atteint, la solution peut etre non-optimal
         if (tpsLimiteAtteint) {
@@ -76,7 +78,7 @@ public abstract class TemplateTSP implements TSP {
     /** {@inheritDoc} */
     public long obtenirDureeCalcul() {
         if (g != null) {
-            return tpsFin - tpsDebut;
+            return (tpsFin - tpsDebut) / 1_000_000;
         }
         return -1;
     }
@@ -139,7 +141,7 @@ public abstract class TemplateTSP implements TSP {
     private void branchAndBound(int sommetCrt, Collection<Integer> nonVus,
             Collection<Integer> accessible,
             Collection<Integer> vus, int coutVus) {
-        if (System.currentTimeMillis() - tpsDebut > tpsLimite) {
+        if ((System.nanoTime() - tpsDebut) / 1_000_000 > tpsLimite) {
             tpsLimiteAtteint = true;
             return;
         }
